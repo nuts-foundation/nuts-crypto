@@ -51,4 +51,4 @@ Usage
 
    client, err := crypto.NewCryptoClient()
 
-For a complete overview of available functions:
+
