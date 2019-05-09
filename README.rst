@@ -15,7 +15,7 @@ Go crypto lib for Nuts service space
     :target: https://codecov.io/gh/nuts-foundation/nuts-crypto
 
 .. image:: https://api.codacy.com/project/badge/Grade/d17595243fd7424fbe743da68c8dcbfc
-    :target: https://codecov.io/gh/nuts-foundation/nuts-crypto https://www.codacy.com/app/woutslakhorst/nuts-crypto
+    :target: https://www.codacy.com/app/woutslakhorst/nuts-crypto
 
 .. inclusion-marker-for-contribution
 
