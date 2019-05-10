@@ -27,18 +27,29 @@ import (
 	"crypto/sha512"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
+	"github.com/spf13/viper"
 	"io"
 )
 
 type cryptoClient struct {
 	backend backend.Backend
 	keyCache map[string]rsa.PrivateKey
+	keySize int
 }
 
 // initiate file system client, loads config from Viper or returns error when config is incorrect
 // it also creates the directories at the configured fspath
 func NewCryptoClient() (types.Client, error) {
 	backend, err := backend.NewCryptoBackend()
+
+	keySize := viper.GetInt(types.ConfigKeySize)
+	if keySize == 0 {
+		keySize = types.ConfigKeySizeDefault
+	}
+
+	if keySize < 2048 {
+		return nil, types.Error{Msg: "invalid keySize, needs to be at least 2048 bits"}
+	}
 
 	if err != nil {
 		return nil ,err
@@ -47,6 +58,7 @@ func NewCryptoClient() (types.Client, error) {
 	return &cryptoClient{
 		backend: backend,
 		keyCache: make(map[string]rsa.PrivateKey),
+		keySize: keySize,
 	}, nil
 }
 
@@ -57,10 +69,7 @@ func (client *cryptoClient) GenerateKeyPair(legalEntity types.LegalEntity) error
 
 	reader := rand.Reader
 
-	// todo: make config
-	bitSize := 2048
-
-	key, err := rsa.GenerateKey(reader, bitSize)
+	key, err := rsa.GenerateKey(reader, client.keySize)
 
 	if err != nil {
 		return err

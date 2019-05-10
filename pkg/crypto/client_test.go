@@ -61,6 +61,25 @@ func TestFileSystemClient_GenerateKeyPair(t *testing.T) {
 
 		emptyTemp()
 	})
+
+	t.Run("A keySize too small generates an error", func(t *testing.T) {
+		client := cryptoClient{
+			backend: createTempBackend(),
+			keyCache: make(map[string]rsa.PrivateKey),
+			keySize: 10,
+		}
+
+		err := client.GenerateKeyPair(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+
+		if err == nil {
+			t.Errorf("Expected error got nothing")
+		} else if err.Error() != "crypto/rsa: too few primes of given length to generate an RSA key" {
+			t.Errorf("Expected error [crypto/rsa: too few primes of given length to generate an RSA key] got: [%s]", err.Error())
+		}
+
+
+		emptyTemp()
+	})
 }
 
 func TestFileSystemClient_DecryptCipherTextFor(t *testing.T) {
@@ -171,6 +190,7 @@ func createTempClient() cryptoClient {
 	client := cryptoClient{
 		backend: createTempBackend(),
 		keyCache: make(map[string]rsa.PrivateKey),
+		keySize: types.ConfigKeySizeDefault,
 	}
 
 	return client
