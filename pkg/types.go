@@ -19,7 +19,9 @@
 // types and interfaces used by all other packages
 package types
 
-import "crypto/rsa"
+import (
+	"crypto/rsa"
+)
 
 // --cryptobackend config flag
 const ConfigBackend string = "cryptobackend"
@@ -41,13 +43,13 @@ const ConfigKeySizeDefault int = 2048
 
 // type identifying the legalEntity responsible for the Patient/medical data
 type LegalEntity struct{
-	Uri string
+	URI string
 }
 
 // main interface for cryptographic functions. Main configuration is done via Viper
 type Client interface {
 	// Generate a new key pair for this LegalEntity.
-	GenerateKeyPair(identifier LegalEntity) error
+	GenerateKeyPairImpl(identifier LegalEntity) error
 
 	// Decrypt a cipher text for a given LegalEntity. Uses the stored private key of the LegalEntity
 	// Uses RSA assymetric encryption

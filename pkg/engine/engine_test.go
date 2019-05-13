@@ -16,31 +16,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package engine
 
 import (
+	"bytes"
 	"crypto/rsa"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
+	"github.com/spf13/cobra"
 	"os"
+	"strings"
 	"testing"
 )
 
-func TestNewCryptoClient(t *testing.T) {
-	t.Run("New returns a fileSystemClient with default path", func(t *testing.T) {
-		client, err := NewCryptoClient()
+func TestNewCryptoEngine(t *testing.T) {
+	t.Run("New returns a fileSystemClient with default keySize", func(t *testing.T) {
+		client := NewCryptoEngine()
 
-		if client == nil {
-			t.Errorf("Expected CryptoClient, Got nil: %s", err.Error())
+		if client.keySize != types.ConfigKeySizeDefault {
+			t.Errorf("Expected default keySize 2048, Got %d", client.keySize)
 		}
 	})
 }
 
 func TestFileSystemClient_GenerateKeyPair(t *testing.T) {
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		err := client.GenerateKeyPair(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -50,9 +53,9 @@ func TestFileSystemClient_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("A new key pair is stored in the cache", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		client.GenerateKeyPair(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 
 		entries := len(client.keyCache)
 		if entries != 1 {
@@ -63,13 +66,13 @@ func TestFileSystemClient_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
-		client := cryptoClient{
+		client := CryptoEngine{
 			backend: createTempBackend(),
 			keyCache: make(map[string]rsa.PrivateKey),
 			keySize: 10,
 		}
 
-		err := client.GenerateKeyPair(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 
 		if err == nil {
 			t.Errorf("Expected error got nothing")
@@ -84,12 +87,12 @@ func TestFileSystemClient_GenerateKeyPair(t *testing.T) {
 
 func TestFileSystemClient_DecryptCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		legalEntity := types.LegalEntity{Uri: "test"}
+		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPair(legalEntity)
+		client.GenerateKeyPairImpl(legalEntity)
 
 		cipherText, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
 
@@ -111,12 +114,12 @@ func TestFileSystemClient_DecryptCipherTextFor(t *testing.T) {
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		legalEntity := types.LegalEntity{Uri: "test"}
+		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPair(legalEntity)
+		client.GenerateKeyPairImpl(legalEntity)
 
 		_, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
 
@@ -125,7 +128,7 @@ func TestFileSystemClient_DecryptCipherTextFor(t *testing.T) {
 			return
 		}
 
-		_, err = client.DecryptCipherTextFor([]byte(""), types.LegalEntity{Uri: "other"})
+		_, err = client.DecryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
 
 		if err.Error() != "open ../../temp/b3RoZXI=_private.pem: no such file or directory" {
 			t.Errorf("Expected error [open ../../temp/b3RoZXI=_private.pem: no such file or directory], Got [%s]", err.Error())
@@ -137,9 +140,9 @@ func TestFileSystemClient_DecryptCipherTextFor(t *testing.T) {
 
 func TestFileSystemClient_EncryptPlainTextFor(t *testing.T) {
 	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		legalEntity := types.LegalEntity{Uri: "test"}
+		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
 		_, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
@@ -159,12 +162,12 @@ func TestFileSystemClient_EncryptPlainTextFor(t *testing.T) {
 
 func TestFileSystemClient_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := createTempClient()
+		client := createTempEngine()
 
-		legalEntity := types.LegalEntity{Uri: "test"}
+		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPair(legalEntity)
+		client.GenerateKeyPairImpl(legalEntity)
 
 		encRecord, err := client.EncryptKeyAndPlainTextFor([]byte(plaintext), legalEntity)
 
@@ -186,8 +189,48 @@ func TestFileSystemClient_DecryptKeyAndCipherTextFor(t *testing.T) {
 	})
 }
 
-func createTempClient() cryptoClient {
-	client := cryptoClient{
+func newRootCommand() *cobra.Command {
+	testRootCommand := &cobra.Command{
+		Use: "root",
+		Run: func(cmd *cobra.Command, args []string) {
+
+		},
+	}
+
+	return testRootCommand
+}
+
+func TestCryptoEngine_FlagSet(t *testing.T) {
+	t.Run("Cobra help should list flags", func(t *testing.T) {
+		e := NewCryptoEngine()
+		cmd := newRootCommand()
+		cmd.Flags().AddFlagSet(e.FlagSet())
+		cmd.SetArgs([]string{"--help"})
+
+		buf := new(bytes.Buffer)
+		cmd.SetOutput(buf)
+
+		_, err := cmd.ExecuteC()
+
+		if err != nil {
+			t.Errorf("Expected no error, got %s", err.Error())
+		}
+
+		result := buf.String()
+		println(result)
+		if !strings.Contains(result, "--cryptobackend") {
+			t.Errorf("Expected --cryptobackend to be command line flag")
+		}
+
+		if !strings.Contains(result, "--fspath") {
+			t.Errorf("Expected --fspath to be command line flag")
+		}
+
+	})
+}
+
+func createTempEngine() CryptoEngine {
+	client := CryptoEngine{
 		backend: createTempBackend(),
 		keyCache: make(map[string]rsa.PrivateKey),
 		keySize: types.ConfigKeySizeDefault,

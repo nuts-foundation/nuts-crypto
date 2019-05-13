@@ -124,7 +124,7 @@ func (fsc *fileSystemBackend) createDirs() error {
 func legalEntityToFileName(legalEntity types.LegalEntity, filePostfix string) string {
 	buffer := new(bytes.Buffer)
 	encoder := base64.NewEncoder(base64.StdEncoding, buffer)
-	encoder.Write([]byte(legalEntity.Uri))
+	encoder.Write([]byte(legalEntity.URI))
 	encoder.Close()
 
 	return fmt.Sprintf("%s_%s", buffer.String(), filePostfix)
