@@ -12,7 +12,7 @@ Using the library
 Building the library
 --------------------
 
-Nuts uses Go modules, check out https://github.com/golang/go/wiki/Modules for more info on Gop modules.
+Nuts uses Go modules, check out https://github.com/golang/go/wiki/Modules for more info on Go modules.
 
 To generate the Server stub install some dependencies:
 

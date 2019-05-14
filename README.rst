@@ -32,12 +32,19 @@ Configuration
 -------------
 
 The lib is configured using `Viper <https://github.com/spf13/viper>`_, thus it will work well with `Cobra <https://github.com/spf13/cobra>`_ as well.
-Command flags can be added to a command using the `config.Flags()` helper function.
+Command flags can be added to a command using the `config.FlagSet()` helper function.
 
 .. code-block:: go
 
    cmd := newRootCommand()
-   cmd.Flags().AddFlagSet(Flags())
+   cmd.Flags().AddFlagSet(FlagSet())
+
+Sub-commands can be added as well.
+
+.. code-block:: go
+
+   cmd := newRootCommand()
+   cmd.AddCommand(Cmd())
 
 The following config options are available:
 
@@ -52,6 +59,6 @@ Usage
 
 .. code-block:: go
 
-   client, err := crypto.NewCryptoClient()
+   engine, err := engine.NewCryptoEngine()
 
 
