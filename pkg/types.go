@@ -69,6 +69,9 @@ type Client interface {
 
 	// Encrypt a piece of data with the extra layer of a symmetric key. Returns cipherText and encrypted symmetric key
 	EncryptKeyAndPlainTextWith(cipherText []byte, key *rsa.PublicKey) (DoubleEncryptedCipherText, error)
+
+	// calculate the externalId (HMAC) over a piece of data for the given legalEntity
+	ExternalIdFor(data []byte, entity LegalEntity) ([]byte, error)
 }
 
 // Struct defining the encrypted data in CipherText, a encrypted symmetric key in CipherTextKey and the nonce needed for the AES_GCM decryption.

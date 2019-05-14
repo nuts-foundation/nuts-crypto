@@ -13,16 +13,63 @@ import (
 	"strings"
 )
 
+// Type definition for component schema "DecryptRequest"
+type DecryptRequest struct {
+	CipherText     string         `json:"cipherText"`
+	CipherTextKey  string         `json:"cipherTextKey"`
+	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	Nonce          string         `json:"nonce"`
+}
+
+// Type definition for component schema "DecryptResponse"
+type DecryptResponse struct {
+	PlainText string `json:"plainText"`
+}
+
+// Type definition for component schema "EncryptRequest"
+type EncryptRequest struct {
+	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	PlainText      string         `json:"plainText"`
+	PublicKey      string         `json:"publicKey"`
+}
+
+// Type definition for component schema "EncryptResponse"
+type EncryptResponse struct {
+	CipherText    string `json:"cipherText"`
+	CipherTextKey string `json:"cipherTextKey"`
+	Nonce         string `json:"nonce"`
+}
+
+// Type definition for component schema "ExternalIdRequest"
+type ExternalIdRequest struct {
+	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	SubjectURI     SubjectURI     `json:"subjectURI"`
+}
+
+// Type definition for component schema "ExternalIdResponse"
+type ExternalIdResponse struct {
+	ExternalId string `json:"externalId"`
+}
+
 // Type definition for component schema "LegalEntityURI"
 type LegalEntityURI string
 
-// Parameters object for GenerateKeyPairImpl
+// Type definition for component schema "SubjectURI"
+type SubjectURI string
+
+// Parameters object for GenerateKeyPair
 type GenerateKeyPairParams struct {
 	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
 }
 
 type ServerInterface interface {
-	// Send a request for checking if the given combination has valid consent (POST /crypto)
+	// decrypt a cipherText for the given legalEntity (POST /crypto/decrypt)
+	Decrypt(ctx echo.Context) error
+	// encrypt a piece of data for the given legalEntity or public key (POST /crypto/encrypt)
+	Encrypt(ctx echo.Context) error
+	// calculate an externalId for an identifier for a given legalEntity (POST /crypto/external_id)
+	ExternalId(ctx echo.Context) error
+	// Send a request for checking if the given combination has valid consent (POST /crypto/generate)
 	GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error
 }
 
@@ -30,7 +77,34 @@ type ServerInterfaceWrapper struct {
 	Handler ServerInterface
 }
 
-// Wrapper for GenerateKeyPairImpl
+// Wrapper for Decrypt
+func (w *ServerInterfaceWrapper) Decrypt(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.Decrypt(ctx)
+	return err
+}
+
+// Wrapper for Encrypt
+func (w *ServerInterfaceWrapper) Encrypt(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.Encrypt(ctx)
+	return err
+}
+
+// Wrapper for ExternalId
+func (w *ServerInterfaceWrapper) ExternalId(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.ExternalId(ctx)
+	return err
+}
+
+// Wrapper for GenerateKeyPair
 func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	var err error
 
@@ -58,22 +132,34 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 		Handler: si,
 	}
 
-	router.POST("/crypto", wrapper.GenerateKeyPair)
+	router.POST("/crypto/decrypt", wrapper.Decrypt)
+	router.POST("/crypto/encrypt", wrapper.Encrypt)
+	router.POST("/crypto/external_id", wrapper.ExternalId)
+	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
 
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/2xTTW/bPAz+KwL7Ho3YfbvLfNthGIIWQ9Chp6EHRqZjbrKsinRWI/B/H2gnaLvWF0ui",
-	"H5HPh0/ghz4NkaIK1CcQ31GPy/KODhi+RmWdHu63dtKQ+MxJeYhQw8P91jXUcuR4cNqRa1DRybj/RV4L",
-	"N8qIIUxLJaEyRYUC6Bn7FAhq6FST1GUZR5VNDCU3ZL2YpNxLvPp8fiooQKdkCNHM8QDzPBfAsR3ej/Rl",
-	"t3WSyHPLHu3MtUN2Pk9JByeUj+xJHB6RA+4DuT+sHUdnI1zKThJ6ggICe4pC1iRib/2/7e6ONzAXoKwL",
-	"he+vcZcuiTwUcKQs60zV5npTGWpIFDEx1HCzqTbGK6F2i9TlCrZlGkTtPSTKC4VtAzUcKNqWbmnaIecF",
-	"m7EnpSxQ//zImlXPdrq4E8xOt2g8gQkINTyNlG1zJhjeOl5ApqeRMzVQax6pOKfDxvsvUws1XJUv8SnP",
-	"2Sn/Cc48P9pNkoYotND9v7p+790tTa5DcXui6HwmVGqcjN6TSDuGMJmGn6rKkH6IanmqT6D0rGUKaHxO",
-	"r+K1jUcM3LiVyMvgH2Tp7RwXoHEnUbAvZOx7zBPU8INi4/BSXOPVkf9tKnO7CH3gozEY+j3HNYRGa73U",
-	"mwbLj6B4MOfg7PzjPM/z3wAAAP//rVeL1o0DAAA=",
+	"H4sIAAAAAAAC/7xX32/jNgz+Vwh1j0ad2x0GLG8rVgxBu61od09DMdAyE+vOllRJzuoV+d8HyXb8K26S",
+	"+9E8BRZNfSQ/kp9fGFeFVpKks2z5wizPqMDw91fiptLunp5Kss4/0UZpMk5QOOdCZ2T+oudwlpLlRmgn",
+	"lGRLdoWWfvoAJLlKKYWeacRcpYktmXVGyA3bRT1HN1RNfSVDXyQDLErBVkVBzggOn6k65DinDebX0glX",
+	"fbxfec8/GFqzJbuIu6jjJuT4dmi9i5hUktNRQLXV5PpdxAw9lcJQypZ/j7H0o2bjFLQ3P+6irgpWK2lp",
+	"Wgado5AnVSFYgjtYhRHazqnHcC3HTBjeMzwHEi4jAxlaQNBlkgt+QxUoA8MkRCCVg0S5jEWjoL62cqcn",
+	"JRESTQUpOjxEoT38qaO769+71Aazwzw8RoQOa/+6Qd7nan9GC3Zt476sDWf9zTTfTPNcfUnznNgr18+O",
+	"jMR8lc4Ora8lli2TT8TdCe8+dJZHKdDzOo5jrvS0t5nmOKPnfYJFStKJtSBzNMs9lx7F7SRVw1s+3q8g",
+	"pbWQQm4AJSizQSn+Q38cQWlLzPMKXEbAS+tUKoINIHfKY6FnLHTu4WTOabuMY1k6eynzuIbsA41xk1ws",
+	"mt8hkj0MyvEKPg/D9zg0qR4C1OgESXcqqsTKi5+b3wFYPq9CrtUU0i93K7CauFgLHvIEa2UgNJICS2Yr",
+	"OFnALYock5zgX+EyIcFDaI/BagwdkwtODTMkFv7+3+5ut+99VpxwIYQ/+u+1t2jiLGJbMrbGtLh8d7nw",
+	"bylNErVgS/b+cnHp49LoskC2uH45TutlFNio6vbynAyheCKy1qAmFll3pdIwS7iSzmd4+cJQ67wJP/5k",
+	"PYZWdhxrqZEi2Q0J7ExJ4UHdMgH4j4vFt7+9aclw/bC+f95Ae30EiUoryFSeWkgOLOIwzXYR+zCB6Ad0",
+	"HGzqRm8ZKeQWc5FCQQ7DvpoCEJIrY4g72BvYsijQVF1xAHt6LBDQt8BGbEn2F7TnNW5sGL+h+uzRu2up",
+	"0Mz/eSq0Bt+HCiNJ8sZUGC/mM6gwI18B5UAmvykxGkxerQniBGpdz8pZbvg5PpQ8rzGlWSv/iPQVtnS7",
+	"5zsRZqIN3poz06V+Bm36Kz1Dm70tQTjmvMzRkd/zXakCQVD2NEb95OxhsiHpyUDz/Ggtbqi6Q2HCcjJY",
+	"kCPjvR7a/Q2qql3/AQ5Qi8fniD2VZIKGrDfoRJgN6RGdWOqxbNw9Tnj1bioO/DeS/2ZKiCRwQxiGRMk5",
+	"Wbsu87w6r+arpuaNwtwDPyBWhjjaF82+T/pUeCCZAraHtX7JiH/2WRbr3rjgqvDfVkHl+LBqp9znICit",
+	"KR92u/8DAAD//yH+BcKOEAAA",
 }
 
 // Returns the Swagger specification corresponding to the generated code

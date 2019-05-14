@@ -21,10 +21,18 @@ package engine
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
+	"github.com/golang/glog"
 	"github.com/labstack/echo"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
@@ -33,12 +41,13 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"io"
+	"io/ioutil"
 	"net/http"
 )
 
 type CryptoEngine struct {
 	backend backend.Backend
-	keyCache map[string]rsa.PrivateKey
+	//keyCache map[string]rsa.PrivateKey
 	keySize int
 }
 
@@ -46,7 +55,7 @@ type CryptoEngine struct {
 // it also creates the directories at the configured fspath
 func NewCryptoEngine() *CryptoEngine {
 	return &CryptoEngine{
-		keyCache: make(map[string]rsa.PrivateKey),
+		//keyCache: make(map[string]rsa.PrivateKey),
 		keySize: types.ConfigKeySizeDefault,
 	}
 }
@@ -123,18 +132,178 @@ func (ce *CryptoEngine) Start() error {
 	return nil
 }
 
-// GenerateKeyPair is the implementation of the REST service call POST /crypto
+// GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 func (ce *CryptoEngine) GenerateKeyPair(ctx echo.Context, params generated.GenerateKeyPairParams) error {
 	if err := ce.GenerateKeyPairImpl(types.LegalEntity{URI: string(params.LegalEntityURI)}); err != nil {
 		return err
 	}
 
-	return ctx.String(http.StatusCreated, "")
+	return ctx.NoContent(http.StatusCreated)
 }
 
+// Encrypt is the implementation of the REST service call POST /crypto/encrypt
+func (ce *CryptoEngine) Encrypt(ctx echo.Context) error {
+	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	var encryptRequest = &generated.EncryptRequest{}
+	err = json.Unmarshal(buf, encryptRequest)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	if len(encryptRequest.LegalEntityURI) == 0 && len(encryptRequest.PublicKey) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing either legalEntityURI or publicKey in encryptRequest")
+	}
+
+	if len(encryptRequest.LegalEntityURI) != 0 && len(encryptRequest.PublicKey) != 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "both legalEntityURI and publicKey given in encryptRequest, choose one")
+	}
+
+	var dect types.DoubleEncryptedCipherText
+
+	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	if len(encryptRequest.LegalEntityURI) != 0 {
+		if err != nil {
+			glog.Error(err.Error())
+			return err
+		}
+
+		dect, err = ce.EncryptKeyAndPlainTextFor(plainTextBytes, types.LegalEntity{URI: string(encryptRequest.LegalEntityURI)})
+	}
+
+	if len(encryptRequest.PublicKey) != 0 {
+		publicKey, err := bytesToPublicKey([]byte(encryptRequest.PublicKey))
+		if err != nil {
+			glog.Error(err.Error())
+			return err
+		}
+
+		dect, err = ce.EncryptKeyAndPlainTextWith(plainTextBytes, publicKey)
+	}
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	return ctx.JSON(http.StatusOK, dectToEncryptResponse(dect))
+}
+
+func dectToEncryptResponse(dect types.DoubleEncryptedCipherText) generated.EncryptResponse {
+	return generated.EncryptResponse{
+		CipherText: base64.StdEncoding.EncodeToString(dect.CipherText),
+		CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKey),
+		Nonce: base64.StdEncoding.EncodeToString(dect.Nonce),
+	}
+}
+
+// Decrypt is the API handler function for decrypting a piece of data.
+func (ce *CryptoEngine) Decrypt(ctx echo.Context) error {
+	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	var decryptRequest = &generated.DecryptRequest{}
+	err = json.Unmarshal(buf, decryptRequest)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	if len(decryptRequest.LegalEntityURI) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in decryptRequest")
+	}
+
+
+	dect, err := decryptRequestToDect(*decryptRequest)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	plainTextBytes, err := ce.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntityURI)})
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	decryptResponse := generated.DecryptResponse{
+		PlainText: base64.StdEncoding.EncodeToString(plainTextBytes),
+	}
+
+	return ctx.JSON(http.StatusOK, decryptResponse)
+}
+
+func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCipherText, error) {
+	dect := types.DoubleEncryptedCipherText{}
+	var err error
+
+	dect.CipherText, err = base64.StdEncoding.DecodeString(gen.CipherText)
+	if err != nil { return dect, err }
+	dect.CipherTextKey, err = base64.StdEncoding.DecodeString(gen.CipherTextKey)
+	if err != nil { return dect, err }
+	dect.Nonce, err = base64.StdEncoding.DecodeString(gen.Nonce)
+	if err != nil { return dect, err }
+
+	return dect, nil
+}
+
+// ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
+func (ce *CryptoEngine) ExternalId(ctx echo.Context) error {
+	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	var request = &generated.ExternalIdRequest{}
+	err = json.Unmarshal(buf, request)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	if len(request.LegalEntityURI) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in request")
+	}
+	if len(request.SubjectURI) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing subjectURI in request")
+	}
+
+	shaBytes, err := ce.ExternalIdFor([]byte(request.SubjectURI), types.LegalEntity{URI: string(request.LegalEntityURI)})
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	sha := hex.EncodeToString(shaBytes)
+
+	externalIdResponse := generated.ExternalIdResponse{
+		ExternalId: sha,
+	}
+
+	return ctx.JSON(http.StatusOK, externalIdResponse)
+}
 
 // generate a new rsa keypair for the given legalEntity. The legalEntity uri is base64 encoded and used as filename
-// for the key. The generated key is also stored in a in-memory cache
+// for the key.
 func (client *CryptoEngine) GenerateKeyPairImpl(legalEntity types.LegalEntity) error {
 	var err error = nil
 
@@ -148,10 +317,10 @@ func (client *CryptoEngine) GenerateKeyPairImpl(legalEntity types.LegalEntity) e
 
 	err = client.backend.SavePrivateKey(legalEntity, key)
 
-	if err == nil {
-		// also store key in cache
-		client.keyCache[legalEntity.URI] = *key
-	}
+	//if err == nil {
+	//	// also store key in cache
+	//	client.keyCache[legalEntity.URI] = *key
+	//}
 
 	return err
 }
@@ -279,6 +448,21 @@ func (client *CryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, key *rs
 	return types.DoubleEncryptedCipherText{CipherText: cipherText, CipherTextKey: encryptedKey, Nonce: nonce}, err
 }
 
+// ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity public key as key.
+// This is not secure but does generate the same unique identifier everytime. It should only be used as unique identifier for consent records.
+func (client *CryptoEngine) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
+	pk, err := client.backend.GetPublicKey(entity)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a new HMAC
+	h := hmac.New(sha256.New, pk.N.Bytes())
+	h.Write(data)
+
+	return h.Sum(nil), nil
+}
+
 func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	hash := sha512.New()
 	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
@@ -306,4 +490,15 @@ func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) ([]byte, []byte,
 	cipherText := key.Seal(nil, nonce, plainText, nil)
 
 	return cipherText, nonce, nil
+}
+
+// shared function to convert bytes to a RSA private key
+func bytesToPublicKey(pub []byte) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode(pub)
+	b := block.Bytes
+	key, err := x509.ParsePKCS1PublicKey(b)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
 }
