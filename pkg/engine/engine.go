@@ -33,7 +33,7 @@ import (
 	"encoding/pem"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/golang/glog"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
 	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
