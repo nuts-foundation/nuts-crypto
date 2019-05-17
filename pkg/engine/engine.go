@@ -448,16 +448,17 @@ func (client *CryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, key *rs
 	return types.DoubleEncryptedCipherText{CipherText: cipherText, CipherTextKey: encryptedKey, Nonce: nonce}, err
 }
 
-// ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity public key as key.
-// This is not secure but does generate the same unique identifier everytime. It should only be used as unique identifier for consent records.
+// ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
+// This is not for security but does generate the same unique identifier every time. It should only be used as unique identifier for consent records. Using the private key also ensure the BSN can not be deduced from the externalID.
+// todo: check by others if this makes sense
 func (client *CryptoEngine) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
-	pk, err := client.backend.GetPublicKey(entity)
+	pk, err := client.backend.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a new HMAC
-	h := hmac.New(sha256.New, pk.N.Bytes())
+	h := hmac.New(sha256.New, pk.D.Bytes())
 	h.Write(data)
 
 	return h.Sum(nil), nil
