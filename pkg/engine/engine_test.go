@@ -20,17 +20,12 @@ package engine
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
-	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
 	"github.com/nuts-foundation/nuts-go/mock"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -52,7 +47,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 		client := createTempEngine()
 		defer emptyTemp()
 
-		err := client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -63,7 +58,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 	//	client := createTempEngine()
 	//	defer emptyTemp()
 	//
-	//	client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+	//	client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 	//
 	//	entries := len(client.keyCache)
 	//	if entries != 1 {
@@ -72,13 +67,13 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 	//})
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
-		client := CryptoEngine{
+		client := DefaultCryptoEngine{
 			backend: createTempBackend(),
 			//keyCache: make(map[string]rsa.PrivateKey),
 			keySize: 10,
 		}
 
-		err := client.GenerateKeyPairImpl(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
 		defer emptyTemp()
 
 		if err == nil {
@@ -86,17 +81,6 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 		} else if err.Error() != "crypto/rsa: too few primes of given length to generate an RSA key" {
 			t.Errorf("Expected error [crypto/rsa: too few primes of given length to generate an RSA key] got: [%s]", err.Error())
 		}
-	})
-
-	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
-		se := createTempEngine()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		echo := mock.NewMockContext(ctrl)
-
-		echo.EXPECT().NoContent(http.StatusCreated)
-
-		se.GenerateKeyPair(echo, generated.GenerateKeyPairParams{LegalEntityURI: "test"})
 	})
 }
 
@@ -108,15 +92,15 @@ func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPairImpl(legalEntity)
+		client.GenerateKeyPairFor(legalEntity)
 
-		cipherText, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
+		cipherText, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		decryptedText, err := client.DecryptCipherTextFor(cipherText, legalEntity)
+		decryptedText, err := client.decryptCipherTextFor(cipherText, legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -134,16 +118,16 @@ func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPairImpl(legalEntity)
+		client.GenerateKeyPairFor(legalEntity)
 
-		_, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
+		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
 			return
 		}
 
-		_, err = client.DecryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
+		_, err = client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
 
 		if err.Error() != "open ../../temp/b3RoZXI=_private.pem: no such file or directory" {
 			t.Errorf("Expected error [open ../../temp/b3RoZXI=_private.pem: no such file or directory], Got [%s]", err.Error())
@@ -151,7 +135,7 @@ func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 	})
 }
 
-func TestCryptoEngine_EncryptPlainTextFor(t *testing.T) {
+func TestCryptoEngine_encryptPlainTextFor(t *testing.T) {
 	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
 		client := createTempEngine()
 		defer emptyTemp()
@@ -159,7 +143,7 @@ func TestCryptoEngine_EncryptPlainTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		_, err := client.EncryptPlainTextFor([]byte(plaintext), legalEntity)
+		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
@@ -172,36 +156,6 @@ func TestCryptoEngine_EncryptPlainTextFor(t *testing.T) {
 	})
 }
 
-func TestCryptoEngine_Encrypt(t *testing.T) {
-	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
-		client := createTempEngine()
-		defer emptyTemp()
-
-		legalEntity := types.LegalEntity{URI: "test"}
-		plaintext := "for your eyes only"
-		client.GenerateKeyPairImpl(legalEntity)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		echo := mock.NewMockContext(ctrl)
-
-		jsonRequest := generated.EncryptRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
-			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
-		}
-
-		json, _ := json.Marshal(jsonRequest)
-		request := &http.Request{
-			Body: ioutil.NopCloser(bytes.NewReader(json)),
-		}
-
-		echo.EXPECT().Request().Return(request)
-		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
-
-		client.Encrypt(echo)
-	})
-}
-
 func TestCryptoEngine_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		client := createTempEngine()
@@ -210,7 +164,7 @@ func TestCryptoEngine_DecryptKeyAndCipherTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPairImpl(legalEntity)
+		client.GenerateKeyPairFor(legalEntity)
 
 		encRecord, err := client.EncryptKeyAndPlainTextFor([]byte(plaintext), legalEntity)
 
@@ -228,36 +182,37 @@ func TestCryptoEngine_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
 		}
 	})
+}
 
-	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
+func TestDefaultCryptoEngine_VerifyWith(t *testing.T) {
+	t.Run("A signed piece of data can be verified", func(t *testing.T) {
+		data := []byte("hello")
+		legalEntity := types.LegalEntity{URI: "test"}
 		client := createTempEngine()
+		client.GenerateKeyPairFor(legalEntity)
 		defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
-		plaintext := "for your eyes only"
-		client.GenerateKeyPairImpl(legalEntity)
+		sig, err := client.SignFor(data, legalEntity)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		echo := mock.NewMockContext(ctrl)
-
-		encRecord, _ := client.EncryptKeyAndPlainTextFor([]byte(plaintext), legalEntity)
-		jsonRequest := generated.DecryptRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
-			CipherText: base64.StdEncoding.EncodeToString(encRecord.CipherText),
-			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKey),
-			Nonce: base64.StdEncoding.EncodeToString(encRecord.Nonce),
+		if err != nil {
+			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		json, _ := json.Marshal(jsonRequest)
-		request := &http.Request{
-			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		pub, err := client.backend.GetPublicKey(legalEntity)
+
+		if err != nil {
+			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		echo.EXPECT().Request().Return(request)
-		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
+		bool, err := client.VerifyWith(data, sig, pub)
 
-		client.Decrypt(echo)
+		if err != nil {
+			t.Errorf("Expected no error, Got %s", err.Error())
+		}
+
+		if !bool {
+			t.Error("Expected signature to be valid")
+		}
 	})
 }
 
@@ -267,7 +222,7 @@ func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
-		client.GenerateKeyPairImpl(legalEntity)
+		client.GenerateKeyPairFor(legalEntity)
 		subject := "test_patient"
 
 		bytes1, err := client.ExternalIdFor([]byte(subject), legalEntity)
@@ -298,34 +253,6 @@ func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 		if err.Error() != "open ../../temp/dGVzdA==_private.pem: no such file or directory" {
 			t.Errorf("Expected error [open ../../temp/dGVzdA==_private.pem: no such file or directory], got %s", err.Error())
 		}
-	})
-
-	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
-		client := createTempEngine()
-		defer emptyTemp()
-
-		legalEntity := types.LegalEntity{URI: "test"}
-		subject := generated.SubjectURI("test")
-		client.GenerateKeyPairImpl(legalEntity)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		echo := mock.NewMockContext(ctrl)
-
-		jsonRequest := generated.ExternalIdRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
-			SubjectURI: subject,
-		}
-
-		json, _ := json.Marshal(jsonRequest)
-		request := &http.Request{
-			Body: ioutil.NopCloser(bytes.NewReader(json)),
-		}
-
-		echo.EXPECT().Request().Return(request)
-		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
-
-		client.ExternalId(echo)
 	})
 }
 
@@ -416,8 +343,8 @@ func TestCryptoEngine_Routes(t *testing.T) {
 	})
 }
 
-func createTempEngine() CryptoEngine {
-	client := CryptoEngine{
+func createTempEngine() DefaultCryptoEngine {
+	client := DefaultCryptoEngine{
 		backend: createTempBackend(),
 		//keyCache: make(map[string]rsa.PrivateKey),
 		keySize: types.ConfigKeySizeDefault,

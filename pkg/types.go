@@ -49,11 +49,11 @@ type LegalEntity struct{
 // main interface for cryptographic functions. Main configuration is done via Viper
 type Client interface {
 	// Generate a new key pair for this LegalEntity.
-	GenerateKeyPairImpl(identifier LegalEntity) error
+	GenerateKeyPairFor(identifier LegalEntity) error
 
 	// Decrypt a cipher text for a given LegalEntity. Uses the stored private key of the LegalEntity
 	// Uses RSA assymetric encryption
-	DecryptCipherTextFor(cipherText []byte, legalEntity LegalEntity) ([]byte, error)
+	decryptCipherTextFor(cipherText []byte, legalEntity LegalEntity) ([]byte, error)
 
 	// Encrypt a piece of data for a legalEntity, can only be used if the legalEntity is also served through the current node, otherwise no keys are stored. In that case use the EncryptCipherTextWith function
 	EncryptPlainTextFor(plaintext []byte, legalEntity LegalEntity) ([]byte, error)

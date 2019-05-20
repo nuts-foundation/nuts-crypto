@@ -24,6 +24,7 @@ Then run
 
 .. code-block:: shell
 
-   oapi-codegen PATH_TO_NUTS_SPEC/nuts-service-crypto.yaml > pkg/generated/api_gen.go
+   oapi-codegen -package api -generate server PATH_TO_NUTS_SPEC/nuts-service-crypto.yaml > pkg/api/api_gen.go
+   oapi-codegen -package client -generate client PATH_TO_NUTS_SPEC/nuts-service-crypto.yaml > pkg/client/client_gen.go
 
 

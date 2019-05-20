@@ -59,6 +59,6 @@ Usage
 
 .. code-block:: go
 
-   engine, err := engine.NewCryptoEngine()
+   client := engine.NewCryptoClient()
 
 
