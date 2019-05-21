@@ -334,6 +334,8 @@ func TestCryptoEngine_Routes(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockEchoRouter(ctrl)
 
+		echo.EXPECT().POST("/crypto/sign", gomock.Any())
+		echo.EXPECT().POST("/crypto/verify", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/external_id", gomock.Any())

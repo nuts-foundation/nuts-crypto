@@ -35,7 +35,7 @@ type DecryptResponse struct {
 type EncryptRequest struct {
 	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
 	PlainText      string         `json:"plainText"`
-	PublicKey      string         `json:"publicKey"`
+	PublicKey      PublicKey      `json:"publicKey"`
 }
 
 // EncryptResponse defines component schema for EncryptResponse.
@@ -59,8 +59,34 @@ type ExternalIdResponse struct {
 // LegalEntityURI defines component schema for LegalEntityURI.
 type LegalEntityURI string
 
+// PublicKey defines component schema for PublicKey.
+type PublicKey string
+
+// SignRequest defines component schema for SignRequest.
+type SignRequest struct {
+	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	PlainText      string         `json:"plainText"`
+}
+
+// SignResponse defines component schema for SignResponse.
+type SignResponse struct {
+	Signature string `json:"signature"`
+}
+
 // SubjectURI defines component schema for SubjectURI.
 type SubjectURI string
+
+// VerifyRequest defines component schema for VerifyRequest.
+type VerifyRequest struct {
+	PlainText string    `json:"plainText"`
+	PublicKey PublicKey `json:"publicKey"`
+	Signature string    `json:"signature"`
+}
+
+// VerifyResponse defines component schema for VerifyResponse.
+type VerifyResponse struct {
+	Outcome bool `json:"outcome"`
+}
 
 // Client which conforms to the OpenAPI3 specification for this service. The
 // server should be fully qualified with shema and server, ie,
@@ -103,6 +129,26 @@ func (c *Client) ExternalId(ctx context.Context, body ExternalIdRequest) (*http.
 // GenerateKeyPair request
 func (c *Client) GenerateKeyPair(ctx context.Context, params *GenerateKeyPairParams) (*http.Response, error) {
 	req, err := NewGenerateKeyPairRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	return c.Client.Do(req)
+}
+
+// Sign request with JSON body
+func (c *Client) Sign(ctx context.Context, body SignRequest) (*http.Response, error) {
+	req, err := NewSignRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	return c.Client.Do(req)
+}
+
+// Verify request with JSON body
+func (c *Client) Verify(ctx context.Context, body VerifyRequest) (*http.Response, error) {
+	req, err := NewVerifyRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +269,62 @@ func NewGenerateKeyPairRequest(server string, params *GenerateKeyPairParams) (*h
 	return req, nil
 }
 
+// NewSignRequest generates requests for Sign with JSON body
+func NewSignRequest(server string, body SignRequest) (*http.Request, error) {
+	var bodyReader io.Reader
+
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+
+	return NewSignRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSignRequestWithBody generates requests for Sign with non-JSON body
+func NewSignRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryURL := fmt.Sprintf("%s/crypto/sign", server)
+
+	req, err := http.NewRequest("POST", queryURL, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewVerifyRequest generates requests for Verify with JSON body
+func NewVerifyRequest(server string, body VerifyRequest) (*http.Request, error) {
+	var bodyReader io.Reader
+
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+
+	return NewVerifyRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewVerifyRequestWithBody generates requests for Verify with non-JSON body
+func NewVerifyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryURL := fmt.Sprintf("%s/crypto/verify", server)
+
+	req, err := http.NewRequest("POST", queryURL, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
 // GenerateKeyPairParams defines parameters for GenerateKeyPair.
 type GenerateKeyPairParams struct {
 	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
@@ -238,6 +340,10 @@ type ServerInterface interface {
 	ExternalId(ctx echo.Context) error
 	// Send a request for checking if the given combination has valid consent (POST /crypto/generate)
 	GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error
+	// sign a piece of data with the private key of the given legalEntity (POST /crypto/sign)
+	Sign(ctx echo.Context) error
+	// verify a signature given a public key, signature and the data (POST /crypto/verify)
+	Verify(ctx echo.Context) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -296,6 +402,24 @@ func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	return err
 }
 
+// Sign converts echo context to params.
+func (w *ServerInterfaceWrapper) Sign(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.Sign(ctx)
+	return err
+}
+
+// Verify converts echo context to params.
+func (w *ServerInterfaceWrapper) Verify(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.Verify(ctx)
+	return err
+}
+
 // RegisterHandlers adds each server route to the EchoRouter.
 func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 
@@ -307,30 +431,35 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/encrypt", wrapper.Encrypt)
 	router.POST("/crypto/external_id", wrapper.ExternalId)
 	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
+	router.POST("/crypto/sign", wrapper.Sign)
+	router.POST("/crypto/verify", wrapper.Verify)
 
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7xX32/jNgz+Vwh1j0ad2x0GLG8rVgxBu61od09DMdAyE+vOllRJzuoV+d8HyXb8K26S",
-	"+9E8BRZNfSQ/kp9fGFeFVpKks2z5wizPqMDw91fiptLunp5Kss4/0UZpMk5QOOdCZ2T+oudwlpLlRmgn",
-	"lGRLdoWWfvoAJLlKKYWeacRcpYktmXVGyA3bRT1HN1RNfSVDXyQDLErBVkVBzggOn6k65DinDebX0glX",
-	"fbxfec8/GFqzJbuIu6jjJuT4dmi9i5hUktNRQLXV5PpdxAw9lcJQypZ/j7H0o2bjFLQ3P+6irgpWK2lp",
-	"Wgado5AnVSFYgjtYhRHazqnHcC3HTBjeMzwHEi4jAxlaQNBlkgt+QxUoA8MkRCCVg0S5jEWjoL62cqcn",
-	"JRESTQUpOjxEoT38qaO769+71Aazwzw8RoQOa/+6Qd7nan9GC3Zt476sDWf9zTTfTPNcfUnznNgr18+O",
-	"jMR8lc4Ora8lli2TT8TdCe8+dJZHKdDzOo5jrvS0t5nmOKPnfYJFStKJtSBzNMs9lx7F7SRVw1s+3q8g",
-	"pbWQQm4AJSizQSn+Q38cQWlLzPMKXEbAS+tUKoINIHfKY6FnLHTu4WTOabuMY1k6eynzuIbsA41xk1ws",
-	"mt8hkj0MyvEKPg/D9zg0qR4C1OgESXcqqsTKi5+b3wFYPq9CrtUU0i93K7CauFgLHvIEa2UgNJICS2Yr",
-	"OFnALYock5zgX+EyIcFDaI/BagwdkwtODTMkFv7+3+5ut+99VpxwIYQ/+u+1t2jiLGJbMrbGtLh8d7nw",
-	"bylNErVgS/b+cnHp49LoskC2uH45TutlFNio6vbynAyheCKy1qAmFll3pdIwS7iSzmd4+cJQ67wJP/5k",
-	"PYZWdhxrqZEi2Q0J7ExJ4UHdMgH4j4vFt7+9aclw/bC+f95Ae30EiUoryFSeWkgOLOIwzXYR+zCB6Ad0",
-	"HGzqRm8ZKeQWc5FCQQ7DvpoCEJIrY4g72BvYsijQVF1xAHt6LBDQt8BGbEn2F7TnNW5sGL+h+uzRu2up",
-	"0Mz/eSq0Bt+HCiNJ8sZUGC/mM6gwI18B5UAmvykxGkxerQniBGpdz8pZbvg5PpQ8rzGlWSv/iPQVtnS7",
-	"5zsRZqIN3poz06V+Bm36Kz1Dm70tQTjmvMzRkd/zXakCQVD2NEb95OxhsiHpyUDz/Ggtbqi6Q2HCcjJY",
-	"kCPjvR7a/Q2qql3/AQ5Qi8fniD2VZIKGrDfoRJgN6RGdWOqxbNw9Tnj1bioO/DeS/2ZKiCRwQxiGRMk5",
-	"Wbsu87w6r+arpuaNwtwDPyBWhjjaF82+T/pUeCCZAraHtX7JiH/2WRbr3rjgqvDfVkHl+LBqp9znICit",
-	"KR92u/8DAAD//yH+BcKOEAAA",
+	"H4sIAAAAAAAC/8SYb2/bthPH3wrB/h4KkftrMWB+tmLBECTbjGTdkyEYTtTJYiORCkm50QK/9+Eoyfpn",
+	"xXbaeHlUmKfj8e5zxy/7zIXOC61QOcuXz9yKFHPw//wZhakKd4uPJVpHvxRGF2icRL8uZJGi+QOf/FqM",
+	"VhhZOKkVX/JPYPGHjwyV0DHGrGcacFcVyJfcOiPVmm+DnqNrrKa+oqEvVD4sjJmt8hydkYI9YLXPcYZr",
+	"yC6Vk676fHtFnv9nMOFL/i7sTh02Rw5vhtbbgCutBB4MqLaabL8NuMHHUhqM+fKvcSz9U/NxCtqd77dB",
+	"VwVbaGVxWoYiA6mOqoK3ZG5vFUbRdk4phks1JmG4z3CdoXQpGpaCZcCKMsqkuMaKacOGSQiY0o5F2qU8",
+	"GB3qWyt3fFIiqcBULAYH+xDahX8ohtXO8GDlu+D6/geJniv2CT3X9Yl7Xd/N+pvptplu+fSabjmyOS6f",
+	"HBoF2VU8O6W+lSRbRl9QuCO+vessDyLQ8zo+x1zpcWczzXGKT7sEyxiVk4lEczDLPZcUxc0kVcNdPt9e",
+	"sRgTqaRaM1BMmzUo+Q/QcsBKW0KWVcylyERpnY6lt2EgnKZY8AnyIqNwUucKuwxDVTp7obKwDpkOGsI6",
+	"erdo/vZBtur34zC81eWv3ajzZnOk3sm1ejNgjh89+2fO7CSe3Gf3u6PMMWPlWoErDb6MTGd2KJrO0m8+",
+	"6I0XYCEm6LSs4X5ISwFOonLHIhJZ9e7H5m8vI3+ikUk1W+D/9G4Ivn9N+oT0vxpeLW1S5lDRpRM63xOU",
+	"MyVSGyeQ2V4wkdYZgppE0/q539KKVImeuvxpdcVsgUImUvjpwRJtmL9eNLNoNlKgZbABmUGUIfsqXSoV",
+	"IxbaZWYL8PdIJgU2B1JA8fNfVjebD5RpJ51n6bf+d+0uBQoe8A0aW8e0uHh/saCvdIEKCsmX/MPF4oIA",
+	"K8ClPkdh/XEY15rMJ1HXiFEq/VFoPPPWoE4NWvdJx54SoZUj1JfPHIoia44ffrEUQ6u+D+E0EubbYQmo",
+	"Xv6HutI+8P8vFt9/94Ykv/2wvr9fs3b7gEU6rliqs9iyaI8e9eBuA/5xEiLJltDb1NdfOxqk2kAmY5aj",
+	"A9+a0wCkEtoYFI7tDGyZ52CqrjgMes8SDyDNorXcoOrrVCIe1taLEl99IjvYodCoonkUWoO3QWGkzM+M",
+	"wliunoDCzCuOgRq8Fs8KRhMTPVokCmQ6qS+tWTZoLA6VxkukNGLrbxm/QEunyN4ImIliPjczU6l7Ajb9",
+	"GzIFm54XEAGZKDNwSOq3K5UHBFRPede/nDxM1qgIBpzno7W4xmoF0vjLyUCODg153SfCmqiqVof5cBi2",
+	"8VCO+GOJxr+s6ht08lwZ4hEcWeqxNt7eT7h6PxUH11j5/zqIEBUTBsEPiVIItDYps6w6reZXTc2bd9cu",
+	"8LGmmpDQfmh2fdJH4Q5VzKBdrPVLiuKBsiyT3rgQOicZ6VUOHat2KigHXvK+xAOpuXkW/OrbTIn+A+nM",
+	"82HwoDlxMnTq9yRESvWg9Ndho544GWjnyb1BsrV+4Bi5oalBF5xOXqUzNl6+z8PQrL8NDsMH1ZmBGD1c",
+	"zoNELq2lVu59fhoQdT0YdB6akkNPMQS9VRI+7TN5Lwvb7b8BAAD//6PNUEqsFwAA",
 }
 
 // GetSwagger returns the Swagger specification corresponding to the generated code

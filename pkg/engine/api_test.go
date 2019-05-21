@@ -20,8 +20,12 @@ package engine
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
@@ -135,4 +139,234 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 
 		client.ExternalId(echo)
 	})
+}
+
+func TestDefaultCryptoEngine_Sign(t *testing.T) {
+	client := createTempEngine()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	client.GenerateKeyPairFor(legalEntity)
+
+	t.Run("Missing plainText returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.SignRequest{
+			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Sign(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		if err.Error() != "code=400, message=missing plainText" {
+			t.Errorf("Expected error code=400, message=missing plainText, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("Missing legalEntity returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.SignRequest{
+			PlainText: "text",
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Sign(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		if err.Error() != "code=400, message=missing legalEntityURI" {
+			t.Errorf("Expected error code=400, message=missing legalEntityURI, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("All OK returns 200", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.SignRequest{
+			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+			PlainText: "text",
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
+
+		err := client.Sign(echo)
+
+		if err != nil {
+			t.Errorf("Expected no error got [%s]", err.Error())
+		}
+	})
+}
+
+func TestDefaultCryptoEngine_Verify(t *testing.T) {
+	client := createTempEngine()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	client.GenerateKeyPairFor(legalEntity)
+
+	pubKey, _ := client.backend.GetPublicKey(legalEntity)
+	pemPubKey := string(publicKeyToBytes(pubKey))
+	plainText := "text"
+	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
+	signature, _ := client.SignFor([]byte(plainText), legalEntity)
+	hexSignature := hex.EncodeToString(signature)
+
+
+	t.Run("Missing publicKey returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.VerifyRequest{
+			PlainText: plainText,
+			Signature: hexSignature,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Verify(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		if err.Error() != "code=400, message=missing publicKey in verifyRequest" {
+			t.Errorf("Expected error code=400, message=missing publicKey in verifyRequest, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("Missing plainText returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.VerifyRequest{
+			PublicKey: generated.PublicKey(pemPubKey),
+			Signature: hexSignature,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Verify(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		if err.Error() != "code=400, message=missing plainText in verifyRequest" {
+			t.Errorf("Expected error code=400, message=missing plainText in verifyRequest, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("Missing signature returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.VerifyRequest{
+			PlainText: plainText,
+			PublicKey: generated.PublicKey(pemPubKey),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Verify(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		if err.Error() != "code=400, message=missing signature in verifyRequest" {
+			t.Errorf("Expected error code=400, message=missing signature in verifyRequest, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("All OK returns 200", func(t *testing.T) {
+		client := createTempEngine()
+		defer emptyTemp()
+
+		legalEntity := types.LegalEntity{URI: "test"}
+		client.GenerateKeyPairFor(legalEntity)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := generated.VerifyRequest{
+			Signature: hexSignature,
+			PublicKey: generated.PublicKey(pemPubKey),
+			PlainText: base64PlainText,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
+
+		err := client.Verify(echo)
+
+		if err != nil {
+			t.Errorf("Expected no error got [%s]", err.Error())
+		}
+	})
+}
+
+func publicKeyToBytes(pub *rsa.PublicKey) []byte {
+	pubASN1 := x509.MarshalPKCS1PublicKey(pub)
+
+	pubBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubASN1,
+	})
+
+	return pubBytes
 }

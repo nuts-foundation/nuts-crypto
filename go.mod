@@ -9,6 +9,7 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo/v4 v4.1.5
+	github.com/labstack/gommon v0.2.8
 	github.com/nuts-foundation/nuts-go v0.0.0-20190513130535-6db5fc9f485ca
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3

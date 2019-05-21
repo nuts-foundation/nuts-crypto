@@ -180,6 +180,113 @@ func (ce *DefaultCryptoEngine) ExternalId(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, externalIdResponse)
 }
 
+func (ce *DefaultCryptoEngine) Sign(ctx echo.Context) error {
+	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	if err != nil {
+		glog.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	var signRequest = &generated.SignRequest{}
+	err = json.Unmarshal(buf, signRequest)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	if len(signRequest.LegalEntityURI) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI")
+	}
+
+	if len(signRequest.PlainText) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing plainText")
+	}
+
+	plainTextBytes, err := base64.StdEncoding.DecodeString(signRequest.PlainText)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+
+	le := types.LegalEntity{URI: string(signRequest.LegalEntityURI)}
+	sig, err := ce.SignFor(plainTextBytes, le)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	signResponse := generated.SignResponse{
+		Signature: hex.EncodeToString(sig),
+	}
+
+	return ctx.JSON(http.StatusOK, signResponse)
+}
+
+func (ce *DefaultCryptoEngine) Verify(ctx echo.Context) error {
+	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	var verifyRequest = &generated.VerifyRequest{}
+	err = json.Unmarshal(buf, verifyRequest)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	if len(verifyRequest.PublicKey) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing publicKey in verifyRequest")
+	}
+
+	if len(verifyRequest.Signature) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing signature in verifyRequest")
+	}
+
+	if len(verifyRequest.PlainText) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing plainText in verifyRequest")
+	}
+
+	plainTextBytes, err := base64.StdEncoding.DecodeString(verifyRequest.PlainText)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	sigBytes, err := hex.DecodeString(verifyRequest.Signature)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	publicKey, err := bytesToPublicKey([]byte(verifyRequest.PublicKey))
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	valid, err := ce.VerifyWith(plainTextBytes, sigBytes, publicKey)
+
+	if err != nil {
+		glog.Error(err.Error())
+		return err
+	}
+
+	verifyResponse := generated.VerifyResponse{
+		Outcome: valid,
+	}
+
+	return ctx.JSON(http.StatusOK, verifyResponse)
+}
+
 func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCipherText, error) {
 	dect := types.DoubleEncryptedCipherText{}
 	var err error
