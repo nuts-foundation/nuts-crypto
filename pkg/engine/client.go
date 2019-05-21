@@ -28,7 +28,7 @@ type CryptoClient interface {
 	// decrypt a cipherText for the given legalEntity
 	DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error)
 	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-	EncryptKeyAndPlainTextWith(plainText []byte, key *rsa.PublicKey) (types.DoubleEncryptedCipherText, error)
+	EncryptKeyAndPlainTextWith(plainText []byte, key []rsa.PublicKey) (types.DoubleEncryptedCipherText, error)
 	// ExternalIdFor calculates an externalId for an identifier for a given legalEntity
 	ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error)
 	// GenerateKeyPairFor creates a KeyPair on the backend for given legalEntity

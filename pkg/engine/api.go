@@ -19,9 +19,11 @@
 package engine
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/labstack/echo/v4"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
@@ -57,16 +59,22 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 		return err
 	}
 
-	if len(encryptRequest.LegalEntityURI) == 0 && len(encryptRequest.PublicKey) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing either legalEntityURI or publicKey in encryptRequest")
+	if len(encryptRequest.EncryptRequestSubjects) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing encryptRequestSubjects in encryptRequest")
 	}
 
-	if len(encryptRequest.LegalEntityURI) != 0 && len(encryptRequest.PublicKey) != 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "both legalEntityURI and publicKey given in encryptRequest, choose one")
+	var pubKeys []rsa.PublicKey
+	var legalEntities []generated.LegalEntityURI
+	for _, e := range encryptRequest.EncryptRequestSubjects {
+		pk, err := pemToPublicKey([]byte(e.PublicKey))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("incorrect public key for %s in encryptRequest.encryptRequestSubjects in encryptRequest", e.LegalEntityURI))
+		}
+		pubKeys = append(pubKeys, *pk)
+		legalEntities = append(legalEntities, e.LegalEntityURI)
 	}
 
-	var dect types.DoubleEncryptedCipherText
-
+	// encrypt with symmetric key and encrypt keys with asymmetric keys
 	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
 
 	if err != nil {
@@ -74,23 +82,11 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 		return err
 	}
 
-	if len(encryptRequest.LegalEntityURI) != 0 {
-		if err != nil {
-			glog.Error(err.Error())
-			return err
-		}
+	dect, err := ce.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
 
-		dect, err = ce.EncryptKeyAndPlainTextFor(plainTextBytes, types.LegalEntity{URI: string(encryptRequest.LegalEntityURI)})
-	}
-
-	if len(encryptRequest.PublicKey) != 0 {
-		publicKey, err := bytesToPublicKey([]byte(encryptRequest.PublicKey))
-		if err != nil {
-			glog.Error(err.Error())
-			return err
-		}
-
-		dect, err = ce.EncryptKeyAndPlainTextWith(plainTextBytes, publicKey)
+	if err != nil {
+		glog.Error(err.Error())
+		return err
 	}
 
 	if err != nil {
@@ -98,7 +94,7 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 		return err
 	}
 
-	return ctx.JSON(http.StatusOK, dectToEncryptResponse(dect))
+	return ctx.JSON(http.StatusOK, dectToEncryptResponse(dect, legalEntities))
 }
 
 // Decrypt is the API handler function for decrypting a piece of data.
@@ -267,7 +263,7 @@ func (ce *DefaultCryptoEngine) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	publicKey, err := bytesToPublicKey([]byte(verifyRequest.PublicKey))
+	publicKey, err := pemToPublicKey([]byte(verifyRequest.PublicKey))
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -293,18 +289,29 @@ func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCi
 
 	dect.CipherText, err = base64.StdEncoding.DecodeString(gen.CipherText)
 	if err != nil { return dect, err }
-	dect.CipherTextKey, err = base64.StdEncoding.DecodeString(gen.CipherTextKey)
+	cipherTextKey, err := base64.StdEncoding.DecodeString(gen.CipherTextKey)
 	if err != nil { return dect, err }
+	dect.CipherTextKeys = append(dect.CipherTextKeys, cipherTextKey)
 	dect.Nonce, err = base64.StdEncoding.DecodeString(gen.Nonce)
 	if err != nil { return dect, err }
 
 	return dect, nil
 }
 
-func dectToEncryptResponse(dect types.DoubleEncryptedCipherText) generated.EncryptResponse {
+func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []generated.LegalEntityURI) generated.EncryptResponse {
+
+	var encryptResponseEntries []generated.EncryptResponseEntry
+
+	for i := range dect.CipherTextKeys {
+		encryptResponseEntries = append(encryptResponseEntries, generated.EncryptResponseEntry{
+			CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKeys[i]),
+			LegalEntityURI: legalIdentities[i],
+		})
+	}
+
 	return generated.EncryptResponse{
 		CipherText: base64.StdEncoding.EncodeToString(dect.CipherText),
-		CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKey),
+		EncryptResponseEntries:encryptResponseEntries,
 		Nonce: base64.StdEncoding.EncodeToString(dect.Nonce),
 	}
 }

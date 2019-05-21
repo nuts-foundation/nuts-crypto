@@ -19,10 +19,6 @@
 // types and interfaces used by all other packages
 package types
 
-import (
-	"crypto/rsa"
-)
-
 // --cryptobackend config flag
 const ConfigBackend string = "cryptobackend"
 
@@ -46,38 +42,10 @@ type LegalEntity struct{
 	URI string
 }
 
-// main interface for cryptographic functions. Main configuration is done via Viper
-type Client interface {
-	// Generate a new key pair for this LegalEntity.
-	GenerateKeyPairFor(identifier LegalEntity) error
-
-	// Decrypt a cipher text for a given LegalEntity. Uses the stored private key of the LegalEntity
-	// Uses RSA assymetric encryption
-	decryptCipherTextFor(cipherText []byte, legalEntity LegalEntity) ([]byte, error)
-
-	// Encrypt a piece of data for a legalEntity, can only be used if the legalEntity is also served through the current node, otherwise no keys are stored. In that case use the EncryptCipherTextWith function
-	EncryptPlainTextFor(plaintext []byte, legalEntity LegalEntity) ([]byte, error)
-
-	// Encrypt a piece of data with a PublicKey
-	EncryptPlainTextWith(plaintext []byte, key *rsa.PublicKey) ([]byte, error)
-
-	// Decrypt a piece of data that has been encrypted with a symmetric key which has been encrypted with a asymmetric key
-	DecryptKeyAndCipherTextFor(cipherText DoubleEncryptedCipherText, legalEntity LegalEntity) ([]byte, error)
-
-	// Encrypt a piece of data with the extra layer of a symmetric key. Returns cipherText and encrypted symmetric key with nonce
-	EncryptKeyAndPlainTextFor(cipherText []byte, legalEntity LegalEntity) (DoubleEncryptedCipherText, error)
-
-	// Encrypt a piece of data with the extra layer of a symmetric key. Returns cipherText and encrypted symmetric key
-	EncryptKeyAndPlainTextWith(cipherText []byte, key *rsa.PublicKey) (DoubleEncryptedCipherText, error)
-
-	// calculate the externalId (HMAC) over a piece of data for the given legalEntity
-	ExternalIdFor(data []byte, entity LegalEntity) ([]byte, error)
-}
-
-// Struct defining the encrypted data in CipherText, a encrypted symmetric key in CipherTextKey and the nonce needed for the AES_GCM decryption.
+// Struct defining the encrypted data in CipherText, an encrypted symmetric key in CipherTextKeys (1 for each given public key) and the nonce needed for the AES_GCM decryption.
 type DoubleEncryptedCipherText struct {
 	CipherText []byte
-	CipherTextKey []byte
+	CipherTextKeys [][]byte
 	Nonce []byte
 }
 

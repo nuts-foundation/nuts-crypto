@@ -170,10 +170,10 @@ func (client *DefaultCryptoEngine) GenerateKeyPairFor(legalEntity types.LegalEnt
 }
 
 // Main decryption function, first the symmetric key will be decrypted using the private key of the legal entity.
-// The resulting symmetric key will then be used to decrypt the given cipherText
+// The resulting symmetric key will then be used to decrypt the given cipherText.
 func (client *DefaultCryptoEngine) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
 
-	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKey, legalEntity)
+	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
 
 	block, err := aes.NewCipher(symmKey)
 
@@ -196,54 +196,67 @@ func (client *DefaultCryptoEngine) DecryptKeyAndCipherTextFor(cipherText types.D
 	return plaintext, nil
 }
 
-// Main encryption function, first the symmetric key is generated and used to encrypt the data.
-// The resulting symmetric key will then be encrypted using the public key from the legal entity.
-// CipherText, EncryptedKey and nonce are all returned. in the form of types.DoubleEncryptedCipherText
-func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextFor(plainText []byte, legalEntity types.LegalEntity) (types.DoubleEncryptedCipherText, error) {
-	pubKey, err := client.backend.GetPublicKey(legalEntity)
+// EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
+func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, keys []rsa.PublicKey) (types.DoubleEncryptedCipherText, error) {
+	cipherBytes, cipher, err := generateSymmetricKey()
 
 	if err != nil {
 		return types.DoubleEncryptedCipherText{}, err
 	}
 
-	return client.EncryptKeyAndPlainTextWith(plainText, pubKey)
+	cipherText, nonce, err := encryptWithSymmetricKey(plainText, cipher)
+
+	if err != nil {
+		return types.DoubleEncryptedCipherText{}, err
+	}
+
+	var cipherTextKeys [][]byte
+
+	for _, pk := range keys {
+		encSymKey, err := client.encryptPlainTextWith(cipherBytes, &pk)
+		if err != nil {
+			return types.DoubleEncryptedCipherText{}, err
+		}
+		cipherTextKeys = append(cipherTextKeys, encSymKey)
+	}
+
+	return types.DoubleEncryptedCipherText{
+		Nonce:nonce,
+		CipherText:cipherText,
+		CipherTextKeys:cipherTextKeys,
+	}, nil
 }
 
-// Main encryption function, first the symmetric key is generated and used to encrypt the data.
-// The resulting symmetric key will then be encrypted using the public key.
-// CipherText, EncryptedKey and nonce are all returned. in the form of types.DoubleEncryptedCipherText
-func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, key *rsa.PublicKey) (types.DoubleEncryptedCipherText, error) {
-	// create new symmetric key
+func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) ([]byte, []byte, error) {
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, nil, err
+	}
+
+	cipherText := key.Seal(nil, nonce, plainText, nil)
+
+	return cipherText, nonce, nil
+}
+
+func generateSymmetricKey() ([]byte, cipher.AEAD, error) {
 	symkey := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, symkey); err != nil {
-		return types.DoubleEncryptedCipherText{}, err
+		return nil, nil, err
 	}
 
-	block, err := aes.NewCipher(symkey)
+	aead, err := symmetricKeyToBlockCipher(symkey)
+
+	return symkey, aead, err
+}
+
+func symmetricKeyToBlockCipher(ciph []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(ciph)
 
 	if err != nil {
-		return types.DoubleEncryptedCipherText{}, err
+		return nil, err
 	}
 
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return types.DoubleEncryptedCipherText{}, err
-	}
-
-	// encrypt plainText with this symmetric key
-	cipherText, nonce, err := encryptWithSymmetricKey(plainText, aesgcm)
-
-	if err != nil {
-		return types.DoubleEncryptedCipherText{}, err
-	}
-
-	encryptedKey, err := client.encryptPlainTextWith(symkey, key)
-
-	if err != nil {
-		return types.DoubleEncryptedCipherText{}, err
-	}
-
-	return types.DoubleEncryptedCipherText{CipherText: cipherText, CipherTextKey: encryptedKey, Nonce: nonce}, err
+	return cipher.NewGCM(block)
 }
 
 // ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
@@ -359,19 +372,8 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 	return plaintext, nil
 }
 
-func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) ([]byte, []byte, error) {
-	nonce := make([]byte, 12)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, nil, err
-	}
-
-	cipherText := key.Seal(nil, nonce, plainText, nil)
-
-	return cipherText, nonce, nil
-}
-
 // shared function to convert bytes to a RSA private key
-func bytesToPublicKey(pub []byte) (*rsa.PublicKey, error) {
+func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	b := block.Bytes
 	key, err := x509.ParsePKCS1PublicKey(b)

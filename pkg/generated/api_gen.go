@@ -33,16 +33,27 @@ type DecryptResponse struct {
 
 // EncryptRequest defines component schema for EncryptRequest.
 type EncryptRequest struct {
+	EncryptRequestSubjects []EncryptRequestSubject `json:"encryptRequestSubjects"`
+	PlainText              string                  `json:"plainText"`
+}
+
+// EncryptRequestSubject defines component schema for EncryptRequestSubject.
+type EncryptRequestSubject struct {
 	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
-	PlainText      string         `json:"plainText"`
 	PublicKey      PublicKey      `json:"publicKey"`
 }
 
 // EncryptResponse defines component schema for EncryptResponse.
 type EncryptResponse struct {
-	CipherText    string `json:"cipherText"`
-	CipherTextKey string `json:"cipherTextKey"`
-	Nonce         string `json:"nonce"`
+	CipherText             string                 `json:"cipherText"`
+	EncryptResponseEntries []EncryptResponseEntry `json:"encryptResponseEntries"`
+	Nonce                  string                 `json:"nonce"`
+}
+
+// EncryptResponseEntry defines component schema for EncryptResponseEntry.
+type EncryptResponseEntry struct {
+	CipherTextKey  string         `json:"cipherTextKey"`
+	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
 }
 
 // ExternalIdRequest defines component schema for ExternalIdRequest.
@@ -334,7 +345,7 @@ type GenerateKeyPairParams struct {
 type ServerInterface interface {
 	// decrypt a cipherText for the given legalEntity (POST /crypto/decrypt)
 	Decrypt(ctx echo.Context) error
-	// encrypt a piece of data for the given legalEntity or public key (POST /crypto/encrypt)
+	// encrypt a piece of data for a list of public keys/legalEntityURI's. A single symmetric keys will be used for all entries (POST /crypto/encrypt)
 	Encrypt(ctx echo.Context) error
 	// calculate an externalId for an identifier for a given legalEntity (POST /crypto/external_id)
 	ExternalId(ctx echo.Context) error
@@ -439,27 +450,31 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"jZLwGgAA",
 }
 
 // GetSwagger returns the Swagger specification corresponding to the generated code

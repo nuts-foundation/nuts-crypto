@@ -56,13 +56,19 @@ func TestServiceWrapper_Encrypt(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 		client.GenerateKeyPairFor(legalEntity)
+		pubKey, _ := client.backend.GetPublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := generated.EncryptRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+			EncryptRequestSubjects: []generated.EncryptRequestSubject{
+				{
+					LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+					PublicKey: generated.PublicKey(string(publicKeyToBytes(pubKey))),
+				},
+			},
 			PlainText:      base64.StdEncoding.EncodeToString([]byte(plaintext)),
 		}
 
@@ -86,16 +92,17 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 		client.GenerateKeyPairFor(legalEntity)
+		pubKey, _ := client.backend.GetPublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		encRecord, _ := client.EncryptKeyAndPlainTextFor([]byte(plaintext), legalEntity)
+		encRecord, _ := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []rsa.PublicKey{*pubKey})
 		jsonRequest := generated.DecryptRequest{
 			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
 			CipherText:     base64.StdEncoding.EncodeToString(encRecord.CipherText),
-			CipherTextKey:  base64.StdEncoding.EncodeToString(encRecord.CipherTextKey),
+			CipherTextKey:  base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 			Nonce:          base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
 

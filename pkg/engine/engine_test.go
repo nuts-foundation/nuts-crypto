@@ -20,6 +20,7 @@ package engine
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
@@ -165,8 +166,9 @@ func TestCryptoEngine_DecryptKeyAndCipherTextFor(t *testing.T) {
 		plaintext := "for your eyes only"
 
 		client.GenerateKeyPairFor(legalEntity)
+		pubKey, _ := client.backend.GetPublicKey(legalEntity)
 
-		encRecord, err := client.EncryptKeyAndPlainTextFor([]byte(plaintext), legalEntity)
+		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []rsa.PublicKey{*pubKey})
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
