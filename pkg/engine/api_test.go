@@ -92,13 +92,13 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 		client.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.backend.GetPublicKey(legalEntity)
+		pubKey, _ := client.PublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		encRecord, _ := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []rsa.PublicKey{*pubKey})
+		encRecord, _ := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 		jsonRequest := generated.DecryptRequest{
 			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
 			CipherText:     base64.StdEncoding.EncodeToString(encRecord.CipherText),

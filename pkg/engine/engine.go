@@ -221,7 +221,7 @@ func (client *DefaultCryptoEngine) DecryptKeyAndCipherTextFor(cipherText types.D
 }
 
 // EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, keys []rsa.PublicKey) (types.DoubleEncryptedCipherText, error) {
+func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, keys []string) (types.DoubleEncryptedCipherText, error) {
 	cipherBytes, cipher, err := generateSymmetricKey()
 
 	if err != nil {
@@ -236,8 +236,13 @@ func (client *DefaultCryptoEngine) EncryptKeyAndPlainTextWith(plainText []byte, 
 
 	var cipherTextKeys [][]byte
 
-	for _, pk := range keys {
-		encSymKey, err := client.encryptPlainTextWith(cipherBytes, &pk)
+	for _, pemKey := range keys {
+		pk, err := pemToPublicKey([]byte(pemKey))
+		if err != nil {
+			return types.DoubleEncryptedCipherText{}, err
+		}
+
+		encSymKey, err := client.encryptPlainTextWith(cipherBytes, pk)
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}
@@ -323,7 +328,13 @@ func (client *DefaultCryptoEngine) SignFor(data []byte, legalEntity types.LegalE
 }
 
 // VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA512 hashing function.
-func (client *DefaultCryptoEngine) VerifyWith(data []byte, sig []byte, key *rsa.PublicKey) (bool, error) {
+func (client *DefaultCryptoEngine) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
+	key, err := pemToPublicKey([]byte(pemKey))
+
+	if err != nil {
+		return false, err
+	}
+
 	hashedData := sha512.Sum512(data)
 	if err:= rsa.VerifyPKCS1v15(key, crypto.SHA512, hashedData[:], sig); err != nil {
 		return false, err
@@ -332,14 +343,14 @@ func (client *DefaultCryptoEngine) VerifyWith(data []byte, sig []byte, key *rsa.
 	return true, nil
 }
 
-func (client *DefaultCryptoEngine) PublicKey(legalEntity types.LegalEntity) ([]byte, error) {
+func (client *DefaultCryptoEngine) PublicKey(legalEntity types.LegalEntity) (string, error) {
 	pubKey, err := client.backend.GetPublicKey(legalEntity)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return publicKeyToPem(pubKey), nil
+	return string(publicKeyToPem(pubKey)), nil
 }
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the backend and decrypts the cipherText.

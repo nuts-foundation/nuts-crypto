@@ -19,7 +19,6 @@
 package engine
 
 import (
-	"crypto/rsa"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
 )
 
@@ -27,18 +26,18 @@ import (
 type CryptoClient interface {
 	// decrypt a cipherText for the given legalEntity
 	DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error)
-	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-	EncryptKeyAndPlainTextWith(plainText []byte, key []rsa.PublicKey) (types.DoubleEncryptedCipherText, error)
+	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given PEM encoded public key
+	EncryptKeyAndPlainTextWith(plainText []byte, pemKey []string) (types.DoubleEncryptedCipherText, error)
 	// ExternalIdFor calculates an externalId for an identifier for a given legalEntity
 	ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error)
 	// GenerateKeyPairFor creates a KeyPair on the backend for given legalEntity
 	GenerateKeyPairFor(legalEntity types.LegalEntity) error
 	// SignFor signs a piece of data for a legal entity
 	SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error)
-	// VerifyWith verifies a signature for a given public key
-	VerifyWith(data []byte, sig []byte, key *rsa.PublicKey) (bool, error)
-	// PublicKey returns the PublicKey for a given legal entity
-	PublicKey(legalEntity types.LegalEntity) ([]byte, error)
+	// VerifyWith verifies a signature for a given PEM encoded public key
+	VerifyWith(data []byte, sig []byte, pemKey string) (bool, error)
+	// PublicKey returns the PEM encoded PublicKey for a given legal entity
+	PublicKey(legalEntity types.LegalEntity) (string, error)
 }
 
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.

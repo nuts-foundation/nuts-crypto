@@ -19,11 +19,9 @@
 package engine
 
 import (
-	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/golang/glog"
 	"github.com/labstack/echo/v4"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
@@ -63,14 +61,10 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing encryptRequestSubjects in encryptRequest")
 	}
 
-	var pubKeys []rsa.PublicKey
+	var pubKeys []string
 	var legalEntities []generated.LegalEntityURI
 	for _, e := range encryptRequest.EncryptRequestSubjects {
-		pk, err := pemToPublicKey([]byte(e.PublicKey))
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("incorrect public key for %s in encryptRequest.encryptRequestSubjects in encryptRequest", e.LegalEntityURI))
-		}
-		pubKeys = append(pubKeys, *pk)
+		pubKeys = append(pubKeys, string(e.PublicKey))
 		legalEntities = append(legalEntities, e.LegalEntityURI)
 	}
 
@@ -263,13 +257,7 @@ func (ce *DefaultCryptoEngine) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	publicKey, err := pemToPublicKey([]byte(verifyRequest.PublicKey))
-	if err != nil {
-		glog.Error(err.Error())
-		return err
-	}
-
-	valid, err := ce.VerifyWith(plainTextBytes, sigBytes, publicKey)
+	valid, err := ce.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
 
 	if err != nil {
 		glog.Error(err.Error())
