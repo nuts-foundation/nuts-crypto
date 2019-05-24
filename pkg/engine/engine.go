@@ -29,6 +29,7 @@ import (
 	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	types "github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
@@ -89,6 +90,29 @@ func (ce *DefaultCryptoEngine) Cmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cc := NewCryptoClient()
 			cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]})
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "publicKey [legalEntityURI]",
+		Short: "views the publicKey for a given legal entity",
+
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return types.Error{Msg: "requires a URI argument"}
+			}
+
+			return nil
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			cc := NewCryptoClient()
+			bytes, err := cc.PublicKey(types.LegalEntity{URI: args[0]})
+
+			if err != nil {
+				fmt.Printf("Error printing publicKey: %s", err)
+			}
+
+			fmt.Print(string(bytes))
 		},
 	})
 
@@ -308,6 +332,16 @@ func (client *DefaultCryptoEngine) VerifyWith(data []byte, sig []byte, key *rsa.
 	return true, nil
 }
 
+func (client *DefaultCryptoEngine) PublicKey(legalEntity types.LegalEntity) ([]byte, error) {
+	pubKey, err := client.backend.GetPublicKey(legalEntity)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return publicKeyToPem(pubKey), nil
+}
+
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the backend and decrypts the cipherText.
 // It returns an error if the given legalEntity does not have a private key.
 func (client *DefaultCryptoEngine) decryptCipherTextFor(cipherText []byte, legalEntity types.LegalEntity) ([]byte, error) {
@@ -381,4 +415,15 @@ func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+func publicKeyToPem(pub *rsa.PublicKey) []byte {
+	pubASN1 := x509.MarshalPKCS1PublicKey(pub)
+
+	pubBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubASN1,
+	})
+
+	return pubBytes
 }

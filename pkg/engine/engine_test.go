@@ -258,6 +258,25 @@ func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 	})
 }
 
+func TestDefaultCryptoEngine_PublicKey(t *testing.T) {
+	t.Run("A signed piece of data can be verified", func(t *testing.T) {
+		legalEntity := types.LegalEntity{URI: "test"}
+		client := createTempEngine()
+		client.GenerateKeyPairFor(legalEntity)
+		defer emptyTemp()
+
+		pub, err := client.PublicKey(legalEntity)
+
+		if err != nil {
+			t.Errorf("Expected no error, Got %s", err.Error())
+		}
+
+		if pub == nil {
+			t.Error("Expected public key, got nothing")
+		}
+	})
+}
+
 func newRootCommand() *cobra.Command {
 	testRootCommand := &cobra.Command{
 		Use: "root",
@@ -278,7 +297,7 @@ func TestCryptoEngine_Cmd(t *testing.T) {
 			t.Errorf("Expected Cmd name to equal [crypto], got %s", cmd.Name())
 		}
 
-		if len(cmd.Commands()) != 1 {
+		if len(cmd.Commands()) != 2 {
 			t.Errorf("Expected Cmd to have 1 sub-command, got %d", len(cmd.Commands()))
 		}
 	})

@@ -37,6 +37,8 @@ type CryptoClient interface {
 	SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error)
 	// VerifyWith verifies a signature for a given public key
 	VerifyWith(data []byte, sig []byte, key *rsa.PublicKey) (bool, error)
+	// PublicKey returns the PublicKey for a given legal entity
+	PublicKey(legalEntity types.LegalEntity) ([]byte, error)
 }
 
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
