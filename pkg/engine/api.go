@@ -34,7 +34,7 @@ import (
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 func (ce *DefaultCryptoEngine) GenerateKeyPair(ctx echo.Context, params generated.GenerateKeyPairParams) error {
-	if err := ce.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntityURI)}); err != nil {
+	if err := ce.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
 		return err
 	}
 
@@ -62,10 +62,10 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 	}
 
 	var pubKeys []string
-	var legalEntities []generated.LegalEntityURI
+	var legalEntities []generated.Identifier
 	for _, e := range encryptRequest.EncryptRequestSubjects {
 		pubKeys = append(pubKeys, string(e.PublicKey))
-		legalEntities = append(legalEntities, e.LegalEntityURI)
+		legalEntities = append(legalEntities, e.LegalEntity)
 	}
 
 	// encrypt with symmetric key and encrypt keys with asymmetric keys
@@ -107,7 +107,7 @@ func (ce *DefaultCryptoEngine) Decrypt(ctx echo.Context) error {
 		return err
 	}
 
-	if len(decryptRequest.LegalEntityURI) == 0 {
+	if len(decryptRequest.LegalEntity) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in decryptRequest")
 	}
 
@@ -118,7 +118,7 @@ func (ce *DefaultCryptoEngine) Decrypt(ctx echo.Context) error {
 		return err
 	}
 
-	plainTextBytes, err := ce.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntityURI)})
+	plainTextBytes, err := ce.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
 
 	if err != nil {
 		glog.Error(err.Error())
@@ -148,14 +148,14 @@ func (ce *DefaultCryptoEngine) ExternalId(ctx echo.Context) error {
 		return err
 	}
 
-	if len(request.LegalEntityURI) == 0 {
+	if len(request.LegalEntity) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in request")
 	}
-	if len(request.SubjectURI) == 0 {
+	if len(request.Subject) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing subjectURI in request")
 	}
 
-	shaBytes, err := ce.ExternalIdFor([]byte(request.SubjectURI), types.LegalEntity{URI: string(request.LegalEntityURI)})
+	shaBytes, err := ce.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -185,7 +185,7 @@ func (ce *DefaultCryptoEngine) Sign(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if len(signRequest.LegalEntityURI) == 0 {
+	if len(signRequest.LegalEntity) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI")
 	}
 
@@ -201,7 +201,7 @@ func (ce *DefaultCryptoEngine) Sign(ctx echo.Context) error {
 	}
 
 
-	le := types.LegalEntity{URI: string(signRequest.LegalEntityURI)}
+	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
 	sig, err := ce.SignFor(plainTextBytes, le)
 
 	if err != nil {
@@ -286,14 +286,14 @@ func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCi
 	return dect, nil
 }
 
-func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []generated.LegalEntityURI) generated.EncryptResponse {
+func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []generated.Identifier) generated.EncryptResponse {
 
 	var encryptResponseEntries []generated.EncryptResponseEntry
 
 	for i := range dect.CipherTextKeys {
 		encryptResponseEntries = append(encryptResponseEntries, generated.EncryptResponseEntry{
 			CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKeys[i]),
-			LegalEntityURI: legalIdentities[i],
+			LegalEntity: legalIdentities[i],
 		})
 	}
 

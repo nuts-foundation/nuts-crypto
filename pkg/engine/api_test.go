@@ -44,7 +44,7 @@ func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
 
 		echo.EXPECT().NoContent(http.StatusCreated)
 
-		se.GenerateKeyPair(echo, generated.GenerateKeyPairParams{LegalEntityURI: "test"})
+		se.GenerateKeyPair(echo, generated.GenerateKeyPairParams{LegalEntity: "test"})
 	})
 }
 
@@ -65,7 +65,7 @@ func TestServiceWrapper_Encrypt(t *testing.T) {
 		jsonRequest := generated.EncryptRequest{
 			EncryptRequestSubjects: []generated.EncryptRequestSubject{
 				{
-					LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+					LegalEntity: generated.Identifier(legalEntity.URI),
 					PublicKey: generated.PublicKey(string(publicKeyToBytes(pubKey))),
 				},
 			},
@@ -100,7 +100,7 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 
 		encRecord, _ := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 		jsonRequest := generated.DecryptRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+			LegalEntity: generated.Identifier(legalEntity.URI),
 			CipherText:     base64.StdEncoding.EncodeToString(encRecord.CipherText),
 			CipherTextKey:  base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 			Nonce:          base64.StdEncoding.EncodeToString(encRecord.Nonce),
@@ -124,7 +124,7 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
-		subject := generated.SubjectURI("test")
+		subject := generated.Identifier("test")
 		client.GenerateKeyPairFor(legalEntity)
 
 		ctrl := gomock.NewController(t)
@@ -132,8 +132,8 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := generated.ExternalIdRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
-			SubjectURI:     subject,
+			LegalEntity: generated.Identifier(legalEntity.URI),
+			Subject:     subject,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -161,7 +161,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := generated.SignRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+			LegalEntity: generated.Identifier(legalEntity.URI),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -215,7 +215,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := generated.SignRequest{
-			LegalEntityURI: generated.LegalEntityURI(legalEntity.URI),
+			LegalEntity: generated.Identifier(legalEntity.URI),
 			PlainText: "text",
 		}
 

@@ -6,24 +6,21 @@ package generated
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/labstack/echo/v4"
-	"io"
 	"net/http"
 	"strings"
 )
 
 // DecryptRequest defines component schema for DecryptRequest.
 type DecryptRequest struct {
-	CipherText     string         `json:"cipherText"`
-	CipherTextKey  string         `json:"cipherTextKey"`
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
-	Nonce          string         `json:"nonce"`
+	CipherText    string     `json:"cipherText"`
+	CipherTextKey string     `json:"cipherTextKey"`
+	LegalEntity   Identifier `json:"legalEntity"`
+	Nonce         string     `json:"nonce"`
 }
 
 // DecryptResponse defines component schema for DecryptResponse.
@@ -39,8 +36,8 @@ type EncryptRequest struct {
 
 // EncryptRequestSubject defines component schema for EncryptRequestSubject.
 type EncryptRequestSubject struct {
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
-	PublicKey      PublicKey      `json:"publicKey"`
+	LegalEntity Identifier `json:"legalEntity"`
+	PublicKey   PublicKey  `json:"publicKey"`
 }
 
 // EncryptResponse defines component schema for EncryptResponse.
@@ -52,14 +49,14 @@ type EncryptResponse struct {
 
 // EncryptResponseEntry defines component schema for EncryptResponseEntry.
 type EncryptResponseEntry struct {
-	CipherTextKey  string         `json:"cipherTextKey"`
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	CipherTextKey string     `json:"cipherTextKey"`
+	LegalEntity   Identifier `json:"legalEntity"`
 }
 
 // ExternalIdRequest defines component schema for ExternalIdRequest.
 type ExternalIdRequest struct {
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
-	SubjectURI     SubjectURI     `json:"subjectURI"`
+	LegalEntity Identifier `json:"legalEntity"`
+	Subject     Identifier `json:"subject"`
 }
 
 // ExternalIdResponse defines component schema for ExternalIdResponse.
@@ -67,25 +64,22 @@ type ExternalIdResponse struct {
 	ExternalId string `json:"externalId"`
 }
 
-// LegalEntityURI defines component schema for LegalEntityURI.
-type LegalEntityURI string
+// Identifier defines component schema for Identifier.
+type Identifier string
 
 // PublicKey defines component schema for PublicKey.
 type PublicKey string
 
 // SignRequest defines component schema for SignRequest.
 type SignRequest struct {
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
-	PlainText      string         `json:"plainText"`
+	LegalEntity Identifier `json:"legalEntity"`
+	PlainText   string     `json:"plainText"`
 }
 
 // SignResponse defines component schema for SignResponse.
 type SignResponse struct {
 	Signature string `json:"signature"`
 }
-
-// SubjectURI defines component schema for SubjectURI.
-type SubjectURI string
 
 // VerifyRequest defines component schema for VerifyRequest.
 type VerifyRequest struct {
@@ -99,253 +93,16 @@ type VerifyResponse struct {
 	Outcome bool `json:"outcome"`
 }
 
-// Client which conforms to the OpenAPI3 specification for this service. The
-// server should be fully qualified with shema and server, ie,
-// https://deepmap.com.
-type Client struct {
-	Server string
-	Client http.Client
-}
-
-// Decrypt request with JSON body
-func (c *Client) Decrypt(ctx context.Context, body DecryptRequest) (*http.Response, error) {
-	req, err := NewDecryptRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// Encrypt request with JSON body
-func (c *Client) Encrypt(ctx context.Context, body EncryptRequest) (*http.Response, error) {
-	req, err := NewEncryptRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// ExternalId request with JSON body
-func (c *Client) ExternalId(ctx context.Context, body ExternalIdRequest) (*http.Response, error) {
-	req, err := NewExternalIdRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// GenerateKeyPair request
-func (c *Client) GenerateKeyPair(ctx context.Context, params *GenerateKeyPairParams) (*http.Response, error) {
-	req, err := NewGenerateKeyPairRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// Sign request with JSON body
-func (c *Client) Sign(ctx context.Context, body SignRequest) (*http.Response, error) {
-	req, err := NewSignRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// Verify request with JSON body
-func (c *Client) Verify(ctx context.Context, body VerifyRequest) (*http.Response, error) {
-	req, err := NewVerifyRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	return c.Client.Do(req)
-}
-
-// NewDecryptRequest generates requests for Decrypt with JSON body
-func NewDecryptRequest(server string, body DecryptRequest) (*http.Request, error) {
-	var bodyReader io.Reader
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-
-	return NewDecryptRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewDecryptRequestWithBody generates requests for Decrypt with non-JSON body
-func NewDecryptRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/decrypt", server)
-
-	req, err := http.NewRequest("POST", queryURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
-// NewEncryptRequest generates requests for Encrypt with JSON body
-func NewEncryptRequest(server string, body EncryptRequest) (*http.Request, error) {
-	var bodyReader io.Reader
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-
-	return NewEncryptRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewEncryptRequestWithBody generates requests for Encrypt with non-JSON body
-func NewEncryptRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/encrypt", server)
-
-	req, err := http.NewRequest("POST", queryURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
-// NewExternalIdRequest generates requests for ExternalId with JSON body
-func NewExternalIdRequest(server string, body ExternalIdRequest) (*http.Request, error) {
-	var bodyReader io.Reader
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-
-	return NewExternalIdRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewExternalIdRequestWithBody generates requests for ExternalId with non-JSON body
-func NewExternalIdRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/external_id", server)
-
-	req, err := http.NewRequest("POST", queryURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
-// NewGenerateKeyPairRequest generates requests for GenerateKeyPair
-func NewGenerateKeyPairRequest(server string, params *GenerateKeyPairParams) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/generate", server)
-
-	var queryStrings []string
-
-	var queryParam0 string
-
-	queryParam0, err = runtime.StyleParam("form", true, "legalEntityURI", params.LegalEntityURI)
-	if err != nil {
-		return nil, err
-	}
-
-	queryStrings = append(queryStrings, queryParam0)
-
-	if len(queryStrings) != 0 {
-		queryURL += "?" + strings.Join(queryStrings, "&")
-	}
-
-	req, err := http.NewRequest("POST", queryURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSignRequest generates requests for Sign with JSON body
-func NewSignRequest(server string, body SignRequest) (*http.Request, error) {
-	var bodyReader io.Reader
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-
-	return NewSignRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSignRequestWithBody generates requests for Sign with non-JSON body
-func NewSignRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/sign", server)
-
-	req, err := http.NewRequest("POST", queryURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
-// NewVerifyRequest generates requests for Verify with JSON body
-func NewVerifyRequest(server string, body VerifyRequest) (*http.Request, error) {
-	var bodyReader io.Reader
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-
-	return NewVerifyRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewVerifyRequestWithBody generates requests for Verify with non-JSON body
-func NewVerifyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	queryURL := fmt.Sprintf("%s/crypto/verify", server)
-
-	req, err := http.NewRequest("POST", queryURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-	return req, nil
-}
-
 // GenerateKeyPairParams defines parameters for GenerateKeyPair.
 type GenerateKeyPairParams struct {
-	LegalEntityURI LegalEntityURI `json:"legalEntityURI"`
+	LegalEntity Identifier `json:"legalEntity"`
 }
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// decrypt a cipherText for the given legalEntity (POST /crypto/decrypt)
 	Decrypt(ctx echo.Context) error
-	// encrypt a piece of data for a list of public keys/legalEntityURI's. A single symmetric keys will be used for all entries (POST /crypto/encrypt)
+	// encrypt a piece of data for a list of public keys/legalEntity's. A single symmetric keys will be used for all entries (POST /crypto/encrypt)
 	Encrypt(ctx echo.Context) error
 	// calculate an externalId for an identifier for a given legalEntity (POST /crypto/external_id)
 	ExternalId(ctx echo.Context) error
@@ -396,16 +153,16 @@ func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	// Parameter object where we will unmarshal all parameters from the
 	// context.
 	var params GenerateKeyPairParams
-	// ------------- Required query parameter "legalEntityURI" -------------
-	if paramValue := ctx.QueryParam("legalEntityURI"); paramValue != "" {
+	// ------------- Required query parameter "legalEntity" -------------
+	if paramValue := ctx.QueryParam("legalEntity"); paramValue != "" {
 
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Query argument legalEntityURI is required, but not found"))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Query argument legalEntity is required, but not found"))
 	}
 
-	err = runtime.BindQueryParameter("form", true, true, "legalEntityURI", ctx.QueryParams(), &params.LegalEntityURI)
+	err = runtime.BindQueryParameter("form", true, true, "legalEntity", ctx.QueryParams(), &params.LegalEntity)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter legalEntityURI: %s", err))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter legalEntity: %s", err))
 	}
 
 	// Invoke the callback with all the unmarshalled arguments
@@ -450,31 +207,33 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"jZLwGgAA",
+	"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",
+	"PSysVn8HAAD//+IfwiUkGwAA",
 }
 
 // GetSwagger returns the Swagger specification corresponding to the generated code
