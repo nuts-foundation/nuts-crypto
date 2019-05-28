@@ -47,7 +47,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 		client := createTempEngine()
 		defer emptyTemp()
 
-		err := client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -58,7 +58,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 	//	client := createTempEngine()
 	//	defer emptyTemp()
 	//
-	//	client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+	//	client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 	//
 	//	entries := len(client.keyCache)
 	//	if entries != 1 {
@@ -73,7 +73,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 			keySize: 10,
 		}
 
-		err := client.GenerateKeyPairFor(types.LegalEntity{"https://nuts.nl/identities/agbcode#00000000"})
+		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 		defer emptyTemp()
 
 		if err == nil {
