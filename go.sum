@@ -17,6 +17,7 @@ github.com/getkin/kin-openapi v0.2.0 h1:PbHHtYZpjKwZtGlIyELgA2DploRrsaXztoNNx9Hj
 github.com/getkin/kin-openapi v0.2.0/go.mod h1:V1z9xl9oF5Wt7v32ne4FmiF1alpS4dM6mNzoywPOXlk=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
+github.com/go-bindata/go-bindata v3.1.1+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b h1:VKtxabqXZkF25pY9ekfRL6a582T4P37/31XEstQ5p58=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/mock v1.3.1 h1:qGJ6qTW+x6xX/my+8YUVl4WNpX9B7+/l2tRsHGZ7f2s=
@@ -51,10 +52,16 @@ github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQz
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/nuts-foundation/nuts-crypto v0.0.0-20190514100741-540cb973b331/go.mod h1:WYfWFdU0lVkXCBuNNPAPfo6y6xwIEzMpLp3CkfTEto4=
 github.com/nuts-foundation/nuts-crypto v0.0.0-20190528080626-e86cf752a066/go.mod h1:m1QkgQOor1ntbMGy1un6m+Gc9kFDDr+DwhL8v+sZk4g=
+github.com/nuts-foundation/nuts-crypto v0.0.0-20190531090539-3dcbaf956e25/go.mod h1:RP62FLETAn90pgwvFC3nn5Oc2GPpNI52lXwCyDKRlHM=
+github.com/nuts-foundation/nuts-fhir-validation v0.0.0-20190531100010-e2c4af6ddd70 h1:SLxyOJfR+9KE+7/AF893m7IHnjiPhfkhDGTvu9Vdou0=
+github.com/nuts-foundation/nuts-fhir-validation v0.0.0-20190531100010-e2c4af6ddd70/go.mod h1:3r14ATalZl+oYGJMEY6/VMmfbGKeWsK7Hitk46ZRiMg=
 github.com/nuts-foundation/nuts-go v0.0.0-20190513130535-6db5fc9f485ca h1:jPiCkYCCg+3PrkT+gopIV5+zZ06XNl8eQOywpxYyWl4=
 github.com/nuts-foundation/nuts-go v0.0.0-20190513130535-6db5fc9f485ca/go.mod h1:vDPY3Qk0A8DfztMw9LukSk60hgG1BpaBV6bhGB/c6rc=
 github.com/nuts-foundation/nuts-go v0.0.0-20190513130535-ed32562df4321 h1:eAGsfxPTrhbeTDZeCTQRGXJVK76xCKHLVHU46mLmjH4=
 github.com/nuts-foundation/nuts-go v0.0.0-20190513130535-ed32562df4321/go.mod h1:t2PnZu3V0wFlv2npZvXEC7jhrpDViEGrMYhYy/FMh0U=
+github.com/nuts-foundation/nuts-go v0.0.0-20190531091145-8849e4f78c5a/go.mod h1:AAiSruIx7w+aVvkPmXt5k2v62/QHvBC8/8Sa8EmgQPg=
+github.com/nuts-foundation/nuts-go v0.0.0-20190531110251-4cdd6f59cf74 h1:oGlz32LhvO2QTliuMMjDW+bLBjKjWis/ONtNqthYdwk=
+github.com/nuts-foundation/nuts-go v0.0.0-20190531110251-4cdd6f59cf74/go.mod h1:pgQb/sYzpjTTOLGWhZkUzIepFMQk10LQD0We/en3rAg=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -81,6 +88,12 @@ github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyC
 github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4/go.mod h1:50wTf68f99/Zt14pr046Tgt3Lp2vLyFZKzbFXTOabXw=
 github.com/valyala/fasttemplate v1.0.1 h1:tY9CJiPnMXf1ERmG2EyK7gNUd+c6RKGD0IfU8WdUSz8=
 github.com/valyala/fasttemplate v1.0.1/go.mod h1:UQGH1tvbgY+Nz5t2n7tXsz52dQxojPUpymEIMZ47gx8=
+github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f h1:J9EGpcZtP0E/raorCMxlFGSTBrsSlaDGf3jU/qvAE2c=
+github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
+github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 h1:EzJWgHovont7NscjpAxXsDA8S8BMYve8Y5+7cuRE7R0=
+github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415/go.mod h1:GwrjFmJcFw6At/Gs6z4yjiIwzuJ1/+UwLxMQDVQXShQ=
+github.com/xeipuuv/gojsonschema v1.1.0 h1:ngVtJC9TY/lg0AA/1k48FYhBrhRoFlEmWzsehpNAaZg=
+github.com/xeipuuv/gojsonschema v1.1.0/go.mod h1:5yf86TLmAcydyeJq5YvxkGPE2fm/u4myDekKRoLuqhs=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190130090550-b01c7a725664/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
@@ -108,5 +121,7 @@ golang.org/x/tools v0.0.0-20190425150028-36563e24a262/go.mod h1:RgjU9mgBXZiqYHBn
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/thedevsaddam/gojsonq.v2 v2.2.1 h1:U8j1mHsAnVkVlzZYQksm4Fh9fmHANmVJiBHBXVOqbSs=
+gopkg.in/thedevsaddam/gojsonq.v2 v2.2.1/go.mod h1:HBelnCeVANZNhSEb9VArE6CFYrmP2CSIBKP4ftgsl/M=
 gopkg.in/yaml.v2 v2.2.2 h1:ZCJp+EgiOT7lHqUV2J862kp8Qj64Jo6az82+3Td9dZw=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=

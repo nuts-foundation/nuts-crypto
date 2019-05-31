@@ -32,6 +32,7 @@ func NewCryptoEngine() *engine.Engine {
 		Cmd: cb.Cmd(),
 		Configure: cb.Configure,
 		FlagSet:FlagSet(),
+		Name: "Crypto",
 		Routes: func(router runtime.EchoRouter) {
 			generated.RegisterHandlers(router, cb)
 		},
