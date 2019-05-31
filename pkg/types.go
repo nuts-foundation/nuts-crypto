@@ -19,11 +19,11 @@
 // types and interfaces used by all other packages
 package types
 
-// --cryptobackend config flag
-const ConfigBackend string = "cryptobackend"
+// --storage config flag
+const ConfigStorage string = "storage"
 
-// default setting for --cryptobackend "fs"
-const ConfigBackendFs string = "fs"
+// default setting for --storage "fs"
+const ConfigStorageFs string = "fs"
 
 // --fspath config flag
 const ConfigFSPath string = "fspath"
@@ -47,13 +47,4 @@ type DoubleEncryptedCipherText struct {
 	CipherText []byte
 	CipherTextKeys [][]byte
 	Nonce []byte
-}
-
-// Generic error
-type Error struct {
-	Msg string
-}
-// error interface
-func (ce Error) Error() string {
-	return ce.Msg
 }

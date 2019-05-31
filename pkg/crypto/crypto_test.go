@@ -1,6 +1,6 @@
 /*
  * Nuts crypto
- * Copyright (C) 2019 Nuts community
+ * Copyright (C) 2019. Nuts community
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,35 +16,38 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package engine
+package crypto
 
 import (
-	"bytes"
-	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/nuts-foundation/nuts-crypto/pkg/backend"
-	"github.com/nuts-foundation/nuts-go/mock"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 )
 
-func TestNewCryptoEngine(t *testing.T) {
-	t.Run("New returns a fileSystemClient with default keySize", func(t *testing.T) {
-		client := NewCryptoEngine()
+func TestCryptoBackend(t *testing.T) {
+	t.Run("CryptoBackend always returns same instance", func(t *testing.T) {
+		client := CryptoBackend()
+		client2 := CryptoBackend()
+
+		if client != client2 {
+			t.Error("Expected instances to be the same")
+		}
+	})
+
+	t.Run("CryptoBackend with default keysize", func(t *testing.T) {
+		client := CryptoBackend()
 
 		if client.keySize != types.ConfigKeySizeDefault {
-			t.Errorf("Expected default keySize 2048, Got %d", client.keySize)
+			t.Errorf("Expected keySize to be %d, got %d", types.ConfigKeySizeDefault, client.keySize)
 		}
 	})
 }
 
-func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
+func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
@@ -67,9 +70,8 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 	//})
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
-		client := DefaultCryptoEngine{
-			backend: createTempBackend(),
-			//keyCache: make(map[string]rsa.PrivateKey),
+		client := DefaultCryptoBackend{
+			storage: createTempStorage(),
 			keySize: 10,
 		}
 
@@ -86,7 +88,7 @@ func TestCryptoEngine_GenerateKeyPair(t *testing.T) {
 
 func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -112,7 +114,7 @@ func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -137,7 +139,7 @@ func TestCryptoEngine_DecryptCipherTextFor(t *testing.T) {
 
 func TestCryptoEngine_encryptPlainTextFor(t *testing.T) {
 	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -158,7 +160,7 @@ func TestCryptoEngine_encryptPlainTextFor(t *testing.T) {
 
 func TestCryptoEngine_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -189,7 +191,7 @@ func TestDefaultCryptoEngine_VerifyWith(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		data := []byte("hello")
 		legalEntity := types.LegalEntity{URI: "test"}
-		client := createTempEngine()
+		client := defaultBackend()
 		client.GenerateKeyPairFor(legalEntity)
 		defer emptyTemp()
 
@@ -219,7 +221,7 @@ func TestDefaultCryptoEngine_VerifyWith(t *testing.T) {
 
 func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -239,7 +241,7 @@ func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 	})
 
 	t.Run("ExternalId generates error for unknown legalEntity", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -260,7 +262,7 @@ func TestCryptoEngine_ExternalIdFor(t *testing.T) {
 func TestDefaultCryptoEngine_PublicKey(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test"}
-		client := createTempEngine()
+		client := defaultBackend()
 		client.GenerateKeyPairFor(legalEntity)
 		defer emptyTemp()
 
@@ -276,20 +278,9 @@ func TestDefaultCryptoEngine_PublicKey(t *testing.T) {
 	})
 }
 
-func newRootCommand() *cobra.Command {
-	testRootCommand := &cobra.Command{
-		Use: "root",
-		Run: func(cmd *cobra.Command, args []string) {
-
-		},
-	}
-
-	return testRootCommand
-}
-
-func TestCryptoEngine_Cmd(t *testing.T) {
+func TestDefaultCrypto_Cmd(t *testing.T) {
 	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
-		e := NewCryptoEngine()
+		e := CryptoBackend()
 		cmd := e.Cmd()
 
 		if cmd.Name() != "crypto" {
@@ -302,81 +293,18 @@ func TestCryptoEngine_Cmd(t *testing.T) {
 	})
 }
 
-func TestCryptoEngine_Configure(t *testing.T) {
-	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
-		e := NewCryptoEngine()
-		viper.Set(types.ConfigKeySize, 2047)
-		err := e.Configure()
-
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
-		}
-
-		if err.Error() != "invalid keySize, needs to be at least 2048 bits" {
-			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
-		}
-	})
-}
-
-func TestCryptoEngine_FlagSet(t *testing.T) {
-	t.Run("Cobra help should list flags", func(t *testing.T) {
-		e := NewCryptoEngine()
-		cmd := newRootCommand()
-		cmd.Flags().AddFlagSet(e.FlagSet())
-		cmd.SetArgs([]string{"--help"})
-
-		buf := new(bytes.Buffer)
-		cmd.SetOutput(buf)
-
-		_, err := cmd.ExecuteC()
-
-		if err != nil {
-			t.Errorf("Expected no error, got %s", err.Error())
-		}
-
-		result := buf.String()
-		println(result)
-		if !strings.Contains(result, "--cryptobackend") {
-			t.Errorf("Expected --cryptobackend to be command line flag")
-		}
-
-		if !strings.Contains(result, "--fspath") {
-			t.Errorf("Expected --fspath to be command line flag")
-		}
-
-	})
-}
-
-func TestCryptoEngine_Routes(t *testing.T) {
-	t.Run("Registers the 4 available routes", func(t *testing.T) {
-		se := createTempEngine()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		echo := mock.NewMockEchoRouter(ctrl)
-
-		echo.EXPECT().POST("/crypto/sign", gomock.Any())
-		echo.EXPECT().POST("/crypto/verify", gomock.Any())
-		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
-		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
-		echo.EXPECT().POST("/crypto/external_id", gomock.Any())
-		echo.EXPECT().POST("/crypto/generate", gomock.Any())
-
-		se.Routes(echo)
-	})
-}
-
-func createTempEngine() DefaultCryptoEngine {
-	client := DefaultCryptoEngine{
-		backend: createTempBackend(),
+func defaultBackend() DefaultCryptoBackend {
+	backend := DefaultCryptoBackend{
+		storage: createTempStorage(),
 		//keyCache: make(map[string]rsa.PrivateKey),
 		keySize: types.ConfigKeySizeDefault,
 	}
 
-	return client
+	return backend
 }
 
-func createTempBackend() backend.Backend {
-	b, _ := backend.NewFileSystemBackend("../../temp")
+func createTempStorage() storage.Storage {
+	b, _ := storage.NewFileSystemBackend("../../temp")
 	return b
 }
 

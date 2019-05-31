@@ -16,24 +16,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package cmd
+package crypto
 
 import (
-	goflag "flag"
-	"github.com/nuts-foundation/nuts-crypto/pkg/crypto"
-	flag "github.com/spf13/pflag"
+	"github.com/deepmap/oapi-codegen/pkg/runtime"
+	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
+	engine "github.com/nuts-foundation/nuts-go/pkg"
 )
 
-var e = crypto.CryptoBackend()
-var rootCmd = e.Cmd()
+// NewCryptoEngine the engine configuration for nuts-go.
+func NewCryptoEngine() *engine.Engine {
+	cb := CryptoBackend()
 
-func Execute() {
-	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	goflag.Parse()
-
-	if err := e.Configure(); err != nil {
-		panic(err)
+	return &engine.Engine {
+		Cmd: cb.Cmd(),
+		Configure: cb.Configure,
+		FlagSet:FlagSet(),
+		Routes: func(router runtime.EchoRouter) {
+			generated.RegisterHandlers(router, cb)
+		},
 	}
-
-	rootCmd.Execute()
 }

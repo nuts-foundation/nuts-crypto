@@ -18,7 +18,7 @@
 
 // The backend package contains the various options for storing the actual private keys.
 // Currently only a file backend is supported
-package backend
+package storage
 
 import (
 	"crypto/rsa"
@@ -26,10 +26,11 @@ import (
 	"encoding/pem"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/spf13/viper"
+	. "go/types"
 )
 
-// Backend interface containing functions for storing and retrieving keys
-type Backend interface {
+// Storage interface containing functions for storing and retrieving keys
+type Storage interface {
 	GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error)
 	GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error)
 	SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error
@@ -37,8 +38,8 @@ type Backend interface {
 
 // Helper function to create a new CryptoBackend. It checks the config (via Viper) for a --cryptobackend setting
 // if none are given or this is set to 'fs', the filesystem backend is used.
-func NewCryptoBackend() (Backend, error) {
-	if viper.GetString(types.ConfigBackend) == types.ConfigBackendFs || viper.GetString(types.ConfigBackend) == "" {
+func NewCryptoStorage() (Storage, error) {
+	if viper.GetString(types.ConfigStorage) == types.ConfigStorageFs || viper.GetString(types.ConfigStorage) == "" {
 		fspath := viper.GetString(types.ConfigFSPath)
 		if fspath == "" {
 			fspath = types.ConfigFSPathDefault
@@ -47,7 +48,7 @@ func NewCryptoBackend() (Backend, error) {
 		return NewFileSystemBackend(fspath)
 	}
 
-	return nil, types.Error{Msg: "Only fs backend available for now"}
+	return nil, Error{Msg: "Only fs backend available for now"}
 }
 
 // shared function to convert bytes to a RSA private key

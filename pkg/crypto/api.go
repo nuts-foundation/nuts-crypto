@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package engine
+package crypto
 
 import (
 	"encoding/base64"
@@ -33,7 +33,7 @@ import (
 // implementation of pkg/generated/api_gen.go#ServerInterface
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
-func (ce *DefaultCryptoEngine) GenerateKeyPair(ctx echo.Context, params generated.GenerateKeyPairParams) error {
+func (ce *DefaultCryptoBackend) GenerateKeyPair(ctx echo.Context, params generated.GenerateKeyPairParams) error {
 	if err := ce.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (ce *DefaultCryptoEngine) GenerateKeyPair(ctx echo.Context, params generate
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
-func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
+func (ce *DefaultCryptoBackend) Encrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
@@ -92,7 +92,7 @@ func (ce *DefaultCryptoEngine) Encrypt(ctx echo.Context) error {
 }
 
 // Decrypt is the API handler function for decrypting a piece of data.
-func (ce *DefaultCryptoEngine) Decrypt(ctx echo.Context) error {
+func (ce *DefaultCryptoBackend) Decrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
@@ -133,7 +133,7 @@ func (ce *DefaultCryptoEngine) Decrypt(ctx echo.Context) error {
 }
 
 // ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
-func (ce *DefaultCryptoEngine) ExternalId(ctx echo.Context) error {
+func (ce *DefaultCryptoBackend) ExternalId(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
@@ -170,7 +170,7 @@ func (ce *DefaultCryptoEngine) ExternalId(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, externalIdResponse)
 }
 
-func (ce *DefaultCryptoEngine) Sign(ctx echo.Context) error {
+func (ce *DefaultCryptoBackend) Sign(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
@@ -216,7 +216,7 @@ func (ce *DefaultCryptoEngine) Sign(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, signResponse)
 }
 
-func (ce *DefaultCryptoEngine) Verify(ctx echo.Context) error {
+func (ce *DefaultCryptoBackend) Verify(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())

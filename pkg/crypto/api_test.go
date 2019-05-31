@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package engine
+package crypto
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ import (
 
 func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
-		se := createTempEngine()
+		se := defaultBackend()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -50,13 +50,13 @@ func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
 
 func TestServiceWrapper_Encrypt(t *testing.T) {
 	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 		client.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.backend.GetPublicKey(legalEntity)
+		pubKey, _ := client.storage.GetPublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -86,7 +86,7 @@ func TestServiceWrapper_Encrypt(t *testing.T) {
 
 func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -120,7 +120,7 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 
 func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -149,7 +149,7 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Sign(t *testing.T) {
-	client := createTempEngine()
+	client := defaultBackend()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
@@ -236,13 +236,13 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
-	client := createTempEngine()
+	client := defaultBackend()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
 	client.GenerateKeyPairFor(legalEntity)
 
-	pubKey, _ := client.backend.GetPublicKey(legalEntity)
+	pubKey, _ := client.storage.GetPublicKey(legalEntity)
 	pemPubKey := string(publicKeyToBytes(pubKey))
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
@@ -335,7 +335,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 
 	t.Run("All OK returns 200", func(t *testing.T) {
-		client := createTempEngine()
+		client := defaultBackend()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
