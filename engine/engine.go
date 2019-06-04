@@ -103,7 +103,7 @@ func cmd() *cobra.Command {
 				fmt.Printf("Error printing publicKey: %s", err)
 			}
 
-			fmt.Print(string(bytes))
+			fmt.Println(string(bytes))
 		},
 	})
 
