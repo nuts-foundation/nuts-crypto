@@ -19,17 +19,26 @@
 package cmd
 
 import (
-	goflag "flag"
-	"github.com/nuts-foundation/nuts-crypto/pkg/crypto"
-	flag "github.com/spf13/pflag"
+	"github.com/nuts-foundation/nuts-crypto/engine"
+	cfg "github.com/nuts-foundation/nuts-go/pkg"
 )
 
-var e = crypto.CryptoBackend()
-var rootCmd = e.Cmd()
+var e = engine.NewCryptoEngine()
+var rootCmd = e.Cmd
 
 func Execute() {
-	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	goflag.Parse()
+	c := cfg.NutsConfig()
+	c.IgnoredPrefixes = append(c.IgnoredPrefixes, e.ConfigKey)
+	c.RegisterFlags(e)
+	if err := c.Load(); err != nil {
+		panic(err)
+	}
+
+	c.PrintConfig()
+
+	if err := c.InjectIntoEngine(e); err != nil {
+		panic(err)
+	}
 
 	if err := e.Configure(); err != nil {
 		panic(err)

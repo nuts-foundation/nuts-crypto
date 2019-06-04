@@ -1,6 +1,6 @@
 /*
  * Nuts crypto
- * Copyright (C) 2019 Nuts community
+ * Copyright (C) 2019. Nuts community
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 // types and interfaces used by all other packages
 package types
+
 
 // --storage config flag
 const ConfigStorage string = "storage"

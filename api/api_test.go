@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package api
 
 import (
 	"bytes"
@@ -28,45 +28,47 @@ import (
 	"encoding/pem"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go/mock"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 )
 
 func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
-		se := defaultBackend()
+		se := crypt()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
 		echo.EXPECT().NoContent(http.StatusCreated)
 
-		se.GenerateKeyPair(echo, generated.GenerateKeyPairParams{LegalEntity: "test"})
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 	})
 }
 
 func TestServiceWrapper_Encrypt(t *testing.T) {
 	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
-		client := defaultBackend()
+		client := crypt()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
-		client.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.storage.GetPublicKey(legalEntity)
+		client.C.GenerateKeyPairFor(legalEntity)
+		pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.EncryptRequest{
-			EncryptRequestSubjects: []generated.EncryptRequestSubject{
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
-					LegalEntity: generated.Identifier(legalEntity.URI),
-					PublicKey: generated.PublicKey(string(publicKeyToBytes(pubKey))),
+					LegalEntity: Identifier(legalEntity.URI),
+					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
 				},
 			},
 			PlainText:      base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -86,24 +88,24 @@ func TestServiceWrapper_Encrypt(t *testing.T) {
 
 func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
-		client := defaultBackend()
+		client := crypt()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
-		client.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.PublicKey(legalEntity)
+		client.C.GenerateKeyPairFor(legalEntity)
+		pubKey, _ := client.C.PublicKey(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		encRecord, _ := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
-		jsonRequest := generated.DecryptRequest{
-			LegalEntity: generated.Identifier(legalEntity.URI),
-			CipherText:     base64.StdEncoding.EncodeToString(encRecord.CipherText),
-			CipherTextKey:  base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
-			Nonce:          base64.StdEncoding.EncodeToString(encRecord.Nonce),
+		encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
+		jsonRequest := DecryptRequest{
+			LegalEntity:   Identifier(legalEntity.URI),
+			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText),
+			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
+			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -120,19 +122,19 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 
 func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
-		client := defaultBackend()
+		client := crypt()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
-		subject := generated.Identifier("test")
-		client.GenerateKeyPairFor(legalEntity)
+		subject := Identifier("test")
+		client.C.GenerateKeyPairFor(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.ExternalIdRequest{
-			LegalEntity: generated.Identifier(legalEntity.URI),
+		jsonRequest := ExternalIdRequest{
+			LegalEntity: Identifier(legalEntity.URI),
 			Subject:     subject,
 		}
 
@@ -149,19 +151,19 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Sign(t *testing.T) {
-	client := defaultBackend()
+	client := crypt()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPairFor(legalEntity)
 
 	t.Run("Missing plainText returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.SignRequest{
-			LegalEntity: generated.Identifier(legalEntity.URI),
+		jsonRequest := SignRequest{
+			LegalEntity: Identifier(legalEntity.URI),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -187,7 +189,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.SignRequest{
+		jsonRequest := SignRequest{
 			PlainText: "text",
 		}
 
@@ -214,9 +216,9 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.SignRequest{
-			LegalEntity: generated.Identifier(legalEntity.URI),
-			PlainText: "text",
+		jsonRequest := SignRequest{
+			LegalEntity: Identifier(legalEntity.URI),
+			PlainText:   "text",
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -236,17 +238,17 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
-	client := defaultBackend()
+	client := crypt()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPairFor(legalEntity)
 
-	pubKey, _ := client.storage.GetPublicKey(legalEntity)
+	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
 	pemPubKey := string(publicKeyToBytes(pubKey))
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
-	signature, _ := client.SignFor([]byte(plainText), legalEntity)
+	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
 	hexSignature := hex.EncodeToString(signature)
 
 
@@ -255,7 +257,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.VerifyRequest{
+		jsonRequest := VerifyRequest{
 			PlainText: plainText,
 			Signature: hexSignature,
 		}
@@ -283,8 +285,8 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.VerifyRequest{
-			PublicKey: generated.PublicKey(pemPubKey),
+		jsonRequest := VerifyRequest{
+			PublicKey: PublicKey(pemPubKey),
 			Signature: hexSignature,
 		}
 
@@ -311,9 +313,9 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.VerifyRequest{
+		jsonRequest := VerifyRequest{
 			PlainText: plainText,
-			PublicKey: generated.PublicKey(pemPubKey),
+			PublicKey: PublicKey(pemPubKey),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -335,19 +337,19 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 
 	t.Run("All OK returns 200", func(t *testing.T) {
-		client := defaultBackend()
+		client := crypt()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
-		client.GenerateKeyPairFor(legalEntity)
+		client.C.GenerateKeyPairFor(legalEntity)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		jsonRequest := generated.VerifyRequest{
+		jsonRequest := VerifyRequest{
 			Signature: hexSignature,
-			PublicKey: generated.PublicKey(pemPubKey),
+			PublicKey: PublicKey(pemPubKey),
 			PlainText: base64PlainText,
 		}
 
@@ -376,4 +378,26 @@ func publicKeyToBytes(pub *rsa.PublicKey) []byte {
 	})
 
 	return pubBytes
+}
+
+func crypt() ApiWrapper {
+	backend := pkg.Crypto{
+		Storage: createTempStorage(),
+		Config: pkg.CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+	}
+
+	return ApiWrapper{C: &backend}
+}
+
+func createTempStorage() storage.Storage {
+	b, _ := storage.NewFileSystemBackend("../../temp")
+	return b
+}
+
+func emptyTemp() {
+	err := os.RemoveAll("../../temp/")
+
+	if err != nil {
+		println(err.Error())
+	}
 }

@@ -1,6 +1,6 @@
 /*
  * Nuts crypto
- * Copyright (C) 2019 Nuts community
+ * Copyright (C) 2019. Nuts community
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package engine
 
 import (
 	"bytes"
 	"github.com/golang/mock/gomock"
-	types "github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-go/mock"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"strings"
 	"testing"
 )
@@ -61,18 +59,17 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 	})
 }
 
-func TestNewCryptoEngine_Configure(t *testing.T) {
-	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
+func TestNewCryptoEngine_Cmd(t *testing.T) {
+	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
 		e := NewCryptoEngine()
-		viper.Set(types.ConfigKeySize, 2047)
-		err := e.Configure()
+		cmd := e.Cmd
 
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
+		if cmd.Name() != "crypto" {
+			t.Errorf("Expected Cmd name to equal [crypto], got %s", cmd.Name())
 		}
 
-		if err.Error() != "-: invalid keySize, needs to be at least 2048 bits" {
-			t.Errorf("Expected error [-: invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
+		if len(cmd.Commands()) != 2 {
+			t.Errorf("Expected Cmd to have 1 sub-command, got %d", len(cmd.Commands()))
 		}
 	})
 }

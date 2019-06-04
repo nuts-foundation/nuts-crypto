@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package pkg
 
 import (
 	"reflect"
@@ -27,8 +27,8 @@ func TestNewCryptoClient(t *testing.T) {
 	t.Run("returns defaultCryptoEngine by default", func(t *testing.T) {
 		cc := NewCryptoClient()
 
-		if reflect.TypeOf(cc).String() != "*crypto.DefaultCryptoBackend" {
-			t.Errorf("Expected CryptoClient to be of type *crypto.DefaultCryptoBackend, got %s", reflect.TypeOf(cc))
+		if reflect.TypeOf(cc).String() != "*pkg.Crypto" {
+			t.Errorf("Expected CryptoClient to be of type *pkg.Crypto, got %s", reflect.TypeOf(cc))
 		}
 	})
 }

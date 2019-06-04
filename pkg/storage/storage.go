@@ -24,9 +24,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/spf13/viper"
-	. "go/types"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
 // Storage interface containing functions for storing and retrieving keys
@@ -34,21 +32,6 @@ type Storage interface {
 	GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error)
 	GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error)
 	SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error
-}
-
-// Helper function to create a new CryptoBackend. It checks the config (via Viper) for a --cryptobackend setting
-// if none are given or this is set to 'fs', the filesystem backend is used.
-func NewCryptoStorage() (Storage, error) {
-	if viper.GetString(types.ConfigStorage) == types.ConfigStorageFs || viper.GetString(types.ConfigStorage) == "" {
-		fspath := viper.GetString(types.ConfigFSPath)
-		if fspath == "" {
-			fspath = types.ConfigFSPathDefault
-		}
-
-		return NewFileSystemBackend(fspath)
-	}
-
-	return nil, Error{Msg: "Only fs backend available for now"}
 }
 
 // shared function to convert bytes to a RSA private key

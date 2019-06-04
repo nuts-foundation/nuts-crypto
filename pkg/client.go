@@ -16,11 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package pkg
 
-import (
-	types "github.com/nuts-foundation/nuts-crypto/pkg"
-)
+import "github.com/nuts-foundation/nuts-crypto/pkg/types"
 
 // CryptoClient defines the functions than can be called by a Cmd, Direct or via rest call.
 type Client interface {
@@ -43,9 +41,9 @@ type Client interface {
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
 func NewCryptoClient() Client {
 	// todo: use configuration to choose client
-	backend := CryptoBackend()
-	if err := backend.Configure(); err != nil {
+	instance := CryptoInstance()
+	if err := instance.Configure(); err != nil {
 		panic(err)
 	}
-	return backend
+	return instance
 }

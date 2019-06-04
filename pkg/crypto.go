@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package pkg
 
 import (
 	"crypto"
@@ -29,139 +29,88 @@ import (
 	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
-	types "github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	gotypes "go/types"
 	"io"
 	"sync"
 )
 
-// default implementation for CryptoBackend
-type DefaultCryptoBackend struct {
-	storage storage.Storage
-	//keyCache map[string]rsa.PrivateKey
-	keySize int
+type CryptoConfig struct {
+	Keysize int
+	Storage string
+	Fspath string
 }
 
-var instance *DefaultCryptoBackend
+// default implementation for CryptoInstance
+type Crypto struct {
+	Storage storage.Storage
+	//keyCache map[string]rsa.PrivateKey
+	Config CryptoConfig
+	configOnce sync.Once
+	configDone bool
+}
+
+var instance *Crypto
 var oneBackend sync.Once
 
-func CryptoBackend() *DefaultCryptoBackend {
+func CryptoInstance() *Crypto {
 	oneBackend.Do(func() {
-		instance = &DefaultCryptoBackend{
-			//keyCache: make(map[string]rsa.PrivateKey),
-			keySize: types.ConfigKeySizeDefault,
+		instance = &Crypto{
+			Config: CryptoConfig{
+				Keysize: types.ConfigKeySizeDefault,
+			},
 		}
 	})
 	return instance
 }
 
-// Cmd gives the sub-commands made available through crypto:
-// * generateKeyPair: generate a new keyPair for a given legalEntity
-// * publicKey: retrieve the keyPair for a given legalEntity
-func (ce *DefaultCryptoBackend) Cmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "crypto",
-		Short: "crypto commands",
-	}
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "generateKeyPair [legalEntityURI]",
-		Short: "generate a new keyPair for a legalEntity",
-
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return gotypes.Error{Msg: "requires a URI argument"}
-			}
-
-			return nil
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			cc := NewCryptoClient()
-			cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]})
-		},
-	})
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "publicKey [legalEntityURI]",
-		Short: "views the publicKey for a given legal entity",
-
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return gotypes.Error{Msg: "requires a URI argument"}
-			}
-
-			return nil
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			cc := NewCryptoClient()
-			bytes, err := cc.PublicKey(types.LegalEntity{URI: args[0]})
-
-			if err != nil {
-				fmt.Printf("Error printing publicKey: %s", err)
-			}
-
-			fmt.Print(string(bytes))
-		},
-	})
-
-	return cmd
-}
-
-var configOnce sync.Once
-var ConfigDone bool
-
 // Configure loads the given configurations in the engine. Any wrong combination will return an error
-func (ce *DefaultCryptoBackend) Configure() error {
+func (ce *Crypto) Configure() error {
 	var err error
 
-	configOnce.Do(func() {
-		if viper.IsSet(types.ConfigKeySize) {
-			keySize := viper.GetInt(types.ConfigKeySize)
-
-			if keySize < 2048 {
-				err = gotypes.Error{Msg: "invalid keySize, needs to be at least 2048 bits"}
-				return
-			}
-			ce.keySize = keySize
+	ce.configOnce.Do(func() {
+		if ce.Config.Keysize < 2048 {
+			err = gotypes.Error{Msg: "invalid keySize, needs to be at least 2048 bits"}
+			return
 		}
 
-		ce.storage, err = storage.NewCryptoStorage()
-		ConfigDone = true
+		ce.Storage, err = ce.newCryptoStorage()
+		ce.configDone = true
 	})
 
 	return err
 }
 
-// FlagSet returns the configuration possibilities for crypto: --backend, --fspath, --keysize
-func FlagSet() *pflag.FlagSet {
-	flags := pflag.NewFlagSet("crypto", pflag.ContinueOnError)
+// Helper function to create a new CryptoInstance. It checks the config (via Viper) for a --cryptobackend setting
+// if none are given or this is set to 'fs', the filesystem backend is used.
+func (ce *Crypto) newCryptoStorage() (storage.Storage, error) {
+	if ce.Config.Storage == types.ConfigStorageFs || ce.Config.Storage == "" {
+		fspath := ce.Config.Fspath
+		if fspath == "" {
+			fspath = types.ConfigFSPathDefault
+		}
 
-	flags.String(types.ConfigStorage, types.ConfigStorageFs, "storage to use, 'fs' for file system (default)")
-	flags.String(types.ConfigFSPath, types.ConfigFSPathDefault, "when file system is used as storage, this configures the path where keys are stored (default .)")
-	flags.Int(types.ConfigKeySize, types.ConfigKeySizeDefault, "number of bits to use when creating new RSA keys")
+		return storage.NewFileSystemBackend(fspath)
+	}
 
-	return flags
+	return nil, gotypes.Error{Msg: "Only fs backend available for now"}
 }
 
 // generate a new rsa keypair for the given legalEntity. The legalEntity uri is base64 encoded and used as filename
 // for the key.
-func (client *DefaultCryptoBackend) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
+func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 	var err error = nil
 
 	reader := rand.Reader
 
-	key, err := rsa.GenerateKey(reader, client.keySize)
+	key, err := rsa.GenerateKey(reader, client.Config.Keysize)
 
 	if err != nil {
 		return err
 	}
 
-	err = client.storage.SavePrivateKey(legalEntity, key)
+	err = client.Storage.SavePrivateKey(legalEntity, key)
 
 	//if err == nil {
 	//	// also store key in cache
@@ -173,7 +122,7 @@ func (client *DefaultCryptoBackend) GenerateKeyPairFor(legalEntity types.LegalEn
 
 // Main decryption function, first the symmetric key will be decrypted using the private key of the legal entity.
 // The resulting symmetric key will then be used to decrypt the given cipherText.
-func (client *DefaultCryptoBackend) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
 
 	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
 
@@ -199,7 +148,7 @@ func (client *DefaultCryptoBackend) DecryptKeyAndCipherTextFor(cipherText types.
 }
 
 // EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-func (client *DefaultCryptoBackend) EncryptKeyAndPlainTextWith(plainText []byte, keys []string) (types.DoubleEncryptedCipherText, error) {
+func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string) (types.DoubleEncryptedCipherText, error) {
 	cipherBytes, cipher, err := generateSymmetricKey()
 
 	if err != nil {
@@ -269,8 +218,8 @@ func symmetricKeyToBlockCipher(ciph []byte) (cipher.AEAD, error) {
 // ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
 // This is not for security but does generate the same unique identifier every time. It should only be used as unique identifier for consent records. Using the private key also ensure the BSN can not be deduced from the externalID.
 // todo: check by others if this makes sense
-func (client *DefaultCryptoBackend) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
-	pk, err := client.storage.GetPrivateKey(entity)
+func (client *Crypto) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
+	pk, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
 	}
@@ -285,11 +234,11 @@ func (client *DefaultCryptoBackend) ExternalIdFor(data []byte, entity types.Lega
 // SignFor signs a piece of data for a legal entity. This requires the private key for the legal entity to be present.
 // It is expected that the plain data is given. It uses the SHA512 hashing function
 // todo: SHA_512?
-func (client *DefaultCryptoBackend) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
 	// random
 	rng := rand.Reader
 
-	rsaPrivateKey, err := client.storage.GetPrivateKey(legalEntity)
+	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
 	hashedData := sha512.Sum512(data)
 
 	if err != nil {
@@ -306,7 +255,7 @@ func (client *DefaultCryptoBackend) SignFor(data []byte, legalEntity types.Legal
 }
 
 // VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA512 hashing function.
-func (client *DefaultCryptoBackend) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
+func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
 	key, err := pemToPublicKey([]byte(pemKey))
 
 	if err != nil {
@@ -321,8 +270,8 @@ func (client *DefaultCryptoBackend) VerifyWith(data []byte, sig []byte, pemKey s
 	return true, nil
 }
 
-func (client *DefaultCryptoBackend) PublicKey(legalEntity types.LegalEntity) (string, error) {
-	pubKey, err := client.storage.GetPublicKey(legalEntity)
+func (client *Crypto) PublicKey(legalEntity types.LegalEntity) (string, error) {
+	pubKey, err := client.Storage.GetPublicKey(legalEntity)
 
 	if err != nil {
 		return "", err
@@ -333,9 +282,9 @@ func (client *DefaultCryptoBackend) PublicKey(legalEntity types.LegalEntity) (st
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.
 // It returns an error if the given legalEntity does not have a private key.
-func (client *DefaultCryptoBackend) decryptCipherTextFor(cipherText []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) decryptCipherTextFor(cipherText []byte, legalEntity types.LegalEntity) ([]byte, error) {
 
-	key, err := client.storage.GetPrivateKey(legalEntity)
+	key, err := client.Storage.GetPrivateKey(legalEntity)
 
 	if err != nil {
 		return nil, err
@@ -352,9 +301,9 @@ func (client *DefaultCryptoBackend) decryptCipherTextFor(cipherText []byte, lega
 
 // Encrypt a piece of data for a legalEntity. Usually encryptPlainTextWith will be used with a public key of a different (unknown) legalEntity.
 // It returns an error if the given legalEntity does not have a private key.
-func (client *DefaultCryptoBackend) encryptPlainTextFor(plaintext []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) encryptPlainTextFor(plaintext []byte, legalEntity types.LegalEntity) ([]byte, error) {
 
-	publicKey, err := client.storage.GetPublicKey(legalEntity)
+	publicKey, err := client.Storage.GetPublicKey(legalEntity)
 
 	if err != nil {
 		return nil, err
@@ -364,7 +313,7 @@ func (client *DefaultCryptoBackend) encryptPlainTextFor(plaintext []byte, legalE
 }
 
 // Encrypt a piece of data with the given public key
-func (client *DefaultCryptoBackend) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey) ([]byte, error) {
+func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey) ([]byte, error) {
 
 	hash := sha512.New()
 	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, key, plaintext, nil)

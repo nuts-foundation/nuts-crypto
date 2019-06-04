@@ -25,7 +25,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	types "github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"os"
 )

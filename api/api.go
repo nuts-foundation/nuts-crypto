@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package crypto
+package api
 
 import (
 	"encoding/base64"
@@ -24,17 +24,19 @@ import (
 	"encoding/json"
 	"github.com/golang/glog"
 	"github.com/labstack/echo/v4"
-	types "github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/nuts-foundation/nuts-crypto/pkg/generated"
+	"github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"net/http"
 )
 
-// implementation of pkg/generated/api_gen.go#ServerInterface
+type ApiWrapper struct {
+	C *pkg.Crypto
+}
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
-func (ce *DefaultCryptoBackend) GenerateKeyPair(ctx echo.Context, params generated.GenerateKeyPairParams) error {
-	if err := ce.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
+func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
+	if err := w.C.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
 		return err
 	}
 
@@ -42,14 +44,14 @@ func (ce *DefaultCryptoBackend) GenerateKeyPair(ctx echo.Context, params generat
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
-func (ce *DefaultCryptoBackend) Encrypt(ctx echo.Context) error {
+func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	var encryptRequest = &generated.EncryptRequest{}
+	var encryptRequest = &EncryptRequest{}
 	err = json.Unmarshal(buf, encryptRequest)
 
 	if err != nil {
@@ -62,7 +64,7 @@ func (ce *DefaultCryptoBackend) Encrypt(ctx echo.Context) error {
 	}
 
 	var pubKeys []string
-	var legalEntities []generated.Identifier
+	var legalEntities []Identifier
 	for _, e := range encryptRequest.EncryptRequestSubjects {
 		pubKeys = append(pubKeys, string(e.PublicKey))
 		legalEntities = append(legalEntities, e.LegalEntity)
@@ -76,7 +78,7 @@ func (ce *DefaultCryptoBackend) Encrypt(ctx echo.Context) error {
 		return err
 	}
 
-	dect, err := ce.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
+	dect, err := w.C.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
 
 	if err != nil {
 		glog.Error(err.Error())
@@ -92,14 +94,14 @@ func (ce *DefaultCryptoBackend) Encrypt(ctx echo.Context) error {
 }
 
 // Decrypt is the API handler function for decrypting a piece of data.
-func (ce *DefaultCryptoBackend) Decrypt(ctx echo.Context) error {
+func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	var decryptRequest = &generated.DecryptRequest{}
+	var decryptRequest = &DecryptRequest{}
 	err = json.Unmarshal(buf, decryptRequest)
 
 	if err != nil {
@@ -118,14 +120,14 @@ func (ce *DefaultCryptoBackend) Decrypt(ctx echo.Context) error {
 		return err
 	}
 
-	plainTextBytes, err := ce.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
+	plainTextBytes, err := w.C.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
 
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	decryptResponse := generated.DecryptResponse{
+	decryptResponse := DecryptResponse{
 		PlainText: base64.StdEncoding.EncodeToString(plainTextBytes),
 	}
 
@@ -133,14 +135,14 @@ func (ce *DefaultCryptoBackend) Decrypt(ctx echo.Context) error {
 }
 
 // ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
-func (ce *DefaultCryptoBackend) ExternalId(ctx echo.Context) error {
+func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	var request = &generated.ExternalIdRequest{}
+	var request = &ExternalIdRequest{}
 	err = json.Unmarshal(buf, request)
 
 	if err != nil {
@@ -155,7 +157,7 @@ func (ce *DefaultCryptoBackend) ExternalId(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing subjectURI in request")
 	}
 
-	shaBytes, err := ce.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
+	shaBytes, err := w.C.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
 		glog.Error(err.Error())
 		return err
@@ -163,21 +165,21 @@ func (ce *DefaultCryptoBackend) ExternalId(ctx echo.Context) error {
 
 	sha := hex.EncodeToString(shaBytes)
 
-	externalIdResponse := generated.ExternalIdResponse{
+	externalIdResponse := ExternalIdResponse{
 		ExternalId: sha,
 	}
 
 	return ctx.JSON(http.StatusOK, externalIdResponse)
 }
 
-func (ce *DefaultCryptoBackend) Sign(ctx echo.Context) error {
+func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	var signRequest = &generated.SignRequest{}
+	var signRequest = &SignRequest{}
 	err = json.Unmarshal(buf, signRequest)
 
 	if err != nil {
@@ -202,28 +204,28 @@ func (ce *DefaultCryptoBackend) Sign(ctx echo.Context) error {
 
 
 	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
-	sig, err := ce.SignFor(plainTextBytes, le)
+	sig, err := w.C.SignFor(plainTextBytes, le)
 
 	if err != nil {
 		glog.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	signResponse := generated.SignResponse{
+	signResponse := SignResponse{
 		Signature: hex.EncodeToString(sig),
 	}
 
 	return ctx.JSON(http.StatusOK, signResponse)
 }
 
-func (ce *DefaultCryptoBackend) Verify(ctx echo.Context) error {
+func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	var verifyRequest = &generated.VerifyRequest{}
+	var verifyRequest = &VerifyRequest{}
 	err = json.Unmarshal(buf, verifyRequest)
 
 	if err != nil {
@@ -257,21 +259,21 @@ func (ce *DefaultCryptoBackend) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	valid, err := ce.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
+	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
 
 	if err != nil {
 		glog.Error(err.Error())
 		return err
 	}
 
-	verifyResponse := generated.VerifyResponse{
+	verifyResponse := VerifyResponse{
 		Outcome: valid,
 	}
 
 	return ctx.JSON(http.StatusOK, verifyResponse)
 }
 
-func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCipherText, error) {
+func decryptRequestToDect(gen DecryptRequest) (types.DoubleEncryptedCipherText, error) {
 	dect := types.DoubleEncryptedCipherText{}
 	var err error
 
@@ -286,18 +288,18 @@ func decryptRequestToDect(gen generated.DecryptRequest) (types.DoubleEncryptedCi
 	return dect, nil
 }
 
-func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []generated.Identifier) generated.EncryptResponse {
+func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []Identifier) EncryptResponse {
 
-	var encryptResponseEntries []generated.EncryptResponseEntry
+	var encryptResponseEntries []EncryptResponseEntry
 
 	for i := range dect.CipherTextKeys {
-		encryptResponseEntries = append(encryptResponseEntries, generated.EncryptResponseEntry{
+		encryptResponseEntries = append(encryptResponseEntries, EncryptResponseEntry{
 			CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKeys[i]),
 			LegalEntity: legalIdentities[i],
 		})
 	}
 
-	return generated.EncryptResponse{
+	return EncryptResponse{
 		CipherText: base64.StdEncoding.EncodeToString(dect.CipherText),
 		EncryptResponseEntries:encryptResponseEntries,
 		Nonce: base64.StdEncoding.EncodeToString(dect.Nonce),
