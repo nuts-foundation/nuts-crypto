@@ -43,5 +43,9 @@ type Client interface {
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
 func NewCryptoClient() Client {
 	// todo: use configuration to choose client
-	return CryptoBackend()
+	backend := CryptoBackend()
+	if err := backend.Configure(); err != nil {
+		panic(err)
+	}
+	return backend
 }
