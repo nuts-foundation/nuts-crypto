@@ -22,10 +22,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/golang/glog"
 	"github.com/labstack/echo/v4"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 )
@@ -47,7 +47,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -55,7 +55,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	err = json.Unmarshal(buf, encryptRequest)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -74,19 +74,19 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
 	dect, err := w.C.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -97,7 +97,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -105,7 +105,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 	err = json.Unmarshal(buf, decryptRequest)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -116,14 +116,14 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
 	plainTextBytes, err := w.C.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -138,7 +138,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -146,7 +146,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	err = json.Unmarshal(buf, request)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -159,7 +159,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 
 	shaBytes, err := w.C.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -175,7 +175,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -183,7 +183,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	err = json.Unmarshal(buf, signRequest)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -198,7 +198,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(signRequest.PlainText)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -207,7 +207,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	sig, err := w.C.SignFor(plainTextBytes, le)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -221,7 +221,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	buf, err := ioutil.ReadAll(ctx.Request().Body)
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -229,7 +229,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	err = json.Unmarshal(buf, verifyRequest)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -248,21 +248,21 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(verifyRequest.PlainText)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
 	sigBytes, err := hex.DecodeString(verifyRequest.Signature)
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
 	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
 
 	if err != nil {
-		glog.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
