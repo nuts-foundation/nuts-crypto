@@ -29,8 +29,8 @@ var rootCmd = e.Cmd
 func Execute() {
 	c := cfg.NutsConfig()
 	c.IgnoredPrefixes = append(c.IgnoredPrefixes, e.ConfigKey)
-	c.RegisterFlags(e)
-	if err := c.Load(); err != nil {
+	c.RegisterFlags(rootCmd, e)
+	if err := c.Load(rootCmd); err != nil {
 		panic(err)
 	}
 
