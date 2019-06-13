@@ -29,8 +29,10 @@ import (
 	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/sirupsen/logrus"
 	gotypes "go/types"
 	"io"
 	"sync"
@@ -39,14 +41,14 @@ import (
 type CryptoConfig struct {
 	Keysize int
 	Storage string
-	Fspath string
+	Fspath  string
 }
 
 // default implementation for CryptoInstance
 type Crypto struct {
 	Storage storage.Storage
 	//keyCache map[string]rsa.PrivateKey
-	Config CryptoConfig
+	Config     CryptoConfig
 	configOnce sync.Once
 	configDone bool
 }
@@ -177,9 +179,9 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string
 	}
 
 	return types.DoubleEncryptedCipherText{
-		Nonce:nonce,
-		CipherText:cipherText,
-		CipherTextKeys:cipherTextKeys,
+		Nonce:          nonce,
+		CipherText:     cipherText,
+		CipherTextKeys: cipherTextKeys,
 	}, nil
 }
 
@@ -263,7 +265,7 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, 
 	}
 
 	hashedData := sha512.Sum512(data)
-	if err:= rsa.VerifyPKCS1v15(key, crypto.SHA512, hashedData[:], sig); err != nil {
+	if err := rsa.VerifyPKCS1v15(key, crypto.SHA512, hashedData[:], sig); err != nil {
 		return false, err
 	}
 
@@ -325,7 +327,6 @@ func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey)
 	return nil, nil
 }
 
-
 func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	hash := sha512.New()
 	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
@@ -347,6 +348,11 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 // shared function to convert bytes to a RSA private key
 func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
+	if block == nil || block.Type != "PUBLIC KEY" {
+		logrus.Error("failed to decode PEM block containing public key")
+		return nil, errors.New("failed to decode PEM block containing public key")
+	}
+
 	b := block.Bytes
 	key, err := x509.ParsePKCS1PublicKey(b)
 	if err != nil {
