@@ -58,9 +58,8 @@ func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa
 	filePath := fmt.Sprintf("%s/%s", fsc.fspath, fileName)
 
 	bytes, err := ioutil.ReadFile(filePath)
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open private key for legalEntity: %v with filename %s", legalEntity, filePath)
 	}
 
 	var key *rsa.PrivateKey

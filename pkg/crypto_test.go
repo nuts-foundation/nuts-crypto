@@ -130,9 +130,10 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 		}
 
 		_, err = client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
+		expected := "could not open private key for legalEntity: {other} with filename ../temp/b3RoZXI=_private.pem"
 
-		if err.Error() != "open ../temp/b3RoZXI=_private.pem: no such file or directory" {
-			t.Errorf("Expected error [open ../temp/b3RoZXI=_private.pem: no such file or directory], Got [%s]", err.Error())
+		if err.Error() != expected{
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
 }
@@ -152,8 +153,9 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 			return
 		}
 
-		if err.Error() != "open ../temp/dGVzdA==_private.pem: no such file or directory" {
-			t.Errorf("Expected error [open ../temp/dGVzdA==_private.pem: no such file or directory], Got [%s]", err.Error())
+		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
+		if err.Error() != expected{
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
 }
@@ -253,8 +255,9 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		if err.Error() != "open ../temp/dGVzdA==_private.pem: no such file or directory" {
-			t.Errorf("Expected error [open ../temp/dGVzdA==_private.pem: no such file or directory], got %s", err.Error())
+		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
+		if err.Error() != expected{
+		t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
 }
