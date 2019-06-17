@@ -19,6 +19,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/nuts-foundation/nuts-crypto/api"
@@ -27,7 +28,6 @@ import (
 	engine "github.com/nuts-foundation/nuts-go/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	gotypes "go/types"
 )
 
 // NewCryptoEngine the engine configuration for nuts-go.
@@ -73,14 +73,18 @@ func cmd() *cobra.Command {
 
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return gotypes.Error{Msg: "requires a URI argument"}
+				return errors.New("requires a URI argument")
 			}
 
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cc := pkg.NewCryptoClient()
-			cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]})
+			if err := cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]}); err != nil {
+				fmt.Printf("Error generating keyPair: %v\n", err)
+			} else {
+				fmt.Println("KeyPair generated")
+			}
 		},
 	})
 
@@ -90,7 +94,7 @@ func cmd() *cobra.Command {
 
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return gotypes.Error{Msg: "requires a URI argument"}
+				return errors.New("requires a URI argument")
 			}
 
 			return nil
@@ -100,7 +104,7 @@ func cmd() *cobra.Command {
 			bytes, err := cc.PublicKey(types.LegalEntity{URI: args[0]})
 
 			if err != nil {
-				fmt.Printf("Error printing publicKey: %s", err)
+				fmt.Printf("Error printing publicKey: %v", err)
 			}
 
 			fmt.Println(string(bytes))

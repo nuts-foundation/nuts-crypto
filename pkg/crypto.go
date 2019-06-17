@@ -33,7 +33,6 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/sirupsen/logrus"
-	gotypes "go/types"
 	"io"
 	"sync"
 )
@@ -73,7 +72,7 @@ func (ce *Crypto) Configure() error {
 
 	ce.configOnce.Do(func() {
 		if ce.Config.Keysize < 2048 {
-			err = gotypes.Error{Msg: "invalid keySize, needs to be at least 2048 bits"}
+			err = errors.New("invalid keySize, needs to be at least 2048 bits")
 			return
 		}
 
@@ -96,7 +95,7 @@ func (ce *Crypto) newCryptoStorage() (storage.Storage, error) {
 		return storage.NewFileSystemBackend(fspath)
 	}
 
-	return nil, gotypes.Error{Msg: "Only fs backend available for now"}
+	return nil, errors.New("Only fs backend available for now")
 }
 
 // generate a new rsa keypair for the given legalEntity. The legalEntity uri is base64 encoded and used as filename

@@ -292,8 +292,8 @@ func TestCrypto_Configure(t *testing.T) {
 			return
 		}
 
-		if err.Error() != "-: invalid keySize, needs to be at least 2048 bits" {
-			t.Errorf("Expected error [-: invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
+		if err.Error() != "invalid keySize, needs to be at least 2048 bits" {
+			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
 		}
 	})
 }
@@ -322,8 +322,8 @@ func TestNewCryptoBackend(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		if err.Error() != "-: Only fs backend available for now" {
-			t.Errorf("Expected error [-: Only fs backend available for now], Got [%s]", err.Error())
+		if err.Error() != "Only fs backend available for now" {
+			t.Errorf("Expected error [Only fs backend available for now], Got [%s]", err.Error())
 		}
 	})
 }
