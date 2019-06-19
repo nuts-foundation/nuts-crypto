@@ -48,6 +48,22 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 
 		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 	})
+
+	t.Run("GenerateKeyPairAPI returns error if generating the key gives an error", func(t *testing.T) {
+		se := apiWrapper()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		if err := se.GenerateKeyPair(echo, GenerateKeyPairParams{}); err != nil {
+			expected := "Missing legalEntity URI"
+			if err.Error() != expected {
+				t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+			}
+		} else {
+			t.Error("Expected error")
+		}
+	})
 }
 
 func TestApiWrapper_Encrypt(t *testing.T) {

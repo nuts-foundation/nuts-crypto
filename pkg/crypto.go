@@ -103,6 +103,10 @@ func (ce *Crypto) newCryptoStorage() (storage.Storage, error) {
 func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 	var err error = nil
 
+	if len(legalEntity.URI) == 0 {
+		return errors.New("Missing legalEntity URI")
+	}
+
 	reader := rand.Reader
 
 	key, err := rsa.GenerateKey(reader, client.Config.Keysize)
