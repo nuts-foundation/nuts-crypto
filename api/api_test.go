@@ -71,7 +71,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
 				},
 			},
-			PlainText:      base64.StdEncoding.EncodeToString([]byte(plaintext)),
+			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -250,7 +250,6 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
 	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
 	hexSignature := hex.EncodeToString(signature)
-
 
 	t.Run("Missing publicKey returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

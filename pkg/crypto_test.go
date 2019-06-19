@@ -72,7 +72,7 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
 		client := Crypto{
 			Storage: createTempStorage(),
-			Config: CryptoConfig{Keysize: 1},
+			Config:  CryptoConfig{Keysize: 1},
 		}
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
@@ -132,7 +132,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 		_, err = client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
 		expected := "could not open private key for legalEntity: {other} with filename ../temp/b3RoZXI=_private.pem"
 
-		if err.Error() != expected{
+		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
@@ -154,7 +154,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 		}
 
 		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
-		if err.Error() != expected{
+		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
@@ -256,8 +256,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
-		if err.Error() != expected{
-		t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
 }
@@ -331,7 +331,7 @@ func TestNewCryptoBackend(t *testing.T) {
 func defaultBackend() Crypto {
 	backend := Crypto{
 		Storage: createTempStorage(),
-		Config: CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  CryptoConfig{Keysize: types.ConfigKeySizeDefault},
 	}
 
 	return backend

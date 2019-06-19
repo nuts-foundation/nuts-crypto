@@ -19,7 +19,6 @@
 // types and interfaces used by all other packages
 package types
 
-
 // --storage config flag
 const ConfigStorage string = "storage"
 
@@ -39,13 +38,13 @@ const ConfigKeySize string = "keysize"
 const ConfigKeySizeDefault int = 2048
 
 // type identifying the legalEntity responsible for the Patient/medical data
-type LegalEntity struct{
+type LegalEntity struct {
 	URI string
 }
 
 // Struct defining the encrypted data in CipherText, an encrypted symmetric key in CipherTextKeys (1 for each given public key) and the nonce needed for the AES_GCM decryption.
 type DoubleEncryptedCipherText struct {
-	CipherText []byte
+	CipherText     []byte
 	CipherTextKeys [][]byte
-	Nonce []byte
+	Nonce          []byte
 }

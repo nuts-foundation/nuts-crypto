@@ -113,7 +113,6 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in decryptRequest")
 	}
 
-
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
 		logrus.Error(err.Error())
@@ -202,7 +201,6 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-
 	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
 	sig, err := w.C.SignFor(plainTextBytes, le)
 
@@ -278,12 +276,18 @@ func decryptRequestToDect(gen DecryptRequest) (types.DoubleEncryptedCipherText, 
 	var err error
 
 	dect.CipherText, err = base64.StdEncoding.DecodeString(gen.CipherText)
-	if err != nil { return dect, err }
+	if err != nil {
+		return dect, err
+	}
 	cipherTextKey, err := base64.StdEncoding.DecodeString(gen.CipherTextKey)
-	if err != nil { return dect, err }
+	if err != nil {
+		return dect, err
+	}
 	dect.CipherTextKeys = append(dect.CipherTextKeys, cipherTextKey)
 	dect.Nonce, err = base64.StdEncoding.DecodeString(gen.Nonce)
-	if err != nil { return dect, err }
+	if err != nil {
+		return dect, err
+	}
 
 	return dect, nil
 }
@@ -295,13 +299,13 @@ func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities
 	for i := range dect.CipherTextKeys {
 		encryptResponseEntries = append(encryptResponseEntries, EncryptResponseEntry{
 			CipherTextKey: base64.StdEncoding.EncodeToString(dect.CipherTextKeys[i]),
-			LegalEntity: legalIdentities[i],
+			LegalEntity:   legalIdentities[i],
 		})
 	}
 
 	return EncryptResponse{
-		CipherText: base64.StdEncoding.EncodeToString(dect.CipherText),
-		EncryptResponseEntries:encryptResponseEntries,
-		Nonce: base64.StdEncoding.EncodeToString(dect.Nonce),
+		CipherText:             base64.StdEncoding.EncodeToString(dect.CipherText),
+		EncryptResponseEntries: encryptResponseEntries,
+		Nonce:                  base64.StdEncoding.EncodeToString(dect.Nonce),
 	}
 }

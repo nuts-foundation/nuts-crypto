@@ -134,6 +134,3 @@ func serverInterfaceWrapper(err error) *ServerInterfaceWrapper {
 		Handler: &testServerInterface{err: err},
 	}
 }
-
-
-

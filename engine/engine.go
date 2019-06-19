@@ -34,9 +34,9 @@ import (
 func NewCryptoEngine() *engine.Engine {
 	cb := pkg.CryptoInstance()
 
-	return &engine.Engine {
+	return &engine.Engine{
 		Cmd:       cmd(),
-		Config:	   &cb.Config,
+		Config:    &cb.Config,
 		ConfigKey: "crypto",
 		Configure: cb.Configure,
 		FlagSet:   flagSet(),

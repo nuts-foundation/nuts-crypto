@@ -51,6 +51,7 @@ func NewFileSystemBackend(fspath string) (*fileSystemBackend, error) {
 
 	return fsc, nil
 }
+
 // Load the privatekey for the given legalEntity from disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
 func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error) {
 
