@@ -55,20 +55,67 @@ func (t *testServerInterface) Verify(ctx echo.Context) error {
 	return t.err
 }
 
+var siws = []*ServerInterfaceWrapper{
+	serverInterfaceWrapper(nil), serverInterfaceWrapper(errors.New("Server error")),
+}
+
+func TestServerInterfaceWrapper_Decrypt(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Decrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.POST, "/?", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.Decrypt(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_Encrypt(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.POST, "/?", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.Encrypt(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_ExternalId(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.POST, "/?", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.ExternalId(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
 func TestServerInterfaceWrapper_GenerateKeyPair(t *testing.T) {
-	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
+	t.Run("GenerateKeyPairAPI call returns no error", func(t *testing.T) {
 		// given
 		siw := serverInterfaceWrapper(nil)
-		e := echo.New()
-		e.POST("/crypto/generate", siw.GenerateKeyPair)
-
-		// when
 		q := make(url.Values)
 		q.Set("legalEntity", "le")
 		req := httptest.NewRequest(echo.POST, "/?"+q.Encode(), nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetPath("/crypto/generate")
+		c := echo.New().NewContext(req, rec)
 
 		// then
 		if err := siw.GenerateKeyPair(c); err != nil {
@@ -83,14 +130,9 @@ func TestServerInterfaceWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("Missing legalEntity returns 400", func(t *testing.T) {
 		// given
 		siw := serverInterfaceWrapper(nil)
-		e := echo.New()
-		e.POST("/crypto/generate", siw.GenerateKeyPair)
-
-		// when
 		req := httptest.NewRequest(echo.POST, "/", nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetPath("/crypto/generate")
+		c := echo.New().NewContext(req, rec)
 
 		// then
 		if err := siw.GenerateKeyPair(c); err != nil {
@@ -106,16 +148,11 @@ func TestServerInterfaceWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("Server error is returned", func(t *testing.T) {
 		// given
 		siw := serverInterfaceWrapper(errors.New("Server error"))
-		e := echo.New()
-		e.POST("/crypto/generate", siw.GenerateKeyPair)
-
-		// when
 		q := make(url.Values)
 		q.Set("legalEntity", "le")
 		req := httptest.NewRequest(echo.POST, "/?"+q.Encode(), nil)
 		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		c.SetPath("/crypto/generate")
+		c := echo.New().NewContext(req, rec)
 
 		// then
 		if err := siw.GenerateKeyPair(c); err != nil {
@@ -127,6 +164,39 @@ func TestServerInterfaceWrapper_GenerateKeyPair(t *testing.T) {
 			t.Errorf("Expected error for bad request")
 		}
 	})
+}
+
+func TestServerInterfaceWrapper_Sign(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Sign call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.POST, "/?", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			// then
+			err := siw.Sign(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_Verify(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Verify call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.POST, "/?", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.Verify(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
 }
 
 func serverInterfaceWrapper(err error) *ServerInterfaceWrapper {
