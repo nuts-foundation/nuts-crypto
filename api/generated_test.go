@@ -19,7 +19,9 @@
 package api
 
 import (
+	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
+	"github.com/nuts-foundation/nuts-go/mock"
 	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
@@ -197,6 +199,23 @@ func TestServerInterfaceWrapper_Verify(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRegisterHandlers(t *testing.T) {
+	t.Run("Registers routes for crypto module", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockEchoRouter(ctrl)
+
+		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
+		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
+		echo.EXPECT().POST("/crypto/external_id", gomock.Any())
+		echo.EXPECT().POST("/crypto/generate", gomock.Any())
+		echo.EXPECT().POST("/crypto/sign", gomock.Any())
+		echo.EXPECT().POST("/crypto/verify", gomock.Any())
+
+		RegisterHandlers(echo, &testServerInterface{})
+	})
 }
 
 func serverInterfaceWrapper(err error) *ServerInterfaceWrapper {
