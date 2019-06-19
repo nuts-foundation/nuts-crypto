@@ -37,9 +37,9 @@ import (
 	"testing"
 )
 
-func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
+func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
-		se := crypt()
+		se := apiWrapper()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -50,9 +50,9 @@ func TestServiceWrapper_GenerateKeyPair(t *testing.T) {
 	})
 }
 
-func TestServiceWrapper_Encrypt(t *testing.T) {
+func TestApiWrapper_Encrypt(t *testing.T) {
 	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
-		client := crypt()
+		client := apiWrapper()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -86,9 +86,9 @@ func TestServiceWrapper_Encrypt(t *testing.T) {
 	})
 }
 
-func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
+func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
-		client := crypt()
+		client := apiWrapper()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -120,9 +120,9 @@ func TestServiceWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 	})
 }
 
-func TestServiceWrapper_ExternalIdFor(t *testing.T) {
+func TestApiWrapper_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
-		client := crypt()
+		client := apiWrapper()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -151,7 +151,7 @@ func TestServiceWrapper_ExternalIdFor(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Sign(t *testing.T) {
-	client := crypt()
+	client := apiWrapper()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
@@ -238,7 +238,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
-	client := crypt()
+	client := apiWrapper()
 	defer emptyTemp()
 
 	legalEntity := types.LegalEntity{URI: "test"}
@@ -337,7 +337,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 
 	t.Run("All OK returns 200", func(t *testing.T) {
-		client := crypt()
+		client := apiWrapper()
 		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
@@ -380,13 +380,19 @@ func publicKeyToBytes(pub *rsa.PublicKey) []byte {
 	return pubBytes
 }
 
-func crypt() ApiWrapper {
+func apiWrapper() *ApiWrapper {
 	backend := pkg.Crypto{
 		Storage: createTempStorage(),
-		Config: pkg.CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  pkg.CryptoConfig{Keysize: types.ConfigKeySizeDefault},
 	}
 
-	return ApiWrapper{C: &backend}
+	return &ApiWrapper{C: &backend}
+}
+
+func serviceInterfaceWrapper() *ServerInterfaceWrapper {
+	return &ServerInterfaceWrapper{
+		Handler: apiWrapper(),
+	}
 }
 
 func createTempStorage() storage.Storage {
