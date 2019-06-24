@@ -131,7 +131,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{},
-			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
+			PlainText:              base64.StdEncoding.EncodeToString([]byte(plaintext)),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -400,7 +400,7 @@ func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		jsonRequest := DecryptRequest{
 			LegalEntity:   Identifier(legalEntity.URI),
 			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
-			Nonce: base64.StdEncoding.EncodeToString(encRecord.Nonce),
+			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -429,9 +429,9 @@ func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity:   Identifier(legalEntity.URI),
-			CipherText: base64.StdEncoding.EncodeToString(encRecord.CipherText),
-			Nonce: base64.StdEncoding.EncodeToString(encRecord.Nonce),
+			LegalEntity: Identifier(legalEntity.URI),
+			CipherText:  base64.StdEncoding.EncodeToString(encRecord.CipherText),
+			Nonce:       base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -536,7 +536,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := ExternalIdRequest{
-			Subject:     subject,
+			Subject: subject,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -856,5 +856,3 @@ func (errorCloser) Read(p []byte) (n int, err error) {
 func (errorCloser) Close() error {
 	return errors.New("error")
 }
-
-

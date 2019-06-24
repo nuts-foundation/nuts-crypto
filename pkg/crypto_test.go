@@ -220,7 +220,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Broken cipher text returns error", func(t *testing.T) {
 		_, symkey, _ := generateSymmetricKey()
 		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
-		pk, _:= client.Storage.GetPublicKey(legalEntity)
+		pk, _ := client.Storage.GetPublicKey(legalEntity)
 		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
 
 		ct := types.DoubleEncryptedCipherText{
