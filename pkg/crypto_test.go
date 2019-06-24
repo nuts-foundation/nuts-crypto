@@ -414,12 +414,40 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
+			return
 		}
 
 		expected := "crypto/rsa: public exponent too small"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
+	})
+}
+
+func TestCrypto_pemToPublicKey(t *testing.T) {
+	t.Run("wrong PEM block gives error", func(t *testing.T) {
+		_, err := pemToPublicKey([]byte{})
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+			return
+		}
+
+		expected := "failed to decode PEM block containing public key"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("wrong pub key gives error", func(t *testing.T) {
+		_, err := pemToPublicKey([]byte("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA61BjmfXGEvWmegnBGSuS\n+rU9soUg2FnODva32D1AqhwdziwHINFaD1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBS\nEVCgJjtHAGZIm5GL/KA86KDp/CwDFMSwluowcXwDwoyinmeOY9eKyh6aY72xJh7n\noLBBq1N0bWi1e2i+83txOCg4yV2oVXhBo8pYEJ8LT3el6Smxol3C1oFMVdwPgc0v\nTl25XucMcG/ALE/KNY6pqC2AQ6R2ERlVgPiUWOPatVkt7+Bs3h5Ramxh7XjBOXeu\nlmCpGSynXNcpZ/06+vofGi/2MlpQZNhHAo8eayMp6FcvNucIpUndo1X8dKMv3Y26\nZQIDAQAB\n-----END PUBLIC KEY-----"))
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+			return
+		}
+
+		// returned error is long and complex....
 	})
 }
 
