@@ -336,12 +336,12 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 }
 
 func TestCrypto_PublicKey(t *testing.T) {
-	t.Run("A signed piece of data can be verified", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "testPK"}
-		client := defaultBackend(t.Name())
-		client.GenerateKeyPairFor(legalEntity)
-		defer emptyTemp(t.Name())
+	legalEntity := types.LegalEntity{URI: "testPK"}
+	client := defaultBackend(t.Name())
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp(t.Name())
 
+	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKey(legalEntity)
 
 		if err != nil {
@@ -350,6 +350,21 @@ func TestCrypto_PublicKey(t *testing.T) {
 
 		if pub == "" {
 			t.Error("Expected public key, got nothing")
+		}
+	})
+
+	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
+		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
+		_, err := client.PublicKey(legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, got nothing")
+			return
+		}
+
+		expected := "could not open private key for legalEntity: {testPKUnknown} with filename temp/TestCrypto_PublicKey/dGVzdFBLVW5rbm93bg==_private.pem"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
 }
