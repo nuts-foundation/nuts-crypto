@@ -401,7 +401,7 @@ func createTempStorage() storage.Storage {
 func emptyTemp() {
 	files, err := ioutil.ReadDir("../../temp/")
 	for _, f := range files {
-		os.RemoveAll(fmt.Sprintf("../../temp/", f.Name()))
+		os.RemoveAll(fmt.Sprintf("../../temp/%s", f.Name()))
 	}
 
 	if err != nil {
