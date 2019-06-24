@@ -20,7 +20,6 @@ package engine
 
 import (
 	"errors"
-	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
@@ -81,9 +80,9 @@ func cmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cc := pkg.NewCryptoClient()
 			if err := cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]}); err != nil {
-				fmt.Printf("Error generating keyPair: %v\n", err)
+				cmd.Printf("Error generating keyPair: %v\n", err)
 			} else {
-				fmt.Println("KeyPair generated")
+				cmd.Println("KeyPair generated")
 			}
 		},
 	})
@@ -104,10 +103,10 @@ func cmd() *cobra.Command {
 			bytes, err := cc.PublicKey(types.LegalEntity{URI: args[0]})
 
 			if err != nil {
-				fmt.Printf("Error printing publicKey: %v", err)
+				cmd.Printf("Error printing publicKey: %v", err)
 			}
 
-			fmt.Println(string(bytes))
+			cmd.Println(string(bytes))
 		},
 	})
 

@@ -130,7 +130,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 		}
 
 		_, err = client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
-		expected := "could not open private key for legalEntity: {other} with filename ../temp/b3RoZXI=_private.pem"
+		expected := "could not open private key for legalEntity: {other} with filename ../../temp/b3RoZXI=_private.pem"
 
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
@@ -153,7 +153,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 			return
 		}
 
-		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
+		expected := "could not open private key for legalEntity: {test} with filename ../../temp/dGVzdA==_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -255,7 +255,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {test} with filename ../temp/dGVzdA==_private.pem"
+		expected := "could not open private key for legalEntity: {test} with filename ../../temp/dGVzdA==_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -338,12 +338,12 @@ func defaultBackend() Crypto {
 }
 
 func createTempStorage() storage.Storage {
-	b, _ := storage.NewFileSystemBackend("../temp")
+	b, _ := storage.NewFileSystemBackend("../../temp")
 	return b
 }
 
 func emptyTemp() {
-	err := os.RemoveAll("../temp/")
+	err := os.RemoveAll("../../temp/")
 
 	if err != nil {
 		println(err.Error())
