@@ -75,6 +75,28 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	client.C.GenerateKeyPairFor(legalEntity)
 	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
 
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
 	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -118,7 +140,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=unexpected end of JSON input"
+		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
@@ -255,7 +277,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
+func TestApiWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
@@ -305,6 +327,29 @@ func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Illegal json gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte("{"))),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
@@ -530,6 +575,29 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 	})
 
+	t.Run("Illegal json gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte("{"))),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
 	t.Run("missing legalEntity gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -554,6 +622,35 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing legalEntityURI in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("missing subjects gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := ExternalIdRequest{
+			LegalEntity: Identifier(legalEntity.URI),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing subjectURI in request"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}

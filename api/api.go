@@ -55,8 +55,9 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	err = json.Unmarshal(buf, encryptRequest)
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(encryptRequest.EncryptRequestSubjects) == 0 {
@@ -109,8 +110,9 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 	err = json.Unmarshal(buf, decryptRequest)
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(decryptRequest.LegalEntity) == 0 {
@@ -152,8 +154,9 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	err = json.Unmarshal(buf, request)
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(request.LegalEntity) == 0 {
