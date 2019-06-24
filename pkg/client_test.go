@@ -19,7 +19,9 @@
 package pkg
 
 import (
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -30,5 +32,23 @@ func TestNewCryptoClient(t *testing.T) {
 		if reflect.TypeOf(cc).String() != "*pkg.Crypto" {
 			t.Errorf("Expected CryptoClient to be of type *pkg.Crypto, got %s", reflect.TypeOf(cc))
 		}
+	})
+
+	t.Run("panics for illegal config", func(t *testing.T) {
+		instance := CryptoInstance()
+		instance.Config.Keysize = 1
+		instance.configDone = false
+		instance.configOnce = sync.Once{}
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic")
+			}
+			instance.Config.Keysize = types.ConfigKeySizeDefault
+			instance.configDone = false
+			instance.configOnce = sync.Once{}
+		}()
+
+		NewCryptoClient()
 	})
 }

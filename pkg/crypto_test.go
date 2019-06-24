@@ -75,9 +75,10 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 }
 
 func TestCrypto_DecryptCipherTextFor(t *testing.T) {
+	defer emptyTemp()
+
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		client := defaultBackend()
-		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
@@ -103,7 +104,6 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
 		client := defaultBackend()
-		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
@@ -210,9 +210,10 @@ func TestCrypto_VerifyWith(t *testing.T) {
 }
 
 func TestCrypto_ExternalIdFor(t *testing.T) {
+	defer emptyTemp()
+
 	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
 		client := defaultBackend()
-		defer emptyTemp()
 
 		legalEntity := types.LegalEntity{URI: "test"}
 		client.GenerateKeyPairFor(legalEntity)
@@ -232,9 +233,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 
 	t.Run("ExternalId generates error for unknown legalEntity", func(t *testing.T) {
 		client := defaultBackend()
-		defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
+		legalEntity := types.LegalEntity{URI: "test2"}
 		subject := "test_patient"
 
 		_, err := client.ExternalIdFor([]byte(subject), legalEntity)
@@ -243,7 +243,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {test} with filename ../../temp/dGVzdA==_private.pem"
+		expected := "could not open private key for legalEntity: {test2} with filename ../../temp/dGVzdDI=_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -252,7 +252,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 
 func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "test"}
+		legalEntity := types.LegalEntity{URI: "testPK"}
 		client := defaultBackend()
 		client.GenerateKeyPairFor(legalEntity)
 		defer emptyTemp()
