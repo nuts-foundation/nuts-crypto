@@ -105,19 +105,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
 		client := defaultBackend()
 
-		legalEntity := types.LegalEntity{URI: "test"}
-		plaintext := "for your eyes only"
-
-		client.GenerateKeyPairFor(legalEntity)
-
-		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-			return
-		}
-
-		_, err = client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
+		_, err := client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
 		expected := "could not open private key for legalEntity: {other} with filename ../../temp/b3RoZXI=_private.pem"
 
 		if err.Error() != expected {
