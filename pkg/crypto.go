@@ -30,6 +30,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -128,6 +129,10 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 // Main decryption function, first the symmetric key will be decrypted using the private key of the legal entity.
 // The resulting symmetric key will then be used to decrypt the given cipherText.
 func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
+
+	if len(cipherText.CipherTextKeys) != 1 {
+		return nil, errors.New(fmt.Sprintf("unsupported count of CipherTextKeys: %d", len(cipherText.CipherTextKeys)))
+	}
 
 	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
 

@@ -153,7 +153,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend()
-	legalEntity := types.LegalEntity{URI: "test"}
+	legalEntity := types.LegalEntity{URI: "testDecrypt"}
 	client.GenerateKeyPairFor(legalEntity)
 	defer emptyTemp()
 
@@ -165,6 +165,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
+			return
 		}
 
 		decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
