@@ -58,6 +58,21 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 		}
 	})
 
+	t.Run("Missing legalEntity generates error", func(t *testing.T) {
+		client := defaultBackend()
+
+		err := client.GenerateKeyPairFor(types.LegalEntity{})
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "Missing legalEntity URI"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		}
+	})
+
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
 		client := Crypto{
 			Storage: createTempStorage(),
@@ -137,16 +152,15 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 }
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
-	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := defaultBackend()
-		defer emptyTemp()
+	client := defaultBackend()
+	legalEntity := types.LegalEntity{URI: "test"}
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
+	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPairFor(legalEntity)
 		pubKey, _ := client.PublicKey(legalEntity)
-
 		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 
 		if err != nil {
@@ -161,6 +175,69 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 
 		if string(decryptedText) != plaintext {
 			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
+		}
+	})
+
+	t.Run("Incorrect cipher returns error", func(t *testing.T) {
+		ct := types.DoubleEncryptedCipherText{
+			CipherTextKeys: [][]byte{
+				{},
+			},
+		}
+		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "crypto/rsa: decryption error"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing pub key returns error", func(t *testing.T) {
+		_, symkey, _ := generateSymmetricKey()
+		cipherText, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
+
+		ct := types.DoubleEncryptedCipherText{
+			CipherTextKeys: [][]byte{
+				cipherText,
+			},
+		}
+		_, err := client.DecryptKeyAndCipherTextFor(ct, types.LegalEntity{URI: "testU"})
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "could not open private key for legalEntity: {testU} with filename ../../temp/dGVzdFU=_private.pem"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Broken cipher text returns error", func(t *testing.T) {
+		_, symkey, _ := generateSymmetricKey()
+		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
+		pk, _:= client.Storage.GetPublicKey(legalEntity)
+		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
+
+		ct := types.DoubleEncryptedCipherText{
+			CipherTextKeys: [][]byte{
+				cipherTextKey,
+			},
+			CipherText: cipherText[1:],
+		}
+		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "crypto/rsa: decryption error"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
 	})
 }
@@ -203,7 +280,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
 		client := defaultBackend()
 
-		legalEntity := types.LegalEntity{URI: "test"}
+		legalEntity := types.LegalEntity{URI: "testE"}
 		client.GenerateKeyPairFor(legalEntity)
 		subject := "test_patient"
 

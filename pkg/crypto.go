@@ -131,6 +131,10 @@ func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncrypte
 
 	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
 
+	if err != nil {
+		return nil, err
+	}
+
 	block, err := aes.NewCipher(symmKey)
 
 	if err != nil {
@@ -188,13 +192,13 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string
 	}, nil
 }
 
-func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) ([]byte, []byte, error) {
-	nonce := make([]byte, 12)
+func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) (cipherText []byte, nonce []byte, error error) {
+	nonce = make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, nil, err
 	}
 
-	cipherText := key.Seal(nil, nonce, plainText, nil)
+	cipherText = key.Seal(nil, nonce, plainText, nil)
 
 	return cipherText, nonce, nil
 }
