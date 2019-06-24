@@ -772,6 +772,28 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 			t.Errorf("Expected no error got [%s]", err.Error())
 		}
 	})
+
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Sign(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
 }
 
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
@@ -813,6 +835,28 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		if err.Error() != "code=400, message=missing publicKey in verifyRequest" {
 			t.Errorf("Expected error code=400, message=missing publicKey in verifyRequest, got: [%s]", err.Error())
+		}
+	})
+
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Verify(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
 
