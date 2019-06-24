@@ -46,9 +46,10 @@ func TestCryptoBackend(t *testing.T) {
 }
 
 func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
+	defer emptyTemp()
+
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
 		client := defaultBackend()
-		defer emptyTemp()
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 
@@ -57,18 +58,6 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 		}
 	})
 
-	//t.Run("A new key pair is stored in the cache", func(t *testing.T) {
-	//	client := createTempEngine()
-	//	defer emptyTemp()
-	//
-	//	client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
-	//
-	//	entries := len(client.keyCache)
-	//	if entries != 1 {
-	//		t.Errorf("Expected 1 entry in cache, Got %d", entries)
-	//	}
-	//})
-
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
 		client := Crypto{
 			Storage: createTempStorage(),
@@ -76,7 +65,6 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 		}
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
-		defer emptyTemp()
 
 		if err == nil {
 			t.Errorf("Expected error got nothing")
