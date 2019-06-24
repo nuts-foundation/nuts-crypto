@@ -67,15 +67,14 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 }
 
 func TestApiWrapper_Encrypt(t *testing.T) {
+	client := apiWrapper()
+	defer emptyTemp()
+	legalEntity := types.LegalEntity{URI: "test"}
+	plaintext := "for your eyes only"
+	client.C.GenerateKeyPairFor(legalEntity)
+	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
+
 	t.Run("Encrypt API call returns 200 with encrypted message", func(t *testing.T) {
-		client := apiWrapper()
-		defer emptyTemp()
-
-		legalEntity := types.LegalEntity{URI: "test"}
-		plaintext := "for your eyes only"
-		client.C.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
-
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -99,6 +98,159 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
 		client.Encrypt(echo)
+	})
+
+	t.Run("Illegal json gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte("{"))),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=unexpected end of JSON input"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing subjects gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{},
+			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=missing encryptRequestSubjects in encryptRequest"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing plainText gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
+				{
+					LegalEntity: Identifier(legalEntity.URI),
+					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
+				},
+			},
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=missing plainText in encryptRequest"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Illegal BASE64 encoding gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
+				{
+					LegalEntity: Identifier("UNKNOWN"),
+					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
+				},
+			},
+			PlainText: plaintext,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=Illegal base64 encoded string: illegal base64 data at input byte 3"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Broken public key gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
+				{
+					LegalEntity: Identifier("UNKNOWN"),
+					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey)[1:])),
+				},
+			},
+			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=Failed to encrypt plainText: failed to decode PEM block containing public key"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
 	})
 }
 

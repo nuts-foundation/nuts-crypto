@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -56,11 +57,19 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 	if err != nil {
 		logrus.Error(err.Error())
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	if len(encryptRequest.EncryptRequestSubjects) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing encryptRequestSubjects in encryptRequest")
+		msg := "missing encryptRequestSubjects in encryptRequest"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
+
+	if len(encryptRequest.PlainText) == 0 {
+		msg := "missing plainText in encryptRequest"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	var pubKeys []string
@@ -74,20 +83,17 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("Illegal base64 encoded string: %s", err.Error())
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	dect, err := w.C.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
-	}
-
-	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("Failed to encrypt plainText: %s", err.Error())
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	return ctx.JSON(http.StatusOK, dectToEncryptResponse(dect, legalEntities))

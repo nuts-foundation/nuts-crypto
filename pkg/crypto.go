@@ -356,8 +356,9 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
-		logrus.Error("failed to decode PEM block containing public key")
-		return nil, errors.New("failed to decode PEM block containing public key")
+		err := errors.New("failed to decode PEM block containing public key")
+		logrus.Error(err)
+		return nil, err
 	}
 
 	b := block.Bytes
