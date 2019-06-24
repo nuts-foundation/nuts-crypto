@@ -19,6 +19,8 @@
 package pkg
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -395,6 +397,28 @@ func TestNewCryptoBackend(t *testing.T) {
 
 		if err.Error() != "Only fs backend available for now" {
 			t.Errorf("Expected error [Only fs backend available for now], Got [%s]", err.Error())
+		}
+	})
+}
+
+func TestCrypto_encryptPlainTextWith(t *testing.T) {
+	client := defaultBackend(t.Name())
+
+	t.Run("incorrect public key returns error", func(t *testing.T) {
+		plainText := "Secret"
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		pub := key.PublicKey
+		pub.E = 0
+
+		_, err = client.encryptPlainTextWith([]byte(plainText), &pub)
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "crypto/rsa: public exponent too small"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
 	})
 }
