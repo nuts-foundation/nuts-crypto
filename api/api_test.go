@@ -31,6 +31,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go/mock"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -255,20 +256,20 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 }
 
 func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
+	client := apiWrapper()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	plaintext := "for your eyes only"
+	client.C.GenerateKeyPairFor(legalEntity)
+	pubKey, _ := client.C.PublicKey(legalEntity)
+	encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
+
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
-		client := apiWrapper()
-		defer emptyTemp()
-
-		legalEntity := types.LegalEntity{URI: "test"}
-		plaintext := "for your eyes only"
-		client.C.GenerateKeyPairFor(legalEntity)
-		pubKey, _ := client.C.PublicKey(legalEntity)
-
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 		jsonRequest := DecryptRequest{
 			LegalEntity:   Identifier(legalEntity.URI),
 			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText),
@@ -285,6 +286,172 @@ func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
 		client.Decrypt(echo)
+	})
+
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Reading error gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: errorCloser{},
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=error reading request: error"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing legalEntity gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := DecryptRequest{}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing legalEntityURI in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing nonce gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := DecryptRequest{
+			LegalEntity:   Identifier(legalEntity.URI),
+			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText),
+			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=error decrypting request: illegal nonce given"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing CipherText gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := DecryptRequest{
+			LegalEntity:   Identifier(legalEntity.URI),
+			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
+			Nonce: base64.StdEncoding.EncodeToString(encRecord.Nonce),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=error decrypting request: cipher: message authentication failed"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing CipherTextKey gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := DecryptRequest{
+			LegalEntity:   Identifier(legalEntity.URI),
+			CipherText: base64.StdEncoding.EncodeToString(encRecord.CipherText),
+			Nonce: base64.StdEncoding.EncodeToString(encRecord.Nonce),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=error decrypting request: crypto/rsa: decryption error"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
 	})
 }
 
@@ -574,3 +741,15 @@ func emptyTemp() {
 		println(err.Error())
 	}
 }
+
+type errorCloser struct{}
+
+func (errorCloser) Read(p []byte) (n int, err error) {
+	return 0, errors.New("error")
+}
+
+func (errorCloser) Close() error {
+	return errors.New("error")
+}
+
+

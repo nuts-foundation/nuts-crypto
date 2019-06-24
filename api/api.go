@@ -101,10 +101,18 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 // Decrypt is the API handler function for decrypting a piece of data.
 func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
-	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	req := ctx.Request()
+	if req.Body == nil {
+		msg := "missing body in request"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("error reading request: %v", err)
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	var decryptRequest = &DecryptRequest{}
@@ -116,20 +124,24 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 	}
 
 	if len(decryptRequest.LegalEntity) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in decryptRequest")
+		msg := "missing legalEntityURI in request"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("error decrypting request: %v", err)
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	plainTextBytes, err := w.C.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
 
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("error decrypting request: %v", err)
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	decryptResponse := DecryptResponse{
