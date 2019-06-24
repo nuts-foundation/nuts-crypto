@@ -19,8 +19,10 @@
 package pkg
 
 import (
+	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -134,7 +136,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 		client := defaultBackend()
 		defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
+		legalEntity := types.LegalEntity{URI: "testEncrypt"}
 		plaintext := "for your eyes only"
 
 		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
@@ -144,7 +146,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 			return
 		}
 
-		expected := "could not open private key for legalEntity: {test} with filename ../../temp/dGVzdA==_private.pem"
+		expected := "could not open private key for legalEntity: {testEncrypt} with filename ../../temp/dGVzdEVuY3J5cHQ=_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -397,7 +399,10 @@ func createTempStorage() storage.Storage {
 }
 
 func emptyTemp() {
-	err := os.RemoveAll("../../temp/")
+	files, err := ioutil.ReadDir("../../temp/")
+	for _, f := range files {
+		os.RemoveAll(fmt.Sprintf("../../temp/", f.Name()))
+	}
 
 	if err != nil {
 		println(err.Error())
