@@ -46,9 +46,8 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
 func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
-	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	buf, err := readBody(ctx)
 	if err != nil {
-		logrus.Error(err.Error())
 		return err
 	}
 
@@ -101,18 +100,9 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 // Decrypt is the API handler function for decrypting a piece of data.
 func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
-	req := ctx.Request()
-	if req.Body == nil {
-		msg := "missing body in request"
-		logrus.Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
-	}
-
-	buf, err := ioutil.ReadAll(req.Body)
+	buf, err := readBody(ctx)
 	if err != nil {
-		msg := fmt.Sprintf("error reading request: %v", err)
-		logrus.Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
+		return err
 	}
 
 	var decryptRequest = &DecryptRequest{}
@@ -153,18 +143,9 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 // ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
 func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
-	req := ctx.Request()
-	if req.Body == nil {
-		msg := "missing body in request"
-		logrus.Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
-	}
-
-	buf, err := ioutil.ReadAll(req.Body)
+	buf, err := readBody(ctx)
 	if err != nil {
-		msg := fmt.Sprintf("error reading request: %v", err)
-		logrus.Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
+		return err
 	}
 
 	var request = &ExternalIdRequest{}
@@ -203,10 +184,9 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 }
 
 func (w *ApiWrapper) Sign(ctx echo.Context) error {
-	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	buf, err := readBody(ctx)
 	if err != nil {
-		logrus.Error(err.Error())
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return err
 	}
 
 	var signRequest = &SignRequest{}
@@ -248,9 +228,8 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 }
 
 func (w *ApiWrapper) Verify(ctx echo.Context) error {
-	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	buf, err := readBody(ctx)
 	if err != nil {
-		logrus.Error(err.Error())
 		return err
 	}
 
@@ -300,6 +279,24 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, verifyResponse)
+}
+
+func readBody(ctx echo.Context) ([]byte, error) {
+	req := ctx.Request()
+	if req.Body == nil {
+		msg := "missing body in request"
+		logrus.Error(msg)
+		return nil, echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		msg := fmt.Sprintf("error reading request: %v", err)
+		logrus.Error(msg)
+		return nil, echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
+
+	return buf, nil
 }
 
 func decryptRequestToDect(gen DecryptRequest) (types.DoubleEncryptedCipherText, error) {
