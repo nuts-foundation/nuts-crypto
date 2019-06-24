@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -48,11 +47,10 @@ func TestCryptoBackend(t *testing.T) {
 }
 
 func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
-	defer emptyTemp()
+	defer emptyTemp(t.Name())
+	client := defaultBackend(t.Name())
 
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
-		client := defaultBackend()
-
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 
 		if err != nil {
@@ -61,8 +59,6 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("Missing legalEntity generates error", func(t *testing.T) {
-		client := defaultBackend()
-
 		err := client.GenerateKeyPairFor(types.LegalEntity{})
 
 		if err == nil {
@@ -77,7 +73,7 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
 		client := Crypto{
-			Storage: createTempStorage(),
+			Storage: createTempStorage(t.Name()),
 			Config:  CryptoConfig{Keysize: 1},
 		}
 
@@ -92,11 +88,10 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 }
 
 func TestCrypto_DecryptCipherTextFor(t *testing.T) {
-	defer emptyTemp()
+	defer emptyTemp(t.Name())
+	client := defaultBackend(t.Name())
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		client := defaultBackend()
-
 		legalEntity := types.LegalEntity{URI: "test"}
 		plaintext := "for your eyes only"
 
@@ -120,10 +115,8 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := defaultBackend()
-
 		_, err := client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
-		expected := "could not open private key for legalEntity: {other} with filename ../../temp/b3RoZXI=_private.pem"
+		expected := "could not open private key for legalEntity: {other} with filename temp/TestCrypto_DecryptCipherTextFor/b3RoZXI=_private.pem"
 
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
@@ -132,10 +125,10 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 }
 
 func TestCrypto_encryptPlainTextFor(t *testing.T) {
-	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
-		client := defaultBackend()
-		defer emptyTemp()
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 
+	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testEncrypt"}
 		plaintext := "for your eyes only"
 
@@ -146,7 +139,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 			return
 		}
 
-		expected := "could not open private key for legalEntity: {testEncrypt} with filename ../../temp/dGVzdEVuY3J5cHQ=_private.pem"
+		expected := "could not open private key for legalEntity: {testEncrypt} with filename temp/TestCrypto_encryptPlainTextFor/dGVzdEVuY3J5cHQ=_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -154,10 +147,10 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 }
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
-	client := defaultBackend()
+	client := defaultBackend(t.Name())
 	legalEntity := types.LegalEntity{URI: "testDecrypt"}
 	client.GenerateKeyPairFor(legalEntity)
-	defer emptyTemp()
+	defer emptyTemp(t.Name())
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
@@ -214,7 +207,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {testU} with filename ../../temp/dGVzdFU=_private.pem"
+		expected := "could not open private key for legalEntity: {testU} with filename temp/TestCrypto_DecryptKeyAndCipherTextFor/dGVzdFU=_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
@@ -249,9 +242,9 @@ func TestCrypto_VerifyWith(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		data := []byte("hello")
 		legalEntity := types.LegalEntity{URI: "test"}
-		client := defaultBackend()
+		client := defaultBackend(t.Name())
 		client.GenerateKeyPairFor(legalEntity)
-		defer emptyTemp()
+		defer emptyTemp(t.Name())
 
 		sig, err := client.SignFor(data, legalEntity)
 
@@ -278,11 +271,10 @@ func TestCrypto_VerifyWith(t *testing.T) {
 }
 
 func TestCrypto_ExternalIdFor(t *testing.T) {
-	defer emptyTemp()
+	defer emptyTemp(t.Name())
+	client := defaultBackend(t.Name())
 
 	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
-		client := defaultBackend()
-
 		legalEntity := types.LegalEntity{URI: "testE"}
 		client.GenerateKeyPairFor(legalEntity)
 		subject := "test_patient"
@@ -300,8 +292,6 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	})
 
 	t.Run("ExternalId generates error for unknown legalEntity", func(t *testing.T) {
-		client := defaultBackend()
-
 		legalEntity := types.LegalEntity{URI: "test2"}
 		subject := "test_patient"
 
@@ -311,7 +301,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {test2} with filename ../../temp/dGVzdDI=_private.pem"
+		expected := "could not open private key for legalEntity: {test2} with filename temp/TestCrypto_ExternalIdFor/dGVzdDI=_private.pem"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
@@ -321,9 +311,9 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPK"}
-		client := defaultBackend()
+		client := defaultBackend(t.Name())
 		client.GenerateKeyPairFor(legalEntity)
-		defer emptyTemp()
+		defer emptyTemp(t.Name())
 
 		pub, err := client.PublicKey(legalEntity)
 
@@ -339,7 +329,7 @@ func TestCrypto_PublicKey(t *testing.T) {
 
 func TestCrypto_Configure(t *testing.T) {
 	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
-		e := defaultBackend()
+		e := defaultBackend(t.Name())
 		e.Config.Keysize = 2047
 		err := e.Configure()
 
@@ -355,7 +345,7 @@ func TestCrypto_Configure(t *testing.T) {
 }
 
 func TestNewCryptoBackend(t *testing.T) {
-	client := defaultBackend()
+	client := defaultBackend(t.Name())
 
 	t.Run("Getting the backend returns the fs backend", func(t *testing.T) {
 		cl, err := client.newCryptoStorage()
@@ -384,25 +374,22 @@ func TestNewCryptoBackend(t *testing.T) {
 	})
 }
 
-func defaultBackend() Crypto {
+func defaultBackend(name string) Crypto {
 	backend := Crypto{
-		Storage: createTempStorage(),
+		Storage: createTempStorage(name),
 		Config:  CryptoConfig{Keysize: types.ConfigKeySizeDefault},
 	}
 
 	return backend
 }
 
-func createTempStorage() storage.Storage {
-	b, _ := storage.NewFileSystemBackend("../../temp")
+func createTempStorage(name string) storage.Storage {
+	b, _ := storage.NewFileSystemBackend(fmt.Sprintf("temp/%s", name))
 	return b
 }
 
-func emptyTemp() {
-	files, err := ioutil.ReadDir("../../temp/")
-	for _, f := range files {
-		os.RemoveAll(fmt.Sprintf("../../temp/%s", f.Name()))
-	}
+func emptyTemp(name string) {
+	err := os.RemoveAll(fmt.Sprintf("temp/%s", name))
 
 	if err != nil {
 		println(err.Error())
