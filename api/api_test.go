@@ -456,14 +456,14 @@ func TestApiWrapper_DecryptKeyAndCipherTextFor(t *testing.T) {
 }
 
 func TestApiWrapper_ExternalIdFor(t *testing.T) {
+	client := apiWrapper()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	subject := Identifier("test")
+	client.C.GenerateKeyPairFor(legalEntity)
+
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
-		client := apiWrapper()
-		defer emptyTemp()
-
-		legalEntity := types.LegalEntity{URI: "test"}
-		subject := Identifier("test")
-		client.C.GenerateKeyPairFor(legalEntity)
-
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -482,6 +482,111 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
 		client.ExternalId(echo)
+	})
+
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Reading error gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: errorCloser{},
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=error reading request: error"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("missing legalEntity gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := ExternalIdRequest{
+			Subject:     subject,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing legalEntityURI in request"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("unknown legalEntity gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := ExternalIdRequest{
+			LegalEntity: Identifier("UNKNOWN"),
+			Subject:     subject,
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.ExternalId(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=500, message=error getting externalId: could not open private key for legalEntity: {UNKNOWN} with filename ../../temp/VU5LTk9XTg==_private.pem"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
 	})
 }
 

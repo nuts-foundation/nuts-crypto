@@ -153,10 +153,18 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 // ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
 func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
-	buf, err := ioutil.ReadAll(ctx.Request().Body)
+	req := ctx.Request()
+	if req.Body == nil {
+		msg := "missing body in request"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("error reading request: %v", err)
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	var request = &ExternalIdRequest{}
@@ -168,16 +176,21 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	}
 
 	if len(request.LegalEntity) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI in request")
+		msg := "missing legalEntityURI in request"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 	if len(request.Subject) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing subjectURI in request")
+		msg := "missing subjectURI in request"
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	shaBytes, err := w.C.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
-		logrus.Error(err.Error())
-		return err
+		msg := fmt.Sprintf("error getting externalId: %v", err)
+		logrus.Error(msg)
+		return echo.NewHTTPError(http.StatusInternalServerError, msg)
 	}
 
 	sha := hex.EncodeToString(shaBytes)
