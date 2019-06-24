@@ -33,7 +33,6 @@ import (
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/sirupsen/logrus"
 	"io"
 	"sync"
 )
@@ -361,13 +360,10 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 	return plaintext, nil
 }
 
-// shared function to convert bytes to a RSA private key
 func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
-		err := errors.New("failed to decode PEM block containing public key")
-		logrus.Error(err)
-		return nil, err
+		return nil, errors.New("failed to decode PEM block containing public key")
 	}
 
 	b := block.Bytes

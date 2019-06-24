@@ -236,6 +236,31 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
 	})
+
+	t.Run("Incorrect number of cipherTextKeys returns error", func(t *testing.T) {
+		_, symkey, _ := generateSymmetricKey()
+		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
+		pk, _ := client.Storage.GetPublicKey(legalEntity)
+		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
+
+		ct := types.DoubleEncryptedCipherText{
+			CipherTextKeys: [][]byte{
+				cipherTextKey,
+				cipherTextKey,
+			},
+			CipherText: cipherText,
+		}
+		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+		}
+
+		expected := "unsupported count of CipherTextKeys: 2"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		}
+	})
 }
 
 func TestCrypto_VerifyWith(t *testing.T) {
