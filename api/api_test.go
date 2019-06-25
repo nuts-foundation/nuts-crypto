@@ -969,11 +969,6 @@ func apiWrapper() *ApiWrapper {
 	return &ApiWrapper{C: &backend}
 }
 
-func serviceInterfaceWrapper() *ServerInterfaceWrapper {
-	return &ServerInterfaceWrapper{
-		Handler: apiWrapper(),
-	}
-}
 
 func createTempStorage() storage.Storage {
 	b, _ := storage.NewFileSystemBackend("../../temp")
