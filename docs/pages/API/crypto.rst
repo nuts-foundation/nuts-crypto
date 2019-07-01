@@ -14,7 +14,7 @@ Nuts Crypto API
             const ui = SwaggerUIBundle({
                 "dom_id": "#swagger-ui",
                 urls: [
-                    {url: "_static/nuts-service-crypto.yaml", name: "crypto"},
+                    {url: "../../_static/nuts-service-crypto.yaml", name: "crypto"},
                     ],
                 presets: [
                     SwaggerUIBundle.presets.apis,
