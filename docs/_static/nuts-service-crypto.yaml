@@ -1,0 +1,299 @@
+openapi: "3.0.0"
+info:
+  title: Nuts service crypto spec
+  description: API specification for crypto services available within nuts service space
+  version: 0.1.0
+  license:
+    name: GPLv3
+paths:
+  /crypto/generate:
+    post:
+      summary: "Send a request for checking if the given combination has valid consent"
+      operationId: generateKeyPair
+      tags:
+        - crypto
+      parameters:
+        - name:  legalEntity
+          in: query
+          description: "URN identifying the legal entity"
+          required: true
+          schema:
+            $ref: "#/components/schemas/Identifier"
+      responses:
+        '201':
+          description: "Key has been created successfully"
+        '400':
+          description: "Invalid request"
+          content:
+            text/plain:
+              example: "Invalid legalEntity URN"
+              schema:
+                type: string
+  /crypto/encrypt:
+    post:
+      summary: "encrypt a piece of data for a list of public keys/legalEntity's. A single symmetric keys will be used for all entries"
+      operationId: encrypt
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncryptRequest'
+      responses:
+        '200':
+          description: "OK response, body holds encrypted symmetric key and cipherText"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EncryptResponse'
+        '400':
+          description: incorrect data
+          content:
+            text/plain:
+              example:
+                invalid metadata
+  /crypto/decrypt:
+    post:
+      summary: "decrypt a cipherText for the given legalEntity"
+      operationId: decrypt
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecryptRequest'
+      responses:
+        '200':
+          description: "OK response, body holds base64 encoded plainText"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecryptResponse'
+        '400':
+          description: incorrect data
+          content:
+            text/plain:
+              example:
+                invalid metadata
+  /crypto/external_id:
+    post:
+      summary: "calculate an externalId for an identifier for a given legalEntity"
+      operationId: externalId
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalIdRequest'
+      responses:
+        '200':
+          description: "OK response, body holds hex encoded hash"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalIdResponse'
+        '400':
+          description: incorrect data
+          content:
+            text/plain:
+              example:
+                invalid metadata
+  /crypto/sign:
+    post:
+      summary: "sign a piece of data with the private key of the given legalEntity"
+      operationId: sign
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignRequest'
+      responses:
+        '200':
+          description: "OK response, body holds hex signature"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignResponse'
+        '400':
+          description: "incorrect data"
+          content:
+            text/plain:
+              example:
+                "unknown legalEntity"
+  /crypto/verify:
+    post:
+      summary: "verify a signature given a public key, signature and the data"
+      operationId: verify
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: "OK response, body holds hex signature"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '400':
+          description: "incorrect data"
+          content:
+            text/plain:
+              example:
+                "missing signature"
+components:
+  schemas:
+    EncryptRequest:
+      description: "EncryptRequest has a list of publicKeys and legalEntity's. The legalEntity's are there only for easy bookkeeping. The data will only be encrypted once with a symmetric key. The symmetric key will be encrypted for all given publicKeys"
+      required:
+        - plainText
+        - encryptRequestSubjects
+      properties:
+        plainText:
+          type: string
+          description: "Base64 encoded binary data"
+        encryptRequestSubjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/EncryptRequestSubject"
+    EncryptRequestSubject:
+      description: "A legalEntity and its public key. Only the public key is used. The resulting object will match the encrypted key to the given legalEntity"
+      required:
+        - legalEntity
+        - publicKey
+      properties:
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+        publicKey:
+          $ref: "#/components/schemas/PublicKey"
+    EncryptResponse:
+      required:
+        - cipherText
+        - nonce
+        - encryptResponseEntries
+      properties:
+        cipherText:
+          type: string
+          description: "Base64 encoded encrypted text"
+        nonce:
+          type: string
+          description: "Base64 encoded nonce"
+        encryptResponseEntries:
+          type: array
+          items:
+            $ref: "#/components/schemas/EncryptResponseEntry"
+    EncryptResponseEntry:
+      required:
+        - legalEntity
+        - cipherTextKey
+      properties:
+        cipherTextKey:
+          type: string
+          description: "Base64 encoded encrypted key"
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+    DecryptRequest:
+      required:
+        - legalEntity
+        - cipherText
+        - cipherTextKey
+        - nonce
+      properties:
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+        cipherText:
+          type: string
+          description: "Base64 encoded cipherText"
+        cipherTextKey:
+          type: string
+          description: "base64 encoded encrypted symmetric key"
+        nonce:
+          type: string
+          description: "base64 encoded nonce"
+    DecryptResponse:
+      required:
+        - plainText
+      properties:
+        plainText:
+          type: string
+          description: "Base64 encoded plain text"
+    ExternalIdRequest:
+      required:
+        - legalEntity
+        - subject
+      properties:
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+        subject:
+          $ref: "#/components/schemas/Identifier"
+    ExternalIdResponse:
+      required:
+        - externalId
+      properties:
+        externalId:
+          type: string
+          description: "hex encoded identifier"
+    SignRequest:
+      required:
+        - plainText
+        - legalEntity
+      properties:
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+        plainText:
+          type: string
+          description: "Base64 encoded data"
+    SignResponse:
+      required:
+        - signature
+      properties:
+        signature:
+          type: string
+          description: "hex encoded signature"
+    VerifyRequest:
+      required:
+        - plainText
+        - signature
+        - publicKey
+      properties:
+        plainText:
+          type: string
+          description: "Base64 encoded binary data"
+        publicKey:
+          $ref: '#/components/schemas/PublicKey'
+        signature:
+          type: string
+          description: "hex encoded signature"
+    VerifyResponse:
+      required:
+        - outcome
+      properties:
+        outcome:
+          type: boolean
+          description: "true or false"
+    PublicKey:
+      type: string
+      description: "PEM encoded public key"
+    Identifier:
+      type: string
+      description: >
+        Generic identifier used for representing BSN, agbcode, etc.
+        It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+      example: |
+        * urn:oid:2.16.840.1.113883.2.4.6.3:999999990
+        * urn:oid:2.16.840.1.113883.2.4.6.1:00000007
+        * urn:nuts:endpoint:consent
+        * urn:ietf:rfc:1779:O=Nedap, OU=Healthcare, C=NL, ST=Gelderland, L=Groenlo, CN=nuts_corda_development_local
