@@ -367,6 +367,16 @@ func TestCrypto_PublicKey(t *testing.T) {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}
 	})
+
+	t.Run("parse public key", func(t *testing.T) {
+		pub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9wJQN59PYsvIsTrFuTqS\nLoUBgwdRfpJxOa5L8nOALxNk41MlAg7xnPbvnYrOHFucfWBTDOMTKBMSmD4WDkaF\ndVrXAML61z85Le8qsXfX6f7TbKMDm2u1O3cye+KdJe8zclK9sTFzSD0PP0wfw7wf\nlACe+PfwQgeOLPUWHaR6aDfaA64QEdfIzk/IL3S595ixaEn0huxMHgXFX35Vok+o\nQdbnclSTo6HUinkqsHUu/hGHApkE3UfT6GD6SaLiB9G4rAhlrDQ71ai872t4FfoK\n7skhe8sP2DstzAQRMf9FcetrNeTxNL7Zt4F/qKm80cchRZiFYPMCYyjQphyBCoJf\n0wIDAQAB\n-----END PUBLIC KEY-----"
+
+		_, err := pemToPublicKey([]byte(pub))
+
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+	})
 }
 
 func TestCrypto_Configure(t *testing.T) {
@@ -448,21 +458,10 @@ func TestCrypto_pemToPublicKey(t *testing.T) {
 			return
 		}
 
-		expected := "failed to decode PEM block containing public key"
+		expected := "failed to decode PEM block containing public key, key is of the wrong type"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
-	})
-
-	t.Run("wrong pub key gives error", func(t *testing.T) {
-		_, err := pemToPublicKey([]byte("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA61BjmfXGEvWmegnBGSuS\n+rU9soUg2FnODva32D1AqhwdziwHINFaD1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBS\nEVCgJjtHAGZIm5GL/KA86KDp/CwDFMSwluowcXwDwoyinmeOY9eKyh6aY72xJh7n\noLBBq1N0bWi1e2i+83txOCg4yV2oVXhBo8pYEJ8LT3el6Smxol3C1oFMVdwPgc0v\nTl25XucMcG/ALE/KNY6pqC2AQ6R2ERlVgPiUWOPatVkt7+Bs3h5Ramxh7XjBOXeu\nlmCpGSynXNcpZ/06+vofGi/2MlpQZNhHAo8eayMp6FcvNucIpUndo1X8dKMv3Y26\nZQIDAQAB\n-----END PUBLIC KEY-----"))
-
-		if err == nil {
-			t.Errorf("Expected error, Got nothing")
-			return
-		}
-
-		// returned error is long and complex....
 	})
 }
 

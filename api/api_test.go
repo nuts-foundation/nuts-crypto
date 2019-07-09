@@ -20,12 +20,9 @@ package api
 
 import (
 	"bytes"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
@@ -74,6 +71,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPairFor(legalEntity)
 	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
+	pemKey, _ := pkg.PublicKeyToPem(pubKey)
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -106,7 +104,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier(legalEntity.URI),
-					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
+					PublicKey:   PublicKey(pemKey),
 				},
 			},
 			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -184,7 +182,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier(legalEntity.URI),
-					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
+					PublicKey:   PublicKey(pemKey),
 				},
 			},
 		}
@@ -217,7 +215,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey))),
+					PublicKey:   PublicKey(pemKey),
 				},
 			},
 			PlainText: plaintext,
@@ -251,7 +249,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					PublicKey:   PublicKey(string(publicKeyToBytes(pubKey)[1:])),
+					PublicKey:   PublicKey(pemKey[1:]),
 				},
 			},
 			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -270,7 +268,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=Failed to encrypt plainText: failed to decode PEM block containing public key"
+		expected := "code=400, message=Failed to encrypt plainText: failed to decode PEM block containing public key, key is of the wrong type"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
@@ -804,7 +802,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	client.C.GenerateKeyPairFor(legalEntity)
 
 	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
-	pemPubKey := string(publicKeyToBytes(pubKey))
+	pemPubKey, _ := pkg.PublicKeyToPem(pubKey)
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
 	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
@@ -947,17 +945,6 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 			t.Errorf("Expected no error got [%s]", err.Error())
 		}
 	})
-}
-
-func publicKeyToBytes(pub *rsa.PublicKey) []byte {
-	pubASN1 := x509.MarshalPKCS1PublicKey(pub)
-
-	pubBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubASN1,
-	})
-
-	return pubBytes
 }
 
 func apiWrapper() *ApiWrapper {

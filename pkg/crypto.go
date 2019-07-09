@@ -290,7 +290,7 @@ func (client *Crypto) PublicKey(legalEntity types.LegalEntity) (string, error) {
 		return "", err
 	}
 
-	return string(publicKeyToPem(pubKey)), nil
+	return PublicKeyToPem(pubKey)
 }
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.
@@ -363,24 +363,33 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, errors.New("failed to decode PEM block containing public key")
+		return nil, errors.New("failed to decode PEM block containing public key, key is of the wrong type")
 	}
 
 	b := block.Bytes
-	key, err := x509.ParsePKCS1PublicKey(b)
+	key, err := x509.ParsePKIXPublicKey(b)
 	if err != nil {
 		return nil, err
 	}
-	return key, nil
+	finalKey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("Unable to convert public key to RSA public key")
+	}
+
+	return finalKey, nil
 }
 
-func publicKeyToPem(pub *rsa.PublicKey) []byte {
-	pubASN1 := x509.MarshalPKCS1PublicKey(pub)
+func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
+	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
+
+	if err != nil {
+		return "", err
+	}
 
 	pubBytes := pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: pubASN1,
 	})
 
-	return pubBytes
+	return string(pubBytes), err
 }
