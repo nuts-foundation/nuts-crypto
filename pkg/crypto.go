@@ -245,20 +245,20 @@ func (client *Crypto) ExternalIdFor(data []byte, entity types.LegalEntity) ([]by
 }
 
 // SignFor signs a piece of data for a legal entity. This requires the private key for the legal entity to be present.
-// It is expected that the plain data is given. It uses the SHA512 hashing function
-// todo: SHA_512?
+// It is expected that the plain data is given. It uses the SHA256 hashing function
+// todo: SHA_256?
 func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
 	// random
 	rng := rand.Reader
 
 	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
-	hashedData := sha512.Sum512(data)
+	hashedData := sha256.Sum256(data)
 
 	if err != nil {
 		return nil, err
 	}
 
-	signature, err := rsa.SignPKCS1v15(rng, rsaPrivateKey, crypto.SHA512, hashedData[:])
+	signature, err := rsa.SignPKCS1v15(rng, rsaPrivateKey, crypto.SHA256, hashedData[:])
 
 	if err != nil {
 		return nil, err
@@ -267,7 +267,7 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 	return signature, err
 }
 
-// VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA512 hashing function.
+// VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
 	key, err := pemToPublicKey([]byte(pemKey))
 
@@ -275,8 +275,8 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, 
 		return false, err
 	}
 
-	hashedData := sha512.Sum512(data)
-	if err := rsa.VerifyPKCS1v15(key, crypto.SHA512, hashedData[:], sig); err != nil {
+	hashedData := sha256.Sum256(data)
+	if err := rsa.VerifyPKCS1v15(key, crypto.SHA256, hashedData[:], sig); err != nil {
 		return false, err
 	}
 
