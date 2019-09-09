@@ -34,6 +34,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -231,7 +232,15 @@ func symmetricKeyToBlockCipher(ciph []byte) (cipher.AEAD, error) {
 // ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
 // This is not for security but does generate the same unique identifier every time. It should only be used as unique identifier for consent records. Using the private key also ensure the BSN can not be deduced from the externalID.
 // todo: check by others if this makes sense
-func (client *Crypto) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.LegalEntity) ([]byte, error) {
+	if len(strings.TrimSpace(subject)) == 0 {
+		return nil, errors.New("subject is required")
+	}
+
+	if len(strings.TrimSpace(actor)) == 0 {
+		return nil, errors.New("actor is required")
+	}
+
 	pk, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
@@ -239,7 +248,8 @@ func (client *Crypto) ExternalIdFor(data []byte, entity types.LegalEntity) ([]by
 
 	// Create a new HMAC
 	h := hmac.New(sha256.New, pk.D.Bytes())
-	h.Write(data)
+	h.Write([]byte(subject))
+	h.Write([]byte(actor))
 
 	return h.Sum(nil), nil
 }

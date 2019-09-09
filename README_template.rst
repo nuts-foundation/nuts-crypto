@@ -17,11 +17,11 @@ Go crypto lib for Nuts service space
 .. image:: https://api.codacy.com/project/badge/Grade/d17595243fd7424fbe743da68c8dcbfc
     :target: https://www.codacy.com/app/woutslakhorst/nuts-crypto
 
-.. include:: docs/pages/development/discovery.rst
+.. include:: docs/pages/development/crypto.rst
     :start-after: .. marker-for-readme
 
 Configuration
 =============
 
-.. include:: docs/pages/configuration/discovery.rst
+.. include:: docs/pages/configuration/crypto.rst
     :start-after: .. marker-for-readme
