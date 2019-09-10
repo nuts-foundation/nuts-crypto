@@ -22,7 +22,7 @@ The crypto module is written in Go and should be part of nuts-go as an engine.
 Dependencies
 ************
 
-This projects is using go modules, so version > 1.12 is recommended. 1.10 would be a minimum. ZeroMQ is used for listening to the events from the nuts-consent-bridge. Follow installation from the ZMQ website: http://zeromq.org/intro:get-the-software
+This projects is using go modules, so version > 1.12 is recommended. 1.10 would be a minimum.
 
 Running tests
 *************
@@ -42,7 +42,7 @@ The server API is generated from the open-api spec:
 
 .. code-block:: shell
 
-    oapi-codegen -generate types,server -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
+    oapi-codegen -generate server -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
 
 README
 ******
