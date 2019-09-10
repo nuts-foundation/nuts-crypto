@@ -64,18 +64,18 @@ func (mr *MockClientMockRecorder) EncryptKeyAndPlainTextWith(plainText, pemKey i
 }
 
 // ExternalIdFor mocks base method
-func (m *MockClient) ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error) {
+func (m *MockClient) ExternalIdFor(subject, actor string, entity types.LegalEntity) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExternalIdFor", data, entity)
+	ret := m.ctrl.Call(m, "ExternalIdFor", subject, actor, entity)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ExternalIdFor indicates an expected call of ExternalIdFor
-func (mr *MockClientMockRecorder) ExternalIdFor(data, entity interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ExternalIdFor(subject, actor, entity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExternalIdFor", reflect.TypeOf((*MockClient)(nil).ExternalIdFor), data, entity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExternalIdFor", reflect.TypeOf((*MockClient)(nil).ExternalIdFor), subject, actor, entity)
 }
 
 // GenerateKeyPairFor mocks base method
