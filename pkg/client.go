@@ -26,8 +26,8 @@ type Client interface {
 	DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error)
 	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given PEM encoded public key
 	EncryptKeyAndPlainTextWith(plainText []byte, pemKey []string) (types.DoubleEncryptedCipherText, error)
-	// ExternalIdFor calculates an externalId for an identifier for a given legalEntity
-	ExternalIdFor(data []byte, entity types.LegalEntity) ([]byte, error)
+	// ExternalIdFor calculates an externalId for a (custodian, subject, actor) triple. Where the custodian is needed for private key selection
+	ExternalIdFor(subject string, actor string, entity types.LegalEntity) ([]byte, error)
 	// GenerateKeyPairFor creates a KeyPair on the storage for given legalEntity
 	GenerateKeyPairFor(legalEntity types.LegalEntity) error
 	// SignFor signs a piece of data for a legal entity

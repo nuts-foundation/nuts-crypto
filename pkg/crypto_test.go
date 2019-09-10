@@ -302,14 +302,15 @@ func TestCrypto_VerifyWith(t *testing.T) {
 func TestCrypto_ExternalIdFor(t *testing.T) {
 	defer emptyTemp(t.Name())
 	client := defaultBackend(t.Name())
+	legalEntity := types.LegalEntity{URI: "testE"}
+	client.GenerateKeyPairFor(legalEntity)
 
 	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "testE"}
-		client.GenerateKeyPairFor(legalEntity)
 		subject := "test_patient"
+		actor := "test_actor"
 
-		bytes1, err := client.ExternalIdFor([]byte(subject), legalEntity)
-		bytes2, err := client.ExternalIdFor([]byte(subject), legalEntity)
+		bytes1, err := client.ExternalIdFor(subject, actor, legalEntity)
+		bytes2, err := client.ExternalIdFor(subject, actor, legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -323,14 +324,43 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	t.Run("ExternalId generates error for unknown legalEntity", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "test2"}
 		subject := "test_patient"
+		actor := "test_actor"
 
-		_, err := client.ExternalIdFor([]byte(subject), legalEntity)
+		_, err := client.ExternalIdFor(subject, actor, legalEntity)
 
 		if err == nil {
 			t.Errorf("Expected error, got nothing")
 		}
 
 		expected := "could not open private key for legalEntity: {test2} with filename temp/TestCrypto_ExternalIdFor/dGVzdDI=_private.pem"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("ExternalId generates error for missing subject", func(t *testing.T) {
+		_, err := client.ExternalIdFor("", "", legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, got nothing")
+			return
+		}
+
+		expected := "subject is required"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("ExternalId generates error for missing actor", func(t *testing.T) {
+		_, err := client.ExternalIdFor("subject", "", legalEntity)
+
+		if err == nil {
+			t.Errorf("Expected error, got nothing")
+			return
+		}
+
+		expected := "actor is required"
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
 		}

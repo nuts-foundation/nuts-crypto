@@ -170,7 +170,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	shaBytes, err := w.C.ExternalIdFor([]byte(request.Subject), types.LegalEntity{URI: string(request.LegalEntity)})
+	shaBytes, err := w.C.ExternalIdFor(string(request.Subject), string(request.Actor), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
 		msg := fmt.Sprintf("error getting externalId: %v", err)
 		logrus.Error(msg)

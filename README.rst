@@ -1,5 +1,5 @@
 nuts-crypto
-===========
+###########
 
 Go crypto lib for Nuts service space
 
@@ -17,48 +17,85 @@ Go crypto lib for Nuts service space
 .. image:: https://api.codacy.com/project/badge/Grade/d17595243fd7424fbe743da68c8dcbfc
     :target: https://www.codacy.com/app/woutslakhorst/nuts-crypto
 
-.. inclusion-marker-for-contribution
+The crypto module is written in Go and should be part of nuts-go as an engine.
 
-Nuts-crypto is intended to be used as a library within an executable. It abstracts the key storage layer and provides helper function for encryption and decryption.
+Dependencies
+************
 
-Installation
-------------
+This projects is using go modules, so version > 1.12 is recommended. 1.10 would be a minimum.
+
+Running tests
+*************
+
+Tests can be run by executing
 
 .. code-block:: shell
 
-   go get github.com/nuts-foundation/nuts-crypto
+    go test ./...
+
+Building
+********
+
+This project is part of https://github.com/nuts-foundation/nuts-go. If you do however would like a binary, just use ``go build``.
+
+The server API is generated from the open-api spec:
+
+.. code-block:: shell
+
+    oapi-codegen -generate server -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
+
+README
+******
+
+The readme is auto-generated from a template and uses the documentation to fill in the blanks.
+
+.. code-block:: shell
+
+    ./generate_readme.sh
+
+This script uses ``rst_include`` which is installed as part of the dependencies for generating the documentation.
+
+Documentation
+*************
+
+To generate the documentation, you'll need python3, sphinx and a bunch of other stuff. See :ref:`nuts-documentation-development-documentation`
+The documentation can be build by running
+
+.. code-block:: shell
+
+    /docs $ make html
+
+The resulting html will be available from ``docs/_build/html/index.html``
 
 Configuration
--------------
+=============
 
-The lib is configured using `Viper <https://github.com/spf13/viper>`_, thus it will work well with `Cobra <https://github.com/spf13/cobra>`_ as well.
-Command flags can be added to a command using the `config.FlagSet()` helper function.
+The following configuration parameters are available for the event service.
 
-.. code-block:: go
+===================================     ====================    ================================================================================
+Key                                     Default                 Description
+===================================     ====================    ================================================================================
+crypto.storage                          fs                      storage to use, 'fs' for file system
+crypto.fspath                           .                       when file system is used as storage, this configures the path where keys are stored
+crypto.keysize                          2048                    number of bits to use when creating new RSA keys
+===================================     ====================    ================================================================================
 
-   cmd := newRootCommand()
-   cmd.Flags().AddFlagSet(FlagSet())
+As with all other properties for nuts-go, they can be set through yaml:
 
-Sub-commands can be added as well.
+.. sourcecode:: yaml
 
-.. code-block:: go
+    crypto:
+       keysize: 4096
 
-   cmd := newRootCommand()
-   cmd.AddCommand(Cmd())
+as commandline property
 
-The following config options are available:
+.. sourcecode:: shell
 
-.. code-block:: shell
+    ./nuts --crypto.keysize 4096
 
-   Flags:
-      --cryptobackend string   backend to use, 'fs' for file system (default) (default "fs")
-      --fspath string          when file system is used as backend, this configures the path where keys are stored (default .) (default "./")
+Or by using environment variables
 
-Usage
------
+.. sourcecode:: shell
 
-.. code-block:: go
-
-   client := engine.NewCryptoClient()
-
+    NUTS_CRYPTO_KEYSIZE=4096 ./nuts
 

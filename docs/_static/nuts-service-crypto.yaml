@@ -81,7 +81,7 @@ paths:
                 invalid metadata
   /crypto/external_id:
     post:
-      summary: "calculate an externalId for an identifier for a given legalEntity"
+      summary: "calculate an externalId for a (custodian, subject, actor) triple"
       operationId: externalId
       tags:
         - crypto
@@ -234,10 +234,13 @@ components:
       required:
         - legalEntity
         - subject
+        - actor
       properties:
         legalEntity:
           $ref: "#/components/schemas/Identifier"
         subject:
+          $ref: "#/components/schemas/Identifier"
+        actor:
           $ref: "#/components/schemas/Identifier"
     ExternalIdResponse:
       required:

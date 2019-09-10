@@ -504,6 +504,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 
 	legalEntity := types.LegalEntity{URI: "test"}
 	subject := Identifier("test")
+	actor := Identifier("test")
 	client.C.GenerateKeyPairFor(legalEntity)
 
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
@@ -514,6 +515,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		jsonRequest := ExternalIdRequest{
 			LegalEntity: Identifier(legalEntity.URI),
 			Subject:     subject,
+			Actor:		 actor,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -662,6 +664,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		jsonRequest := ExternalIdRequest{
 			LegalEntity: Identifier("UNKNOWN"),
 			Subject:     subject,
+			Actor:		 actor,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
