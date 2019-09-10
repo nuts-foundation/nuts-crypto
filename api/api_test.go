@@ -32,6 +32,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -55,7 +56,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 
 		if err := se.GenerateKeyPair(echo, GenerateKeyPairParams{}); err != nil {
 			expected := "Missing legalEntity URI"
-			if err.Error() != expected {
+			if !strings.Contains(err.Error(), expected) {
 				t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 			}
 		} else {
@@ -90,7 +91,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -139,7 +140,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -168,7 +169,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing encryptRequestSubjects in encryptRequest"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -201,7 +202,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing plainText in encryptRequest"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -235,7 +236,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=Illegal base64 encoded string: illegal base64 data at input byte 3"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -269,7 +270,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=Failed to encrypt plainText: failed to decode PEM block containing public key, key is of the wrong type"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -325,7 +326,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -348,7 +349,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -372,7 +373,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=error reading request: error"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -399,7 +400,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing legalEntityURI in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -430,7 +431,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=error decrypting request: illegal nonce given"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -461,7 +462,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=error decrypting request: cipher: message authentication failed"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -492,7 +493,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		}
 
 		expected := "code=400, message=error decrypting request: crypto/rsa: decryption error"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -546,7 +547,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -570,7 +571,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=error reading request: error"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -593,7 +594,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -622,7 +623,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing legalEntityURI in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -651,7 +652,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing subjectURI in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -682,7 +683,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		}
 
 		expected := "code=500, message=error getting externalId: could not open private key for legalEntity: {UNKNOWN} with filename ../../temp/VU5LTk9XTg==_private.pem"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -717,8 +718,9 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		if err.Error() != "code=400, message=missing plainText" {
-			t.Errorf("Expected error code=400, message=missing plainText, got: [%s]", err.Error())
+		expected := "code=400, message=missing plainText"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
 	})
 
@@ -744,8 +746,9 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		if err.Error() != "code=400, message=missing legalEntityURI" {
-			t.Errorf("Expected error code=400, message=missing legalEntityURI, got: [%s]", err.Error())
+		expected := "code=400, message=missing legalEntityURI"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
 	})
 
@@ -791,7 +794,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -834,8 +837,9 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		if err.Error() != "code=400, message=missing publicKey in verifyRequest" {
-			t.Errorf("Expected error code=400, message=missing publicKey in verifyRequest, got: [%s]", err.Error())
+		expected := "code=400, message=missing publicKey in verifyRequest"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
 	})
 
@@ -856,7 +860,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		}
 
 		expected := "code=400, message=missing body in request"
-		if err.Error() != expected {
+		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
 	})
@@ -884,8 +888,9 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		if err.Error() != "code=400, message=missing plainText in verifyRequest" {
-			t.Errorf("Expected error code=400, message=missing plainText in verifyRequest, got: [%s]", err.Error())
+		expected := "code=400, message=missing plainText in verifyRequest"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
 	})
 
@@ -912,8 +917,9 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		if err.Error() != "code=400, message=missing signature in verifyRequest" {
-			t.Errorf("Expected error code=400, message=missing signature in verifyRequest, got: [%s]", err.Error())
+		expected := "code=400, message=missing signature in verifyRequest"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
 	})
 
