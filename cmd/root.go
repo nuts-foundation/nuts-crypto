@@ -20,7 +20,7 @@ package cmd
 
 import (
 	"github.com/nuts-foundation/nuts-crypto/engine"
-	cfg "github.com/nuts-foundation/nuts-go/pkg"
+	cfg "github.com/nuts-foundation/nuts-go-core"
 	"github.com/sirupsen/logrus"
 )
 

@@ -27,7 +27,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/nuts-foundation/nuts-go/mock"
+	"github.com/nuts-foundation/nuts-go-core/mock"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"

@@ -24,7 +24,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	engine "github.com/nuts-foundation/nuts-go/pkg"
+	engine "github.com/nuts-foundation/nuts-go-core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
