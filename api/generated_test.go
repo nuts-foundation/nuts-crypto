@@ -57,6 +57,10 @@ func (t *testServerInterface) Verify(ctx echo.Context) error {
 	return t.err
 }
 
+func (t *testServerInterface) PublicKey(ctx echo.Context, urn string) error {
+	return t.err
+}
+
 var siws = []*ServerInterfaceWrapper{
 	serverInterfaceWrapper(nil), serverInterfaceWrapper(errors.New("Server error")),
 }
@@ -213,6 +217,7 @@ func TestRegisterHandlers(t *testing.T) {
 		echo.EXPECT().POST("/crypto/generate", gomock.Any())
 		echo.EXPECT().POST("/crypto/sign", gomock.Any())
 		echo.EXPECT().POST("/crypto/verify", gomock.Any())
+		echo.EXPECT().GET("/crypto/public_key/:urn", gomock.Any())
 
 		RegisterHandlers(echo, &testServerInterface{})
 	})

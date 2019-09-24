@@ -134,6 +134,8 @@ type ServerInterface interface {
 	ExternalId(ctx echo.Context) error
 	// Send a request for checking if the given combination has valid consent// (POST /crypto/generate)
 	GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error
+	// get the public key for a given organization. It returns the key in PEM form// (GET /crypto/public_key/{urn})
+	PublicKey(ctx echo.Context, urn string) error
 	// sign a piece of data with the private key of the given legalEntity// (POST /crypto/sign)
 	Sign(ctx echo.Context) error
 	// verify a signature given a public key, signature and the data// (POST /crypto/verify)
@@ -195,6 +197,22 @@ func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	return err
 }
 
+// PublicKey converts echo context to params.
+func (w *ServerInterfaceWrapper) PublicKey(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "urn" -------------
+	var urn string
+
+	err = runtime.BindStyledParameter("simple", false, "urn", ctx.Param("urn"), &urn)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter urn: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.PublicKey(ctx, urn)
+	return err
+}
+
 // Sign converts echo context to params.
 func (w *ServerInterfaceWrapper) Sign(ctx echo.Context) error {
 	var err error
@@ -224,6 +242,7 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/encrypt", wrapper.Encrypt)
 	router.POST("/crypto/external_id", wrapper.ExternalId)
 	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
+	router.GET("/crypto/public_key/:urn", wrapper.PublicKey)
 	router.POST("/crypto/sign", wrapper.Sign)
 	router.POST("/crypto/verify", wrapper.Verify)
 

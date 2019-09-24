@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 type ApiWrapper struct {
@@ -282,6 +283,24 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, verifyResponse)
+}
+
+func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
+	if len(urn) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
+	}
+	pubKey, err := w.C.PublicKey(types.LegalEntity{URI: urn})
+
+	if err != nil {
+		if strings.Contains(err.Error(), "could not open private key") {
+			return ctx.NoContent(404)
+		}
+
+		logrus.Error(err.Error())
+		return err
+	}
+
+	return ctx.String(200, pubKey)
 }
 
 func readBody(ctx echo.Context) ([]byte, error) {

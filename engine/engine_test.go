@@ -57,6 +57,7 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/external_id", gomock.Any())
 		echo.EXPECT().POST("/crypto/generate", gomock.Any())
+		echo.EXPECT().GET("/crypto/public_key/:urn", gomock.Any())
 
 		ce.Routes(echo)
 	})

@@ -956,6 +956,50 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 }
 
+func TestApiWrapper_PublicKey(t *testing.T) {
+	client := apiWrapper()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	client.C.GenerateKeyPairFor(legalEntity)
+
+	t.Run("PublicKey API call returns 200", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().String(http.StatusOK, gomock.Any())
+
+		client.PublicKey(echo, "test")
+	})
+
+	t.Run("PublicKey API call returns 404 for unknown", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().NoContent(http.StatusNotFound)
+
+		client.PublicKey(echo, "not")
+	})
+
+	t.Run("PublicKey API call returns 400 for empty urn", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		err := client.PublicKey(echo, "")
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "incorrect organization urn in request"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error [%s], got [%v]", expected, err)
+		}
+	})
+}
+
 func apiWrapper() *ApiWrapper {
 	backend := pkg.Crypto{
 		Storage: createTempStorage(),

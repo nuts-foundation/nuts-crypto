@@ -29,6 +29,32 @@ paths:
               example: "Invalid legalEntity URN"
               schema:
                 type: string
+  /crypto/public_key/{urn}:
+    get:
+      summary: "get the public key for a given organization. It returns the key in PEM form"
+      operationId: publicKey
+      tags:
+        - crypto
+      parameters:
+        - name: urn
+          in: path
+          schema:
+            type: string
+          description: "organization identifier in urn form"
+          example: "urn:oid:2.16.840.1.113883.2.4.6.1:48000000"
+          required: true
+      responses:
+        '200':
+          description: "OK response, body holds public key in PEM format"
+          content:
+            text/plain:
+              example: "-----BEGIN PUBLIC KEY----- .... -----END PUBLIC KEY-----"
+        '404':
+          description: "not found"
+          content:
+            text/plain:
+              example:
+                "organization not found"
   /crypto/encrypt:
     post:
       summary: "encrypt a piece of data for a list of public keys/legalEntity's. A single symmetric keys will be used for all entries"
