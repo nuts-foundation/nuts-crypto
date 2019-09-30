@@ -193,7 +193,7 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string
 	var cipherTextKeys [][]byte
 
 	for _, pemKey := range keys {
-		pk, err := pemToPublicKey([]byte(pemKey))
+		pk, err := PemToPublicKey([]byte(pemKey))
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}
@@ -294,7 +294,7 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 
 // VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
-	key, err := pemToPublicKey([]byte(pemKey))
+	key, err := PemToPublicKey([]byte(pemKey))
 
 	if err != nil {
 		return false, err
@@ -385,7 +385,8 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 	return plaintext, nil
 }
 
-func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
+// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKey
+func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
 		return nil, ErrWrongPublicKey
@@ -404,6 +405,7 @@ func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	return finalKey, nil
 }
 
+// PublicKeyToPem converts an rsa.PublicKey to PEM encoding
 func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
 

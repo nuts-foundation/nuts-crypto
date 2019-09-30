@@ -399,7 +399,7 @@ func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("parse public key", func(t *testing.T) {
 		pub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9wJQN59PYsvIsTrFuTqS\nLoUBgwdRfpJxOa5L8nOALxNk41MlAg7xnPbvnYrOHFucfWBTDOMTKBMSmD4WDkaF\ndVrXAML61z85Le8qsXfX6f7TbKMDm2u1O3cye+KdJe8zclK9sTFzSD0PP0wfw7wf\nlACe+PfwQgeOLPUWHaR6aDfaA64QEdfIzk/IL3S595ixaEn0huxMHgXFX35Vok+o\nQdbnclSTo6HUinkqsHUu/hGHApkE3UfT6GD6SaLiB9G4rAhlrDQ71ai872t4FfoK\n7skhe8sP2DstzAQRMf9FcetrNeTxNL7Zt4F/qKm80cchRZiFYPMCYyjQphyBCoJf\n0wIDAQAB\n-----END PUBLIC KEY-----"
 
-		_, err := pemToPublicKey([]byte(pub))
+		_, err := PemToPublicKey([]byte(pub))
 
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -479,7 +479,7 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 
 func TestCrypto_pemToPublicKey(t *testing.T) {
 	t.Run("wrong PEM block gives error", func(t *testing.T) {
-		_, err := pemToPublicKey([]byte{})
+		_, err := PemToPublicKey([]byte{})
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
