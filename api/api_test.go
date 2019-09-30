@@ -23,12 +23,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go-core/mock"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -55,9 +55,8 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		if err := se.GenerateKeyPair(echo, GenerateKeyPairParams{}); err != nil {
-			expected := "Missing legalEntity URI"
-			if !strings.Contains(err.Error(), expected) {
-				t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+			if !errors.Is(err, pkg.ErrMissingLegalEntityURI) {
+				t.Errorf("Expected error [%s], got [%s]", pkg.ErrMissingLegalEntityURI, err)
 			}
 		} else {
 			t.Error("Expected error")

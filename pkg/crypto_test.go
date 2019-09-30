@@ -23,6 +23,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -69,9 +70,8 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "Missing legalEntity URI"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingLegalEntityURI) {
+			t.Errorf("Expected error [%v], got [%v]", ErrMissingLegalEntityURI, err)
 		}
 	})
 
@@ -190,9 +190,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "crypto/rsa: decryption error"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, rsa.ErrDecryption) {
+			t.Errorf("Expected error [%v], got [%v]", rsa.ErrDecryption, err)
 		}
 	})
 
@@ -235,9 +234,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "crypto/rsa: decryption error"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, rsa.ErrDecryption) {
+			t.Errorf("Expected error [%v], got [%v]", rsa.ErrDecryption, err)
 		}
 	})
 
@@ -346,9 +344,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			return
 		}
 
-		expected := "subject is required"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingSubject) {
+			t.Errorf("Expected error [%v], Got [%v]", ErrMissingSubject, err)
 		}
 	})
 
@@ -360,9 +357,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			return
 		}
 
-		expected := "actor is required"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingActor) {
+			t.Errorf("Expected error [%v], Got [%v]", ErrMissingActor, err)
 		}
 	})
 }
@@ -422,7 +418,7 @@ func TestCrypto_Configure(t *testing.T) {
 			return
 		}
 
-		if err.Error() != "invalid keySize, needs to be at least 2048 bits" {
+		if !errors.Is(err, ErrInvalidKeySize) {
 			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
 		}
 	})
