@@ -238,6 +238,39 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, signResponse)
 }
 
+func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
+	buf, err := readBody(ctx)
+	if err != nil {
+		return err
+	}
+
+	var signRequest = &SignJwtRequest{}
+	err = json.Unmarshal(buf, signRequest)
+
+	if err != nil {
+		logrus.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	if len(signRequest.LegalEntity) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing legalEntityURI")
+	}
+
+	if len(signRequest.Claims) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing claims")
+	}
+
+	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
+	sig, err := w.C.SignJwtFor(signRequest.Claims, le)
+
+	if err != nil {
+		logrus.Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	return ctx.String(http.StatusOK, sig)
+}
+
 func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
@@ -309,6 +342,8 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 
 	return ctx.String(200, pubKey)
 }
+
+
 
 func readBody(ctx echo.Context) ([]byte, error) {
 	req := ctx.Request()

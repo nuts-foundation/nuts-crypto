@@ -812,6 +812,117 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 	})
 }
 
+func TestApiWrapper_SignJwt(t *testing.T) {
+	client := apiWrapper()
+	defer emptyTemp()
+
+	legalEntity := types.LegalEntity{URI: "test"}
+	client.C.GenerateKeyPairFor(legalEntity)
+
+	t.Run("Missing claims returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := SignJwtRequest{
+			LegalEntity: Identifier(legalEntity.URI),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.SignJwt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=missing claims"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing legalEntity returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := SignJwtRequest{
+			Claims: map[string]interface{}{"iss":"nuts"},
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.SignJwt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+		}
+
+		expected := "code=400, message=missing legalEntityURI"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
+		}
+	})
+
+	t.Run("All OK returns 200", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := SignJwtRequest{
+			LegalEntity: Identifier(legalEntity.URI),
+			Claims: map[string]interface{}{"iss":"nuts"},
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+		echo.EXPECT().String(http.StatusOK, gomock.Any())
+
+		err := client.SignJwt(echo)
+
+		if err != nil {
+			t.Errorf("Expected no error got [%s]", err.Error())
+		}
+	})
+
+	t.Run("Missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.SignJwt(echo)
+
+		if err == nil {
+			t.Error("Expected error got nothing")
+			return
+		}
+
+		expected := "code=400, message=missing body in request"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		}
+	})
+}
+
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()

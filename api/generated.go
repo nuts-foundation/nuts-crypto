@@ -66,6 +66,12 @@ type Identifier string
 // PublicKey defines model for PublicKey.
 type PublicKey string
 
+// SignJwtRequest defines model for SignJwtRequest.
+type SignJwtRequest struct {
+	Claims      map[string]interface{} `json:"claims"`
+	LegalEntity Identifier             `json:"legalEntity"`
+}
+
 // SignRequest defines model for SignRequest.
 type SignRequest struct {
 	LegalEntity Identifier `json:"legalEntity"`
@@ -106,6 +112,9 @@ type GenerateKeyPairParams struct {
 // signJSONBody defines parameters for Sign.
 type signJSONBody SignRequest
 
+// signJwtJSONBody defines parameters for SignJwt.
+type signJwtJSONBody SignJwtRequest
+
 // verifyJSONBody defines parameters for Verify.
 type verifyJSONBody VerifyRequest
 
@@ -120,6 +129,9 @@ type ExternalIdJSONRequestBody externalIdJSONBody
 
 // SignRequestBody defines body for Sign for application/json ContentType.
 type SignJSONRequestBody signJSONBody
+
+// SignJwtRequestBody defines body for SignJwt for application/json ContentType.
+type SignJwtJSONRequestBody signJwtJSONBody
 
 // VerifyRequestBody defines body for Verify for application/json ContentType.
 type VerifyJSONRequestBody verifyJSONBody
@@ -138,6 +150,8 @@ type ServerInterface interface {
 	PublicKey(ctx echo.Context, urn string) error
 	// sign a piece of data with the private key of the given legalEntity// (POST /crypto/sign)
 	Sign(ctx echo.Context) error
+	// sign a JWT payload with the private key of the given legalEntity// (POST /crypto/sign_jwt)
+	SignJwt(ctx echo.Context) error
 	// verify a signature given a public key, signature and the data// (POST /crypto/verify)
 	Verify(ctx echo.Context) error
 }
@@ -222,6 +236,15 @@ func (w *ServerInterfaceWrapper) Sign(ctx echo.Context) error {
 	return err
 }
 
+// SignJwt converts echo context to params.
+func (w *ServerInterfaceWrapper) SignJwt(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.SignJwt(ctx)
+	return err
+}
+
 // Verify converts echo context to params.
 func (w *ServerInterfaceWrapper) Verify(ctx echo.Context) error {
 	var err error
@@ -244,6 +267,7 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
 	router.GET("/crypto/public_key/:urn", wrapper.PublicKey)
 	router.POST("/crypto/sign", wrapper.Sign)
+	router.POST("/crypto/sign_jwt", wrapper.SignJwt)
 	router.POST("/crypto/verify", wrapper.Verify)
 
 }
