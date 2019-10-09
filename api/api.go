@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -292,7 +293,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 }
 
 func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
-	if len(urn) == 0 {
+	if match, err := regexp.MatchString(`^\S+$`, urn); !match || err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
 	pubKey, err := w.C.PublicKey(types.LegalEntity{URI: urn})
