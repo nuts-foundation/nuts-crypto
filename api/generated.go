@@ -247,4 +247,3 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/verify", wrapper.Verify)
 
 }
-

@@ -20,8 +20,11 @@ paths:
           schema:
             $ref: "#/components/schemas/Identifier"
       responses:
-        '201':
-          description: "Key has been created successfully"
+        '200':
+          description: "OK response, body holds public key in PEM format"
+          content:
+            text/plain:
+              example: "-----BEGIN PUBLIC KEY----- .... -----END PUBLIC KEY-----"
         '400':
           description: "Invalid request"
           content:
