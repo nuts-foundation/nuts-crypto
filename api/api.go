@@ -38,11 +38,17 @@ type ApiWrapper struct {
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
-	if err := w.C.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
+	le := types.LegalEntity{URI: string(params.LegalEntity)}
+	if err := w.C.GenerateKeyPairFor(le); err != nil {
 		return err
 	}
 
-	return ctx.NoContent(http.StatusCreated)
+	pub, err := w.C.PublicKey(le)
+	if err != nil {
+		return err
+	}
+
+	return ctx.String(http.StatusOK, pub)
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt

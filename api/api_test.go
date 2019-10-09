@@ -36,14 +36,27 @@ import (
 	"testing"
 )
 
+type pubKeyMatcher struct {
+}
+
+func (p pubKeyMatcher) Matches(x interface{}) bool {
+	s := x.(string)
+
+	return strings.Contains(s, "-----BEGIN PUBLIC KEY-----")
+}
+
+func (p pubKeyMatcher) String() string {
+	return "Public Key Matcher"
+}
+
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
-	t.Run("GenerateKeyPairAPI call returns 201 CREATED", func(t *testing.T) {
+	t.Run("GenerateKeyPairAPI call returns 200 with pub", func(t *testing.T) {
 		se := apiWrapper()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		echo.EXPECT().NoContent(http.StatusCreated)
+		echo.EXPECT().String(http.StatusOK, pubKeyMatcher{})
 
 		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 	})
@@ -516,7 +529,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		jsonRequest := ExternalIdRequest{
 			LegalEntity: Identifier(legalEntity.URI),
 			Subject:     subject,
-			Actor:		 actor,
+			Actor:       actor,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -665,7 +678,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		jsonRequest := ExternalIdRequest{
 			LegalEntity: Identifier("UNKNOWN"),
 			Subject:     subject,
-			Actor:		 actor,
+			Actor:       actor,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -1008,7 +1021,6 @@ func apiWrapper() *ApiWrapper {
 
 	return &ApiWrapper{C: &backend}
 }
-
 
 func createTempStorage() storage.Storage {
 	b, _ := storage.NewFileSystemBackend("../../temp")
