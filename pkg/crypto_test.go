@@ -23,6 +23,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -69,9 +70,8 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "Missing legalEntity URI"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingLegalEntityURI) {
+			t.Errorf("Expected error [%v], got [%v]", ErrMissingLegalEntityURI, err)
 		}
 	})
 
@@ -190,9 +190,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "crypto/rsa: decryption error"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, rsa.ErrDecryption) {
+			t.Errorf("Expected error [%v], got [%v]", rsa.ErrDecryption, err)
 		}
 	})
 
@@ -235,9 +234,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "crypto/rsa: decryption error"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, rsa.ErrDecryption) {
+			t.Errorf("Expected error [%v], got [%v]", rsa.ErrDecryption, err)
 		}
 	})
 
@@ -346,9 +344,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			return
 		}
 
-		expected := "subject is required"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingSubject) {
+			t.Errorf("Expected error [%v], Got [%v]", ErrMissingSubject, err)
 		}
 	})
 
@@ -360,9 +357,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			return
 		}
 
-		expected := "actor is required"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, ErrMissingActor) {
+			t.Errorf("Expected error [%v], Got [%v]", ErrMissingActor, err)
 		}
 	})
 }
@@ -403,7 +399,7 @@ func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("parse public key", func(t *testing.T) {
 		pub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9wJQN59PYsvIsTrFuTqS\nLoUBgwdRfpJxOa5L8nOALxNk41MlAg7xnPbvnYrOHFucfWBTDOMTKBMSmD4WDkaF\ndVrXAML61z85Le8qsXfX6f7TbKMDm2u1O3cye+KdJe8zclK9sTFzSD0PP0wfw7wf\nlACe+PfwQgeOLPUWHaR6aDfaA64QEdfIzk/IL3S595ixaEn0huxMHgXFX35Vok+o\nQdbnclSTo6HUinkqsHUu/hGHApkE3UfT6GD6SaLiB9G4rAhlrDQ71ai872t4FfoK\n7skhe8sP2DstzAQRMf9FcetrNeTxNL7Zt4F/qKm80cchRZiFYPMCYyjQphyBCoJf\n0wIDAQAB\n-----END PUBLIC KEY-----"
 
-		_, err := pemToPublicKey([]byte(pub))
+		_, err := PemToPublicKey([]byte(pub))
 
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -422,7 +418,7 @@ func TestCrypto_Configure(t *testing.T) {
 			return
 		}
 
-		if err.Error() != "invalid keySize, needs to be at least 2048 bits" {
+		if !errors.Is(err, ErrInvalidKeySize) {
 			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
 		}
 	})
@@ -483,7 +479,7 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 
 func TestCrypto_pemToPublicKey(t *testing.T) {
 	t.Run("wrong PEM block gives error", func(t *testing.T) {
-		_, err := pemToPublicKey([]byte{})
+		_, err := PemToPublicKey([]byte{})
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")

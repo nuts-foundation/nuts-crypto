@@ -19,10 +19,10 @@
 package api
 
 import (
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/nuts-foundation/nuts-go-core/mock"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

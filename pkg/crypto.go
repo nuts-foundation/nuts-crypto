@@ -30,13 +30,28 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	core "github.com/nuts-foundation/nuts-go-core"
 	"io"
 	"strings"
 	"sync"
 )
+
+// ErrInvalidKeySize is returned when the keySize for new keys is too short
+var ErrInvalidKeySize = core.NewError("invalid keySize, needs to be at least 2048 bits", false)
+// ErrMissingLegalEntityURI is returned when a required legal entity is missing
+var ErrMissingLegalEntityURI = core.NewError("missing legalEntity URI", false)
+// ErrMissingActor indicates the actor is missing
+var ErrMissingActor = core.NewError("missing actor", false)
+// ErrMissingSubject indicates the Subject is missing
+var ErrMissingSubject = core.NewError("missing subject", false)
+// ErrIllegalNonce indicates an incorrect nonce
+var ErrIllegalNonce = core.NewError("illegal nonce given", false)
+// ErrWrongPublicKey indicates a wrong public key format
+var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing public key, key is of the wrong type", false)
+// ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
+var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
 
 type CryptoConfig struct {
 	Keysize int
@@ -52,8 +67,8 @@ type Crypto struct {
 	configOnce sync.Once
 	configDone bool
 }
-
 var instance *Crypto
+
 var oneBackend sync.Once
 
 func CryptoInstance() *Crypto {
@@ -73,7 +88,7 @@ func (ce *Crypto) Configure() error {
 
 	ce.configOnce.Do(func() {
 		if ce.Config.Keysize < 2048 {
-			err = errors.New("invalid keySize, needs to be at least 2048 bits")
+			err = ErrInvalidKeySize
 			return
 		}
 
@@ -105,7 +120,7 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 	var err error = nil
 
 	if len(legalEntity.URI) == 0 {
-		return errors.New("Missing legalEntity URI")
+		return ErrMissingLegalEntityURI
 	}
 
 	reader := rand.Reader
@@ -131,7 +146,7 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
 
 	if len(cipherText.CipherTextKeys) != 1 {
-		return nil, errors.New(fmt.Sprintf("unsupported count of CipherTextKeys: %d", len(cipherText.CipherTextKeys)))
+		return nil, core.Errorf("unsupported count of CipherTextKeys: %d", false, len(cipherText.CipherTextKeys))
 	}
 
 	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
@@ -178,7 +193,7 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string
 	var cipherTextKeys [][]byte
 
 	for _, pemKey := range keys {
-		pk, err := pemToPublicKey([]byte(pemKey))
+		pk, err := PemToPublicKey([]byte(pemKey))
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}
@@ -234,11 +249,11 @@ func symmetricKeyToBlockCipher(ciph []byte) (cipher.AEAD, error) {
 // todo: check by others if this makes sense
 func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.LegalEntity) ([]byte, error) {
 	if len(strings.TrimSpace(subject)) == 0 {
-		return nil, errors.New("subject is required")
+		return nil, ErrMissingSubject
 	}
 
 	if len(strings.TrimSpace(actor)) == 0 {
-		return nil, errors.New("actor is required")
+		return nil, ErrMissingActor
 	}
 
 	pk, err := client.Storage.GetPrivateKey(entity)
@@ -279,7 +294,7 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 
 // VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
-	key, err := pemToPublicKey([]byte(pemKey))
+	key, err := PemToPublicKey([]byte(pemKey))
 
 	if err != nil {
 		return false, err
@@ -360,7 +375,7 @@ func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, err
 func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
 
 	if len(nonce) == 0 {
-		return nil, errors.New("illegal nonce given")
+		return nil, ErrIllegalNonce
 	}
 
 	plaintext, err := key.Open(nil, nonce, cipherText, nil)
@@ -370,10 +385,11 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 	return plaintext, nil
 }
 
-func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
+// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKey
+func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, errors.New("failed to decode PEM block containing public key, key is of the wrong type")
+		return nil, ErrWrongPublicKey
 	}
 
 	b := block.Bytes
@@ -383,12 +399,13 @@ func pemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	}
 	finalKey, ok := key.(*rsa.PublicKey)
 	if !ok {
-		return nil, errors.New("Unable to convert public key to RSA public key")
+		return nil, ErrRsaPubKeyConversion
 	}
 
 	return finalKey, nil
 }
 
+// PublicKeyToPem converts an rsa.PublicKey to PEM encoding
 func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
 
