@@ -21,10 +21,13 @@ package engine
 import (
 	"errors"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	engine "github.com/nuts-foundation/nuts-go-core"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -65,6 +68,19 @@ func cmd() *cobra.Command {
 		Use:   "crypto",
 		Short: "crypto commands",
 	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "server",
+		Short: "Run standalone crypto server",
+		Run: func(cmd *cobra.Command, args []string) {
+			cryptoEngine := pkg.CryptoInstance()
+			echoServer := echo.New()
+			echoServer.HideBanner = true
+			echoServer.Use(middleware.Logger())
+			api.RegisterHandlers(echoServer, &api.ApiWrapper{C: cryptoEngine})
+			logrus.Fatal(echoServer.Start(":1324"))
+		},
+	})
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "generateKeyPair [legalEntityURI]",

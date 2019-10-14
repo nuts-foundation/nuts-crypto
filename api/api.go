@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -38,11 +39,17 @@ type ApiWrapper struct {
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
-	if err := w.C.GenerateKeyPairFor(types.LegalEntity{URI: string(params.LegalEntity)}); err != nil {
+	le := types.LegalEntity{URI: string(params.LegalEntity)}
+	if err := w.C.GenerateKeyPairFor(le); err != nil {
 		return err
 	}
 
-	return ctx.NoContent(http.StatusCreated)
+	pub, err := w.C.PublicKey(le)
+	if err != nil {
+		return err
+	}
+
+	return ctx.String(http.StatusOK, pub)
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
@@ -286,7 +293,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 }
 
 func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
-	if len(urn) == 0 {
+	if match, err := regexp.MatchString(`^\S+$`, urn); !match || err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
 	pubKey, err := w.C.PublicKey(types.LegalEntity{URI: urn})

@@ -77,8 +77,8 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			t.Errorf("Expected Cmd name to equal [crypto], got %s", cmd.Name())
 		}
 
-		if len(cmd.Commands()) != 2 {
-			t.Errorf("Expected Cmd to have 1 sub-command, got %d", len(cmd.Commands()))
+		if len(cmd.Commands()) != 3 {
+			t.Errorf("Expected Cmd to have 3 sub-command, got %d", len(cmd.Commands()))
 		}
 	})
 

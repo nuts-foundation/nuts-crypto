@@ -16,3 +16,4 @@
 
 #sphinx
 _build
+*.pem
