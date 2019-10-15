@@ -117,6 +117,40 @@ func TestServerInterfaceWrapper_ExternalId(t *testing.T) {
 	}
 }
 
+func TestServerInterfaceWrapper_PublicKey(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.GET, "/", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+			c.SetParamNames("urn")
+			c.SetParamValues("le")
+
+			err := siw.PublicKey(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_SignJwt(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.GET, "/", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.SignJwt(c)
+			tsi := siw.Handler.(*testServerInterface)
+			if tsi.err != err {
+				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
+			}
+		})
+	}
+}
+
 func TestServerInterfaceWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("GenerateKeyPairAPI call returns no error", func(t *testing.T) {
 		// given
