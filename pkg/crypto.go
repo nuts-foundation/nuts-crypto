@@ -30,6 +30,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -40,16 +41,22 @@ import (
 
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
 var ErrInvalidKeySize = core.NewError("invalid keySize, needs to be at least 2048 bits", false)
+
 // ErrMissingLegalEntityURI is returned when a required legal entity is missing
 var ErrMissingLegalEntityURI = core.NewError("missing legalEntity URI", false)
+
 // ErrMissingActor indicates the actor is missing
 var ErrMissingActor = core.NewError("missing actor", false)
+
 // ErrMissingSubject indicates the Subject is missing
 var ErrMissingSubject = core.NewError("missing subject", false)
+
 // ErrIllegalNonce indicates an incorrect nonce
 var ErrIllegalNonce = core.NewError("illegal nonce given", false)
+
 // ErrWrongPublicKey indicates a wrong public key format
 var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing public key, key is of the wrong type", false)
+
 // ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
 var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
 
@@ -67,6 +74,7 @@ type Crypto struct {
 	configOnce sync.Once
 	configDone bool
 }
+
 var instance *Crypto
 
 var oneBackend sync.Once
@@ -83,17 +91,17 @@ func CryptoInstance() *Crypto {
 }
 
 // Configure loads the given configurations in the engine. Any wrong combination will return an error
-func (ce *Crypto) Configure() error {
+func (client *Crypto) Configure() error {
 	var err error
 
-	ce.configOnce.Do(func() {
-		if ce.Config.Keysize < 2048 {
+	client.configOnce.Do(func() {
+		if client.Config.Keysize < 2048 {
 			err = ErrInvalidKeySize
 			return
 		}
 
-		ce.Storage, err = ce.newCryptoStorage()
-		ce.configDone = true
+		client.Storage, err = client.newCryptoStorage()
+		client.configDone = true
 	})
 
 	return err
@@ -101,9 +109,9 @@ func (ce *Crypto) Configure() error {
 
 // Helper function to create a new CryptoInstance. It checks the config (via Viper) for a --cryptobackend setting
 // if none are given or this is set to 'fs', the filesystem backend is used.
-func (ce *Crypto) newCryptoStorage() (storage.Storage, error) {
-	if ce.Config.Storage == types.ConfigStorageFs || ce.Config.Storage == "" {
-		fspath := ce.Config.Fspath
+func (client *Crypto) newCryptoStorage() (storage.Storage, error) {
+	if client.Config.Storage == types.ConfigStorageFs || client.Config.Storage == "" {
+		fspath := client.Config.Fspath
 		if fspath == "" {
 			fspath = types.ConfigFSPathDefault
 		}
@@ -316,6 +324,23 @@ func (client *Crypto) PublicKey(legalEntity types.LegalEntity) (string, error) {
 	}
 
 	return PublicKeyToPem(pubKey)
+}
+
+// SignJwtFor creates a signed JWT given a legalEntity and map of claims
+func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error) {
+	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
+
+	if err != nil {
+		return "", err
+	}
+
+	c := jwt.MapClaims{}
+	for k, v := range claims {
+		c[k] = v
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
+	return token.SignedString(rsaPrivateKey)
 }
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.

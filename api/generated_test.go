@@ -22,6 +22,7 @@ import (
 	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
+	"github.com/magiconair/properties/assert"
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"net/http"
 	"net/http/httptest"
@@ -61,6 +62,10 @@ func (t *testServerInterface) PublicKey(ctx echo.Context, urn string) error {
 	return t.err
 }
 
+func (t *testServerInterface) SignJwt(ctx echo.Context) error {
+	return t.err
+}
+
 var siws = []*ServerInterfaceWrapper{
 	serverInterfaceWrapper(nil), serverInterfaceWrapper(errors.New("Server error")),
 }
@@ -74,9 +79,7 @@ func TestServerInterfaceWrapper_Decrypt(t *testing.T) {
 
 			err := siw.Decrypt(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -90,9 +93,7 @@ func TestServerInterfaceWrapper_Encrypt(t *testing.T) {
 
 			err := siw.Encrypt(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -106,9 +107,37 @@ func TestServerInterfaceWrapper_ExternalId(t *testing.T) {
 
 			err := siw.ExternalId(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_PublicKey(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.GET, "/", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+			c.SetParamNames("urn")
+			c.SetParamValues("le")
+
+			err := siw.PublicKey(c)
+			tsi := siw.Handler.(*testServerInterface)
+			assert.Equal(t, tsi.err, err)
+		})
+	}
+}
+
+func TestServerInterfaceWrapper_SignJwt(t *testing.T) {
+	for _, siw := range siws {
+		t.Run("Encrypt call returns expected error", func(t *testing.T) {
+			req := httptest.NewRequest(echo.GET, "/", nil)
+			rec := httptest.NewRecorder()
+			c := echo.New().NewContext(req, rec)
+
+			err := siw.SignJwt(c)
+			tsi := siw.Handler.(*testServerInterface)
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -217,6 +246,7 @@ func TestRegisterHandlers(t *testing.T) {
 		echo.EXPECT().POST("/crypto/generate", gomock.Any())
 		echo.EXPECT().POST("/crypto/sign", gomock.Any())
 		echo.EXPECT().POST("/crypto/verify", gomock.Any())
+		echo.EXPECT().POST("/crypto/sign_jwt", gomock.Any())
 		echo.EXPECT().GET("/crypto/public_key/:urn", gomock.Any())
 
 		RegisterHandlers(echo, &testServerInterface{})

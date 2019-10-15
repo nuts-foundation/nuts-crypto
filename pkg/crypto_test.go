@@ -25,8 +25,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
 	"testing"
@@ -120,10 +122,9 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
 		_, err := client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
-		expected := "could not open private key for legalEntity: {other} with filename temp/TestCrypto_DecryptCipherTextFor/b3RoZXI=_private.pem"
 
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
 		}
 	})
 }
@@ -143,9 +144,8 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 			return
 		}
 
-		expected := "could not open private key for legalEntity: {testEncrypt} with filename temp/TestCrypto_encryptPlainTextFor/dGVzdEVuY3J5cHQ=_private.pem"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
 		}
 	})
 }
@@ -210,9 +210,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {testU} with filename temp/TestCrypto_DecryptKeyAndCipherTextFor/dGVzdFU=_private.pem"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
 		}
 	})
 
@@ -330,9 +329,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 			t.Errorf("Expected error, got nothing")
 		}
 
-		expected := "could not open private key for legalEntity: {test2} with filename temp/TestCrypto_ExternalIdFor/dGVzdDI=_private.pem"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
 		}
 	})
 
@@ -372,28 +370,16 @@ func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKey(legalEntity)
 
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		if pub == "" {
-			t.Error("Expected public key, got nothing")
-		}
+		assert.Nil(t, err)
+		assert.NotEmpty(t, pub)
 	})
 
 	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
 		_, err := client.PublicKey(legalEntity)
 
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
-			return
-		}
-
-		expected := "could not open private key for legalEntity: {testPKUnknown} with filename temp/TestCrypto_PublicKey/dGVzdFBLVW5rbm93bg==_private.pem"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], Got [%s]", expected, err.Error())
-		}
+		assert.NotNil(t, err)
+		assert.True(t, errors.Is(err, os.ErrNotExist))
 	})
 
 	t.Run("parse public key", func(t *testing.T) {
@@ -401,9 +387,34 @@ func TestCrypto_PublicKey(t *testing.T) {
 
 		_, err := PemToPublicKey([]byte(pub))
 
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
-		}
+		assert.Nil(t, err)
+	})
+}
+
+func TestCrypto_SignJwtFor(t *testing.T) {
+	client := defaultBackend(t.Name())
+	legalEntity := types.LegalEntity{URI: "testSignJwt"}
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp(t.Name())
+
+	t.Run("creates valid JWT", func(t *testing.T) {
+		tokenString, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, legalEntity)
+
+		assert.Nil(t, err)
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			pubKey, _ := client.Storage.GetPublicKey(legalEntity)
+			return pubKey, nil
+		})
+
+		assert.True(t, token.Valid)
+		assert.Equal(t, "nuts", token.Claims.(jwt.MapClaims)["iss"])
+	})
+
+	t.Run("returns error for not found", func(t *testing.T) {
+		_, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, types.LegalEntity{URI: "notFound"})
+
+		assert.True(t, errors.Is(err, os.ErrNotExist))
 	})
 }
 

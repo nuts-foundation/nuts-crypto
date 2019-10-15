@@ -57,6 +57,7 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/external_id", gomock.Any())
 		echo.EXPECT().POST("/crypto/generate", gomock.Any())
+		echo.EXPECT().POST("/crypto/sign_jwt", gomock.Any())
 		echo.EXPECT().GET("/crypto/public_key/:urn", gomock.Any())
 
 		ce.Routes(echo)
@@ -144,7 +145,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			t.Errorf("Expected no error, got [%s]", err.Error())
 		}
 
-		expected := "Error printing publicKey: could not open private key for legalEntity: {legalEntityMissing} with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem\n"
+		expected := "Error printing publicKey: could not open private key for legalEntity: {legalEntityMissing} with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: open ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: no such file or directory\n"
 		if buf.String() != expected {
 			t.Errorf("Expected output [%s], got [%s]", expected, buf.String())
 		}

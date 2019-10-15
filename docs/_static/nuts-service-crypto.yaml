@@ -183,6 +183,31 @@ paths:
             text/plain:
               example:
                 "missing signature"
+  /crypto/sign_jwt:
+    post:
+      summary: "sign a JWT payload with the private key of the given legalEntity"
+      operationId: signJwt
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignJwtRequest'
+      responses:
+        '200':
+          description: "OK response, body holds JWT"
+          content:
+            text/plain:
+              schema:
+                example: "aa==.bb==.cc=="
+        '400':
+          description: "incorrect data"
+          content:
+            text/plain:
+              example:
+                "unknown legalEntity"
 components:
   schemas:
     EncryptRequest:
@@ -288,6 +313,15 @@ components:
         plainText:
           type: string
           description: "Base64 encoded data"
+    SignJwtRequest:
+      required:
+        - claims
+        - legalEntity
+      properties:
+        legalEntity:
+          $ref: "#/components/schemas/Identifier"
+        claims:
+          type: object
     SignResponse:
       required:
         - signature
