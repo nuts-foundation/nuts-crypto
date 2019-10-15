@@ -34,7 +34,7 @@ import (
 )
 
 type ApiWrapper struct {
-	C *pkg.Crypto
+	C pkg.Client
 }
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate

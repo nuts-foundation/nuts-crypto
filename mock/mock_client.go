@@ -136,3 +136,18 @@ func (mr *MockClientMockRecorder) PublicKey(legalEntity interface{}) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKey", reflect.TypeOf((*MockClient)(nil).PublicKey), legalEntity)
 }
+
+// SignJwtFor mocks base method
+func (m *MockClient) SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SignJwtFor", claims, legalEntity)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SignJwtFor indicates an expected call of SignJwtFor
+func (mr *MockClientMockRecorder) SignJwtFor(claims, legalEntity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJwtFor", reflect.TypeOf((*MockClient)(nil).SignJwtFor), claims, legalEntity)
+}

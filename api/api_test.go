@@ -25,10 +25,12 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/golang/mock/gomock"
+	mock2 "github.com/nuts-foundation/nuts-crypto/mock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go-core/mock"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -75,6 +77,28 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 			t.Error("Expected error")
 		}
 	})
+
+	t.Run("PublicKey returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		cl := mock2.NewMockClient(ctrl)
+		echo := mock.NewMockContext(ctrl)
+
+		se := ApiWrapper{
+			C: cl,
+		}
+
+		// key generation is ok
+		le := types.LegalEntity{URI: "test"}
+		cl.EXPECT().GenerateKeyPairFor(le).Return(nil).AnyTimes()
+
+		// getting pub key goes boom!
+		cl.EXPECT().PublicKey(le).Return("", errors.New("boom"))
+
+		err := se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
+
+		assert.NotNil(t, err)
+	})
 }
 
 func TestApiWrapper_Encrypt(t *testing.T) {
@@ -83,8 +107,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPairFor(legalEntity)
-	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
-	pemKey, _ := pkg.PublicKeyToPem(pubKey)
+	pemKey, _ := client.C.PublicKey(legalEntity)
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -930,8 +953,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	client.C.GenerateKeyPairFor(legalEntity)
 
-	pubKey, _ := client.C.Storage.GetPublicKey(legalEntity)
-	pemPubKey, _ := pkg.PublicKeyToPem(pubKey)
+	pemPubKey, _ := client.C.PublicKey(legalEntity)
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
 	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
