@@ -22,6 +22,7 @@ import (
 	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
+	"github.com/magiconair/properties/assert"
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"net/http"
 	"net/http/httptest"
@@ -78,9 +79,7 @@ func TestServerInterfaceWrapper_Decrypt(t *testing.T) {
 
 			err := siw.Decrypt(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -94,9 +93,7 @@ func TestServerInterfaceWrapper_Encrypt(t *testing.T) {
 
 			err := siw.Encrypt(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -110,9 +107,7 @@ func TestServerInterfaceWrapper_ExternalId(t *testing.T) {
 
 			err := siw.ExternalId(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -128,9 +123,7 @@ func TestServerInterfaceWrapper_PublicKey(t *testing.T) {
 
 			err := siw.PublicKey(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }
@@ -144,9 +137,7 @@ func TestServerInterfaceWrapper_SignJwt(t *testing.T) {
 
 			err := siw.SignJwt(c)
 			tsi := siw.Handler.(*testServerInterface)
-			if tsi.err != err {
-				t.Errorf("Expected argument doesn't match given err %v <> %v", tsi.err, err)
-			}
+			assert.Equal(t, tsi.err, err)
 		})
 	}
 }

@@ -860,14 +860,8 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 
 		err := client.SignJwt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=missing claims"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
-		}
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=missing claims")
 	})
 
 	t.Run("Missing legalEntity returns 400", func(t *testing.T) {
@@ -888,14 +882,8 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 
 		err := client.SignJwt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=missing legalEntityURI"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
-		}
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=missing legalEntityURI")
 	})
 
 	t.Run("All OK returns 200", func(t *testing.T) {
@@ -918,9 +906,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 
 		err := client.SignJwt(echo)
 
-		if err != nil {
-			t.Errorf("Expected no error got [%s]", err.Error())
-		}
+		assert.Nil(t, err)
 	})
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
@@ -934,15 +920,8 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 
 		err := client.SignJwt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=missing body in request"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
-		}
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=missing body in request")
 	})
 }
 

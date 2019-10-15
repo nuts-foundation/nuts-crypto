@@ -28,6 +28,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
 	"testing"
@@ -369,27 +370,16 @@ func TestCrypto_PublicKey(t *testing.T) {
 	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKey(legalEntity)
 
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		if pub == "" {
-			t.Error("Expected public key, got nothing")
-		}
+		assert.Nil(t, err)
+		assert.NotEmpty(t, pub)
 	})
 
 	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
 		_, err := client.PublicKey(legalEntity)
 
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
-			return
-		}
-
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
-		}
+		assert.NotNil(t, err)
+		assert.True(t, errors.Is(err, os.ErrNotExist))
 	})
 
 	t.Run("parse public key", func(t *testing.T) {
@@ -397,9 +387,7 @@ func TestCrypto_PublicKey(t *testing.T) {
 
 		_, err := PemToPublicKey([]byte(pub))
 
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
-		}
+		assert.Nil(t, err)
 	})
 }
 
@@ -412,33 +400,22 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	t.Run("creates valid JWT", func(t *testing.T) {
 		tokenString, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, legalEntity)
 
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
+		assert.Nil(t, err)
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			pubKey, _ := client.Storage.GetPublicKey(legalEntity)
 			return pubKey, nil
 		})
 
-		if !token.Valid {
-			t.Errorf("expected valid token, got %v", err)
-		}
-
-		issuer := token.Claims.(jwt.MapClaims)["iss"]
-		if issuer != "nuts" {
-			t.Errorf("expected iss to equal nuts, got %v", issuer)
-		}
+		assert.True(t, token.Valid)
+		assert.Equal(t, "nuts", token.Claims.(jwt.MapClaims)["iss"])
 	})
 
 	t.Run("returns error for not found", func(t *testing.T) {
 		_, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, types.LegalEntity{URI: "notFound"})
 
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("expected %v, Got %v", os.ErrNotExist, err)
-		}
+		assert.True(t, errors.Is(err, os.ErrNotExist))
 	})
-
 }
 
 func TestCrypto_Configure(t *testing.T) {
