@@ -853,7 +853,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := SignJwtRequest{
-			Claims: map[string]interface{}{"iss":"nuts"},
+			Claims: map[string]interface{}{"iss": "nuts"},
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -882,7 +882,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 
 		jsonRequest := SignJwtRequest{
 			LegalEntity: Identifier(legalEntity.URI),
-			Claims: map[string]interface{}{"iss":"nuts"},
+			Claims:      map[string]interface{}{"iss": "nuts"},
 		}
 
 		json, _ := json.Marshal(jsonRequest)

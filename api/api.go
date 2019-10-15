@@ -343,8 +343,6 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	return ctx.String(200, pubKey)
 }
 
-
-
 func readBody(ctx echo.Context) ([]byte, error) {
 	req := ctx.Request()
 	if req.Body == nil {

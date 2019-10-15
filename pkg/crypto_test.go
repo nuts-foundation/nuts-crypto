@@ -439,7 +439,6 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 		}
 	})
 
-
 }
 
 func TestCrypto_Configure(t *testing.T) {
