@@ -9,7 +9,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/labstack/echo/v4 v4.1.11
 	github.com/magiconair/properties v1.8.0
-	github.com/nuts-foundation/nuts-go-core v0.0.0-20191014142450-dd0fd3a25ffb
+	github.com/nuts-foundation/nuts-go-core v0.0.0-20191028170600-66675906a53a
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
