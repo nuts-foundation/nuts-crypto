@@ -25,6 +25,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/golang/mock/gomock"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	mock2 "github.com/nuts-foundation/nuts-crypto/mock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
@@ -51,14 +53,40 @@ func (p pubKeyMatcher) String() string {
 	return "Public Key Matcher"
 }
 
+type jwkMatcher struct {
+}
+
+func (p jwkMatcher) Matches(x interface{}) bool {
+	key := x.(jwk.Key)
+
+	return key.KeyType() == jwa.RSA
+}
+
+func (p jwkMatcher) String() string {
+	return "JWK Matcher"
+}
+
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
-	t.Run("GenerateKeyPairAPI call returns 200 with pub", func(t *testing.T) {
+	t.Run("GenerateKeyPairAPI call returns 200 with pub in PEM format", func(t *testing.T) {
 		se := apiWrapper()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		echo.EXPECT().Request().Return(&http.Request{})
 		echo.EXPECT().String(http.StatusOK, pubKeyMatcher{})
+
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
+	})
+
+	t.Run("GenerateKeyPairAPI call returns 200 with pub in JWK format", func(t *testing.T) {
+		se := apiWrapper()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Request().Return(&http.Request{Header: http.Header{"Accept": []string{"application/json"}}})
+		echo.EXPECT().JSON(http.StatusOK, jwkMatcher{})
 
 		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 	})
@@ -78,7 +106,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		}
 	})
 
-	t.Run("PublicKeyInPEM returns error", func(t *testing.T) {
+	t.Run("PublicKey returns error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		cl := mock2.NewMockClient(ctrl)
@@ -87,6 +115,9 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		se := ApiWrapper{
 			C: cl,
 		}
+
+		// empty mock
+		echo.EXPECT().Request().Return(&http.Request{})
 
 		// key generation is ok
 		le := types.LegalEntity{URI: "test"}
@@ -1087,39 +1118,58 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	client.C.GenerateKeyPairFor(legalEntity)
 
-	t.Run("PublicKeyInPEM API call returns 200", func(t *testing.T) {
+	t.Run("PublicKey API call returns 200", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		echo.EXPECT().Request().Return(&http.Request{})
 		echo.EXPECT().String(http.StatusOK, gomock.Any())
 
-		client.PublicKey(echo, "test")
+		_ = client.PublicKey(echo, "test")
 	})
 
-	t.Run("PublicKeyInPEM API call returns 404 for unknown", func(t *testing.T) {
+	t.Run("PublicKey API call returns JWK", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		echo.EXPECT().NoContent(http.StatusNotFound)
+		echo.EXPECT().Request().Return(&http.Request{Header: http.Header{"Accept": []string{"application/json"}}})
+		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
-		client.PublicKey(echo, "not")
+		_ = client.PublicKey(echo, "test")
 	})
 
-	t.Run("PublicKeyInPEM API call returns 400 for empty urn", func(t *testing.T) {
+	t.Run("PublicKey API call returns 404 for unknown", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Request().Return(&http.Request{})
+		echo.EXPECT().NoContent(http.StatusNotFound)
+
+		_ = client.PublicKey(echo, "not")
+	})
+
+	t.Run("PublicKey API call returns 404 for unknown, JWK requested", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Request().Return(&http.Request{Header: http.Header{"Accept": []string{"application/json"}}})
+		echo.EXPECT().NoContent(http.StatusNotFound)
+
+		_ = client.PublicKey(echo, "not")
+	})
+
+	t.Run("PublicKey API call returns 400 for empty urn", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
 		err := client.PublicKey(echo, "")
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "incorrect organization urn in request"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got [%v]", expected, err)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "incorrect organization urn in request")
 		}
 	})
 }

@@ -38,18 +38,32 @@ type ApiWrapper struct {
 }
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
+// It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
 	le := types.LegalEntity{URI: string(params.LegalEntity)}
 	if err := w.C.GenerateKeyPairFor(le); err != nil {
 		return err
 	}
 
-	pub, err := w.C.PublicKeyInPEM(le)
-	if err != nil {
-		return err
-	}
+	acceptHeader := ctx.Request().Header.Get("Accept")
 
-	return ctx.String(http.StatusOK, pub)
+	// starts with so we can ignore any +
+	if strings.Index(acceptHeader, "application/json") == 0 {
+		jwk, err := w.C.PublicKeyInJWK(le)
+		if err != nil {
+			return err
+		}
+
+		return ctx.JSON(http.StatusOK, jwk)
+	} else {
+		// backwards compatible PEM format is the default
+		pub, err := w.C.PublicKeyInPEM(le)
+		if err != nil {
+			return err
+		}
+
+		return ctx.String(http.StatusOK, pub)
+	}
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
@@ -325,22 +339,41 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, verifyResponse)
 }
 
+// PublicKey returns a public key for the given urn. The urn represents a legal entity. The api returns the public key either in PEM or JWK format.
+// It uses the accept header to determine this. Default is PEM (text/plain), only when application/json is requested will it return JWK.
 func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	if match, err := regexp.MatchString(`^\S+$`, urn); !match || err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
-	pubKey, err := w.C.PublicKeyInPEM(types.LegalEntity{URI: urn})
 
-	if err != nil {
-		if strings.Contains(err.Error(), "could not open private key") {
-			return ctx.NoContent(404)
+	le := types.LegalEntity{URI: urn}
+	acceptHeader := ctx.Request().Header.Get("Accept")
+
+	// starts with so we can ignore any +
+	if strings.Index(acceptHeader, "application/json") == 0 {
+		jwk, err := w.C.PublicKeyInJWK(le)
+		if err != nil {
+			if strings.Contains(err.Error(), "could not open private key") {
+				return ctx.NoContent(404)
+			}
+			logrus.Error(err.Error())
+			return err
 		}
 
-		logrus.Error(err.Error())
-		return err
-	}
+		return ctx.JSON(http.StatusOK, jwk)
+	} else {
+		// backwards compatible PEM format is the default
+		pub, err := w.C.PublicKeyInPEM(le)
+		if err != nil {
+			if strings.Contains(err.Error(), "could not open private key") {
+				return ctx.NoContent(404)
+			}
+			logrus.Error(err.Error())
+			return err
+		}
 
-	return ctx.String(200, pubKey)
+		return ctx.String(http.StatusOK, pub)
+	}
 }
 
 func readBody(ctx echo.Context) ([]byte, error) {
