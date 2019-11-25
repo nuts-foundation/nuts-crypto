@@ -78,7 +78,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		}
 	})
 
-	t.Run("PublicKey returns error", func(t *testing.T) {
+	t.Run("PublicKeyInPEM returns error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		cl := mock2.NewMockClient(ctrl)
@@ -93,7 +93,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		cl.EXPECT().GenerateKeyPairFor(le).Return(nil).AnyTimes()
 
 		// getting pub key goes boom!
-		cl.EXPECT().PublicKey(le).Return("", errors.New("boom"))
+		cl.EXPECT().PublicKeyInPEM(le).Return("", errors.New("boom"))
 
 		err := se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 
@@ -107,7 +107,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPairFor(legalEntity)
-	pemKey, _ := client.C.PublicKey(legalEntity)
+	pemKey, _ := client.C.PublicKeyInPEM(legalEntity)
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -154,7 +154,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		echo.EXPECT().Request().Return(request)
 		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
-		client.Encrypt(echo)
+		_ = client.Encrypt(echo)
 	})
 
 	t.Run("Illegal json gives 400", func(t *testing.T) {
@@ -318,7 +318,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPairFor(legalEntity)
-	pubKey, _ := client.C.PublicKey(legalEntity)
+	pubKey, _ := client.C.PublicKeyInPEM(legalEntity)
 	encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
@@ -932,7 +932,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	client.C.GenerateKeyPairFor(legalEntity)
 
-	pemPubKey, _ := client.C.PublicKey(legalEntity)
+	pemPubKey, _ := client.C.PublicKeyInPEM(legalEntity)
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
 	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
@@ -1087,7 +1087,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	client.C.GenerateKeyPairFor(legalEntity)
 
-	t.Run("PublicKey API call returns 200", func(t *testing.T) {
+	t.Run("PublicKeyInPEM API call returns 200", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1097,7 +1097,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 		client.PublicKey(echo, "test")
 	})
 
-	t.Run("PublicKey API call returns 404 for unknown", func(t *testing.T) {
+	t.Run("PublicKeyInPEM API call returns 404 for unknown", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1107,7 +1107,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 		client.PublicKey(echo, "not")
 	})
 
-	t.Run("PublicKey API call returns 400 for empty urn", func(t *testing.T) {
+	t.Run("PublicKeyInPEM API call returns 400 for empty urn", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)

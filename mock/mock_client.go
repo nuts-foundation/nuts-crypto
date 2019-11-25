@@ -6,6 +6,7 @@ package mock
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	jwk "github.com/lestrrat-go/jwx/jwk"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
 	reflect "reflect"
 )
@@ -122,19 +123,34 @@ func (mr *MockClientMockRecorder) VerifyWith(data, sig, pemKey interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyWith", reflect.TypeOf((*MockClient)(nil).VerifyWith), data, sig, pemKey)
 }
 
-// PublicKey mocks base method
-func (m *MockClient) PublicKey(legalEntity types.LegalEntity) (string, error) {
+// PublicKeyInPEM mocks base method
+func (m *MockClient) PublicKeyInPEM(legalEntity types.LegalEntity) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublicKey", legalEntity)
+	ret := m.ctrl.Call(m, "PublicKeyInPEM", legalEntity)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PublicKey indicates an expected call of PublicKey
-func (mr *MockClientMockRecorder) PublicKey(legalEntity interface{}) *gomock.Call {
+// PublicKeyInPEM indicates an expected call of PublicKeyInPEM
+func (mr *MockClientMockRecorder) PublicKeyInPEM(legalEntity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKey", reflect.TypeOf((*MockClient)(nil).PublicKey), legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKeyInPEM", reflect.TypeOf((*MockClient)(nil).PublicKeyInPEM), legalEntity)
+}
+
+// PublicKeyInJWK mocks base method
+func (m *MockClient) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublicKeyInJWK", legalEntity)
+	ret0, _ := ret[0].(jwk.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublicKeyInJWK indicates an expected call of PublicKeyInJWK
+func (mr *MockClientMockRecorder) PublicKeyInJWK(legalEntity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKeyInJWK", reflect.TypeOf((*MockClient)(nil).PublicKeyInJWK), legalEntity)
 }
 
 // SignJwtFor mocks base method

@@ -19,6 +19,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
@@ -106,6 +107,7 @@ func cmd() *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "publicKey [legalEntityURI]",
 		Short: "views the publicKey for a given legal entity",
+		Long:  "views the publicKey for a given legal entity. It'll output a JWK encoded public key and a (deprecated, <= 0.11.0) PEM encoded public key.",
 
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
@@ -116,13 +118,31 @@ func cmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cc := pkg.NewCryptoClient()
-			bytes, err := cc.PublicKey(types.LegalEntity{URI: args[0]})
+			le := types.LegalEntity{URI: args[0]}
 
+			// printout in JWK
+			jwk, err := cc.PublicKeyInJWK(le)
 			if err != nil {
 				cmd.Printf("Error printing publicKey: %v", err)
+				return
 			}
+			asJson, err := json.MarshalIndent(jwk, "", "  ")
+			if err != nil {
+				cmd.Printf("Error printing publicKey: %v\n", err)
+				return
+			}
+			cmd.Println("Public key in JWK:")
+			cmd.Println(string(asJson))
+			cmd.Println("")
 
-			cmd.Println(string(bytes))
+			// printout in PEM
+			inPem, err := cc.PublicKeyInPEM(le)
+			if err != nil {
+				cmd.Printf("Error printing publicKey: %v\n", err)
+				return
+			}
+			cmd.Println("Public key in PEM:")
+			cmd.Println(inPem)
 		},
 	})
 

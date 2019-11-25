@@ -18,7 +18,10 @@
 
 package pkg
 
-import "github.com/nuts-foundation/nuts-crypto/pkg/types"
+import (
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+)
 
 // CryptoClient defines the functions than can be called by a Cmd, Direct or via rest call.
 type Client interface {
@@ -34,8 +37,10 @@ type Client interface {
 	SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error)
 	// VerifyWith verifies a signature for a given PEM encoded public key
 	VerifyWith(data []byte, sig []byte, pemKey string) (bool, error)
-	// PublicKey returns the PEM encoded PublicKey for a given legal entity
-	PublicKey(legalEntity types.LegalEntity) (string, error)
+	// PublicKeyInPEM returns the PEM encoded PublicKey for a given legal entity
+	PublicKeyInPEM(legalEntity types.LegalEntity) (string, error)
+	// PublicKeyInJWK returns the JWK encoded PublicKey for a given legal entity
+	PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error)
 	// SignJwtFor creates a signed JWT given a legalEntity and map of claims
 	SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error)
 }

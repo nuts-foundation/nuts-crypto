@@ -21,10 +21,17 @@ paths:
             $ref: "#/components/schemas/Identifier"
       responses:
         '200':
-          description: "OK response, body holds public key in PEM format"
+          description: "OK response, body holds public key in PEM format when accept format is text/plain and JWK format if accept equals application/json"
           content:
             text/plain:
               example: "-----BEGIN PUBLIC KEY----- .... -----END PUBLIC KEY-----"
+            application/json:
+              example: {"kty":"EC",
+                        "crv":"P-256",
+                        "x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+                        "y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+                        "kid":"Public key used in JWS spec Appendix A.3 example"
+              }
         '400':
           description: "Invalid request"
           content:
@@ -34,7 +41,7 @@ paths:
                 type: string
   /crypto/public_key/{urn}:
     get:
-      summary: "get the public key for a given organization. It returns the key in PEM form"
+      summary: "get the public key for a given organization. It returns the key in PEM or JWK form. This depends on the accept header used (text/plain vs application/json)"
       operationId: publicKey
       tags:
         - crypto
@@ -52,6 +59,13 @@ paths:
           content:
             text/plain:
               example: "-----BEGIN PUBLIC KEY----- .... -----END PUBLIC KEY-----"
+            application/json:
+              example: {"kty":"EC",
+                        "crv":"P-256",
+                        "x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+                        "y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+                        "kid":"Public key used in JWS spec Appendix A.3 example"
+              }
         '404':
           description: "not found"
           content:

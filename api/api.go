@@ -44,7 +44,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 		return err
 	}
 
-	pub, err := w.C.PublicKey(le)
+	pub, err := w.C.PublicKeyInPEM(le)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	if match, err := regexp.MatchString(`^\S+$`, urn); !match || err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
-	pubKey, err := w.C.PublicKey(types.LegalEntity{URI: urn})
+	pubKey, err := w.C.PublicKeyInPEM(types.LegalEntity{URI: urn})
 
 	if err != nil {
 		if strings.Contains(err.Error(), "could not open private key") {

@@ -146,7 +146,7 @@ type ServerInterface interface {
 	ExternalId(ctx echo.Context) error
 	// Send a request for checking if the given combination has valid consent// (POST /crypto/generate)
 	GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error
-	// get the public key for a given organization. It returns the key in PEM form// (GET /crypto/public_key/{urn})
+	// get the public key for a given organization. It returns the key in PEM or JWK form. This depends on the accept header used (text/plain vs application/json)// (GET /crypto/public_key/{urn})
 	PublicKey(ctx echo.Context, urn string) error
 	// sign a piece of data with the private key of the given legalEntity// (POST /crypto/sign)
 	Sign(ctx echo.Context) error
@@ -271,3 +271,4 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/verify", wrapper.Verify)
 
 }
+

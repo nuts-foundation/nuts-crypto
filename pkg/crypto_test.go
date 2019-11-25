@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -159,7 +160,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
-		pubKey, _ := client.PublicKey(legalEntity)
+		pubKey, _ := client.PublicKeyInPEM(legalEntity)
 		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
 
 		if err != nil {
@@ -278,7 +279,7 @@ func TestCrypto_VerifyWith(t *testing.T) {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		pub, err := client.PublicKey(legalEntity)
+		pub, err := client.PublicKeyInPEM(legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -361,14 +362,14 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	})
 }
 
-func TestCrypto_PublicKey(t *testing.T) {
+func TestCrypto_PublicKeyInPem(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "testPK"}
 	client := defaultBackend(t.Name())
 	client.GenerateKeyPairFor(legalEntity)
 	defer emptyTemp(t.Name())
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
-		pub, err := client.PublicKey(legalEntity)
+		pub, err := client.PublicKeyInPEM(legalEntity)
 
 		assert.Nil(t, err)
 		assert.NotEmpty(t, pub)
@@ -376,7 +377,7 @@ func TestCrypto_PublicKey(t *testing.T) {
 
 	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
-		_, err := client.PublicKey(legalEntity)
+		_, err := client.PublicKeyInPEM(legalEntity)
 
 		assert.NotNil(t, err)
 		assert.True(t, errors.Is(err, os.ErrNotExist))
@@ -388,6 +389,29 @@ func TestCrypto_PublicKey(t *testing.T) {
 		_, err := PemToPublicKey([]byte(pub))
 
 		assert.Nil(t, err)
+	})
+}
+
+func TestCrypto_PublicKeyInJWK(t *testing.T) {
+	legalEntity := types.LegalEntity{URI: "testPK"}
+	client := defaultBackend(t.Name())
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp(t.Name())
+
+	t.Run("Public key is returned from storage", func(t *testing.T) {
+		pub, err := client.PublicKeyInJWK(legalEntity)
+
+		assert.Nil(t, err)
+		assert.NotNil(t, pub)
+		assert.Equal(t, jwa.RSA, pub.KeyType())
+	})
+
+	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
+		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
+		_, err := client.PublicKeyInJWK(legalEntity)
+
+		assert.NotNil(t, err)
+		assert.True(t, errors.Is(err, os.ErrNotExist))
 	})
 }
 
