@@ -126,13 +126,13 @@ func cmd() *cobra.Command {
 				cmd.Printf("Error printing publicKey: %v", err)
 				return
 			}
-			asJson, err := json.MarshalIndent(jwk, "", "  ")
+			asJSON, err := json.MarshalIndent(jwk, "", "  ")
 			if err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return
 			}
 			cmd.Println("Public key in JWK:")
-			cmd.Println(string(asJson))
+			cmd.Println(string(asJSON))
 			cmd.Println("")
 
 			// printout in PEM

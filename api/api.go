@@ -361,19 +361,19 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 		}
 
 		return ctx.JSON(http.StatusOK, jwk)
-	} else {
-		// backwards compatible PEM format is the default
-		pub, err := w.C.PublicKeyInPEM(le)
-		if err != nil {
-			if strings.Contains(err.Error(), "could not open private key") {
-				return ctx.NoContent(404)
-			}
-			logrus.Error(err.Error())
-			return err
-		}
-
-		return ctx.String(http.StatusOK, pub)
 	}
+
+	// backwards compatible PEM format is the default
+	pub, err := w.C.PublicKeyInPEM(le)
+	if err != nil {
+		if strings.Contains(err.Error(), "could not open private key") {
+			return ctx.NoContent(404)
+		}
+		logrus.Error(err.Error())
+		return err
+	}
+
+	return ctx.String(http.StatusOK, pub)
 }
 
 func readBody(ctx echo.Context) ([]byte, error) {
