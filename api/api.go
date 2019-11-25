@@ -55,15 +55,15 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 		}
 
 		return ctx.JSON(http.StatusOK, jwk)
-	} else {
-		// backwards compatible PEM format is the default
-		pub, err := w.C.PublicKeyInPEM(le)
-		if err != nil {
-			return err
-		}
-
-		return ctx.String(http.StatusOK, pub)
 	}
+	
+	// backwards compatible PEM format is the default
+	pub, err := w.C.PublicKeyInPEM(le)
+	if err != nil {
+		return err
+	}
+
+	return ctx.String(http.StatusOK, pub)
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
