@@ -743,14 +743,8 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 
 		err := client.ExternalId(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=500, message=error getting externalId: could not open private key for legalEntity: {UNKNOWN} with filename ../../temp/VU5LTk9XTg==_private.pem"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), storage.ErrNotFound.Error())
 		}
 	})
 }

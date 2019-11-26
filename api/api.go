@@ -22,15 +22,17 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"regexp"
-	"strings"
 )
 
 type ApiWrapper struct {
@@ -48,7 +50,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	acceptHeader := ctx.Request().Header.Get("Accept")
 
 	// starts with so we can ignore any +
-	if strings.Index(acceptHeader, "application/json") == 0 {
+	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
 		jwk, err := w.C.PublicKeyInJWK(le)
 		if err != nil {
 			return err
@@ -56,7 +58,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 
 		return ctx.JSON(http.StatusOK, jwk)
 	}
-	
+
 	// backwards compatible PEM format is the default
 	pub, err := w.C.PublicKeyInPEM(le)
 	if err != nil {
@@ -350,10 +352,10 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	acceptHeader := ctx.Request().Header.Get("Accept")
 
 	// starts with so we can ignore any +
-	if strings.Index(acceptHeader, "application/json") == 0 {
+	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
 		jwk, err := w.C.PublicKeyInJWK(le)
 		if err != nil {
-			if strings.Contains(err.Error(), "could not open private key") {
+			if errors.Is(err, storage.ErrNotFound) {
 				return ctx.NoContent(404)
 			}
 			logrus.Error(err.Error())
@@ -366,7 +368,7 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	// backwards compatible PEM format is the default
 	pub, err := w.C.PublicKeyInPEM(le)
 	if err != nil {
-		if strings.Contains(err.Error(), "could not open private key") {
+		if errors.Is(err, storage.ErrNotFound) {
 			return ctx.NoContent(404)
 		}
 		logrus.Error(err.Error())

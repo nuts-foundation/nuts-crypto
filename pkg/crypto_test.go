@@ -124,9 +124,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
 		_, err := client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
 
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
-		}
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
 
@@ -140,13 +138,8 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 
 		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
 
-		if err == nil {
-			t.Errorf("Expected error, Got nothing")
-			return
-		}
-
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 }
@@ -207,12 +200,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 		}
 		_, err := client.DecryptKeyAndCipherTextFor(ct, types.LegalEntity{URI: "testU"})
 
-		if err == nil {
-			t.Errorf("Expected error, Got nothing")
-		}
-
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 
@@ -326,12 +315,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 
 		_, err := client.ExternalIdFor(subject, actor, legalEntity)
 
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
-		}
-
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("Expected error [%v], Got [%v]", os.ErrNotExist, err)
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 
@@ -379,8 +364,9 @@ func TestCrypto_PublicKeyInPem(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
 		_, err := client.PublicKeyInPEM(legalEntity)
 
-		assert.NotNil(t, err)
-		assert.True(t, errors.Is(err, os.ErrNotExist))
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 	})
 
 	t.Run("parse public key", func(t *testing.T) {
@@ -401,7 +387,7 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKeyInJWK(legalEntity)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.NotNil(t, pub)
 		assert.Equal(t, jwa.RSA, pub.KeyType())
 	})
@@ -410,8 +396,9 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
 		_, err := client.PublicKeyInJWK(legalEntity)
 
-		assert.NotNil(t, err)
-		assert.True(t, errors.Is(err, os.ErrNotExist))
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 	})
 }
 
@@ -438,7 +425,7 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	t.Run("returns error for not found", func(t *testing.T) {
 		_, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, types.LegalEntity{URI: "notFound"})
 
-		assert.True(t, errors.Is(err, os.ErrNotExist))
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
 

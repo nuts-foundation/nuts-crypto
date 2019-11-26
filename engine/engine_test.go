@@ -26,6 +26,7 @@ import (
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -82,7 +83,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 
 	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {
 		cmd.SetArgs([]string{"generateKeyPair"})
-		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetOut(ioutil.Discard)
 		err := cmd.Execute()
 
 		if assert.Error(t, err) {
@@ -103,7 +104,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 
 	t.Run("Running publicKey with too few arguments gives error", func(t *testing.T) {
 		cmd.SetArgs([]string{"publicKey"})
-		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetOut(ioutil.Discard)
 		err := cmd.Execute()
 
 		if assert.Error(t, err) {
@@ -118,7 +119,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		err := cmd.Execute()
 
 		if assert.NoError(t, err) {
-			expected := "Error printing publicKey: could not open private key for legalEntity: {legalEntityMissing} with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: open ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: no such file or directory"
+			expected := "Error printing publicKey: could not open private key for legalEntity: legalEntityMissing with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: key not found"
 			assert.Contains(t, buf.String(), expected)
 		}
 	})
@@ -156,7 +157,7 @@ func TestNewCryptoEngine_FlagSet(t *testing.T) {
 		cmd.SetArgs([]string{"--help"})
 
 		buf := new(bytes.Buffer)
-		cmd.SetOutput(buf)
+		cmd.SetOut(buf)
 
 		_, err := cmd.ExecuteC()
 
