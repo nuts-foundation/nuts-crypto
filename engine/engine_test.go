@@ -78,7 +78,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 
 	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
 		assert.Equal(t, "crypto", cmd.Name())
-		assert.Len(t,  cmd.Commands(), 3)
+		assert.Len(t, cmd.Commands(), 3)
 	})
 
 	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {

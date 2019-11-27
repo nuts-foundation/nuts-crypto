@@ -34,7 +34,7 @@ import (
 const privateKeyFilePostfix = "private.pem"
 
 type FileOpenError struct {
-	filePath 	string
+	filePath    string
 	legalEntity string
 	err         error
 }
@@ -80,9 +80,9 @@ func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa
 	bytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath:filePath, err:ErrNotFound}
+			return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath: filePath, err: ErrNotFound}
 		}
-		return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath:filePath, err:err}
+		return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath: filePath, err: err}
 	}
 
 	var key *rsa.PrivateKey
