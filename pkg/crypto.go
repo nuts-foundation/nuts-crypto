@@ -31,6 +31,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -300,7 +301,7 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 	return signature, err
 }
 
-// VerifyWith verfifies a signature of some data with a given PublicKey. It uses the SHA256 hashing function.
+// VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
 	key, err := PemToPublicKey([]byte(pemKey))
 
@@ -316,7 +317,8 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, 
 	return true, nil
 }
 
-func (client *Crypto) PublicKey(legalEntity types.LegalEntity) (string, error) {
+// PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
+func (client *Crypto) PublicKeyInPEM(legalEntity types.LegalEntity) (string, error) {
 	pubKey, err := client.Storage.GetPublicKey(legalEntity)
 
 	if err != nil {
@@ -324,6 +326,17 @@ func (client *Crypto) PublicKey(legalEntity types.LegalEntity) (string, error) {
 	}
 
 	return PublicKeyToPem(pubKey)
+}
+
+// PublicKeyInJWK loads the key from storage and wraps it in a Key format. Supports RSA, ECDSA and Symmetric style keys
+func (client *Crypto) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error) {
+	pubKey, err := client.Storage.GetPublicKey(legalEntity)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return jwk.New(pubKey)
 }
 
 // SignJwtFor creates a signed JWT given a legalEntity and map of claims
@@ -410,7 +423,7 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 	return plaintext, nil
 }
 
-// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKey
+// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
 func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
@@ -430,7 +443,7 @@ func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	return finalKey, nil
 }
 
-// PublicKeyToPem converts an rsa.PublicKey to PEM encoding
+// PublicKeyToPem converts an rsa.PublicKeyInPEM to PEM encoding
 func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
 

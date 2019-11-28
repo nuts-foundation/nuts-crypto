@@ -25,6 +25,8 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -71,101 +73,78 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 	c := pkg.CryptoInstance()
 	c.Config.Fspath = "../temp"
 	c.Configure()
+	c.GenerateKeyPairFor(types.LegalEntity{URI: "legalEntity"})
+	cmd := e.Cmd
 
 	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
-		cmd := e.Cmd
-		if cmd.Name() != "crypto" {
-			t.Errorf("Expected Cmd name to equal [crypto], got %s", cmd.Name())
-		}
-
-		if len(cmd.Commands()) != 3 {
-			t.Errorf("Expected Cmd to have 3 sub-command, got %d", len(cmd.Commands()))
-		}
+		assert.Equal(t, "crypto", cmd.Name())
+		assert.Len(t, cmd.Commands(), 3)
 	})
 
 	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {
-		cmd := e.Cmd
-
 		cmd.SetArgs([]string{"generateKeyPair"})
-		cmd.SetOutput(new(bytes.Buffer))
+		cmd.SetOut(ioutil.Discard)
 		err := cmd.Execute()
 
-		if err == nil {
-			t.Error("Expected error, got nothing")
-		}
-
-		expected := "requires a URI argument"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Equal(t, "requires a URI argument", err.Error())
 		}
 	})
 
 	t.Run("Running generateKeyPair returns 'keypair generated'", func(t *testing.T) {
-		cmd := e.Cmd
 		buf := new(bytes.Buffer)
 		cmd.SetArgs([]string{"generateKeyPair", "legalEntity"})
-		cmd.SetOutput(buf)
+		cmd.SetOut(buf)
 		err := cmd.Execute()
 
-		if err != nil {
-			t.Errorf("Expected no error, got [%s]", err.Error())
-		}
-
-		expected := "KeyPair generated\n"
-		if buf.String() != expected {
-			t.Errorf("Expected output [%s], got [%s]", expected, buf.String())
+		if assert.NoError(t, err) {
+			assert.Equal(t, "KeyPair generated\n", buf.String())
 		}
 	})
 
 	t.Run("Running publicKey with too few arguments gives error", func(t *testing.T) {
-		cmd := e.Cmd
-
 		cmd.SetArgs([]string{"publicKey"})
-		cmd.SetOutput(new(bytes.Buffer))
+		cmd.SetOut(ioutil.Discard)
 		err := cmd.Execute()
 
-		if err == nil {
-			t.Error("Expected error, got nothing")
-		}
-
-		expected := "requires a URI argument"
-		if err.Error() != expected {
-			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Equal(t, "requires a URI argument", err.Error())
 		}
 	})
 
 	t.Run("Running publicKey returns error if public key does not exist", func(t *testing.T) {
-		cmd := e.Cmd
 		buf := new(bytes.Buffer)
 		cmd.SetArgs([]string{"publicKey", "legalEntityMissing"})
-		cmd.SetOutput(buf)
+		cmd.SetOut(buf)
 		err := cmd.Execute()
 
-		if err != nil {
-			t.Errorf("Expected no error, got [%s]", err.Error())
-		}
-
-		expected := "Error printing publicKey: could not open private key for legalEntity: {legalEntityMissing} with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: open ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: no such file or directory\n"
-		if buf.String() != expected {
-			t.Errorf("Expected output [%s], got [%s]", expected, buf.String())
+		if assert.NoError(t, err) {
+			expected := "Error printing publicKey: could not open private key for legalEntity: legalEntityMissing with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: key not found"
+			assert.Contains(t, buf.String(), expected)
 		}
 	})
 
 	t.Run("Running publicKey returns pem", func(t *testing.T) {
-		c.GenerateKeyPairFor(types.LegalEntity{URI: "legalEntity"})
-		cmd := e.Cmd
 		buf := new(bytes.Buffer)
 		cmd.SetArgs([]string{"publicKey", "legalEntity"})
-		cmd.SetOutput(buf)
+		cmd.SetOut(buf)
 		err := cmd.Execute()
 
-		if err != nil {
-			t.Errorf("Expected no error, got [%s]", err.Error())
+		if assert.NoError(t, err) {
+			assert.Contains(t, buf.String(), "Public key in PEM:")
+			assert.Contains(t, buf.String(), "-----BEGIN PUBLIC KEY-----")
 		}
+	})
 
-		expected := "-----BEGIN PUBLIC KEY-----"
-		if strings.Index(buf.String(), expected) != 0 {
-			t.Errorf("Expected output to begin with [%s], got [%s]", expected, buf.String())
+	t.Run("Running publicKey returns JWK", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd.SetArgs([]string{"publicKey", "legalEntity"})
+		cmd.SetOut(buf)
+		err := cmd.Execute()
+
+		if assert.NoError(t, err) {
+			assert.Contains(t, buf.String(), "Public key in JWK:")
+			assert.Contains(t, buf.String(), "kty")
 		}
 	})
 }
@@ -178,7 +157,7 @@ func TestNewCryptoEngine_FlagSet(t *testing.T) {
 		cmd.SetArgs([]string{"--help"})
 
 		buf := new(bytes.Buffer)
-		cmd.SetOutput(buf)
+		cmd.SetOut(buf)
 
 		_, err := cmd.ExecuteC()
 

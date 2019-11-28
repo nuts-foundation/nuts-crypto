@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
@@ -31,6 +32,24 @@ import (
 )
 
 const privateKeyFilePostfix = "private.pem"
+
+type FileOpenError struct {
+	filePath    string
+	legalEntity string
+	err         error
+}
+
+var ErrNotFound = errors.New("key not found")
+
+// Error returns the string representation
+func (f *FileOpenError) Error() string {
+	return fmt.Sprintf("could not open private key for legalEntity: %v with filename %s: %v", f.legalEntity, f.filePath, f.err)
+}
+
+// UnWrap is needed for FileOpenError to be UnWrapped
+func (f *FileOpenError) Unwrap() error {
+	return f.err
+}
 
 type fileSystemBackend struct {
 	fspath string
@@ -60,7 +79,10 @@ func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa
 
 	bytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("could not open private key for legalEntity: %v with filename %s: %w", legalEntity, filePath, err)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath: filePath, err: ErrNotFound}
+		}
+		return nil, &FileOpenError{legalEntity: legalEntity.URI, filePath: filePath, err: err}
 	}
 
 	var key *rsa.PrivateKey
