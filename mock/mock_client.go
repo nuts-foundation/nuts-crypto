@@ -50,18 +50,18 @@ func (mr *MockClientMockRecorder) DecryptKeyAndCipherTextFor(cipherText, legalEn
 }
 
 // EncryptKeyAndPlainTextWith mocks base method
-func (m *MockClient) EncryptKeyAndPlainTextWith(plainText []byte, pemKey []string) (types.DoubleEncryptedCipherText, error) {
+func (m *MockClient) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EncryptKeyAndPlainTextWith", plainText, pemKey)
+	ret := m.ctrl.Call(m, "EncryptKeyAndPlainTextWith", plainText, keys)
 	ret0, _ := ret[0].(types.DoubleEncryptedCipherText)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // EncryptKeyAndPlainTextWith indicates an expected call of EncryptKeyAndPlainTextWith
-func (mr *MockClientMockRecorder) EncryptKeyAndPlainTextWith(plainText, pemKey interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) EncryptKeyAndPlainTextWith(plainText, keys interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptKeyAndPlainTextWith", reflect.TypeOf((*MockClient)(nil).EncryptKeyAndPlainTextWith), plainText, pemKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptKeyAndPlainTextWith", reflect.TypeOf((*MockClient)(nil).EncryptKeyAndPlainTextWith), plainText, keys)
 }
 
 // ExternalIdFor mocks base method
@@ -109,18 +109,18 @@ func (mr *MockClientMockRecorder) SignFor(data, legalEntity interface{}) *gomock
 }
 
 // VerifyWith mocks base method
-func (m *MockClient) VerifyWith(data, sig []byte, pemKey string) (bool, error) {
+func (m *MockClient) VerifyWith(data, sig []byte, jwk jwk.Key) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyWith", data, sig, pemKey)
+	ret := m.ctrl.Call(m, "VerifyWith", data, sig, jwk)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // VerifyWith indicates an expected call of VerifyWith
-func (mr *MockClientMockRecorder) VerifyWith(data, sig, pemKey interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) VerifyWith(data, sig, jwk interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyWith", reflect.TypeOf((*MockClient)(nil).VerifyWith), data, sig, pemKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyWith", reflect.TypeOf((*MockClient)(nil).VerifyWith), data, sig, jwk)
 }
 
 // PublicKeyInPEM mocks base method

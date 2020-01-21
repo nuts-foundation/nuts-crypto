@@ -24,6 +24,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -33,11 +39,6 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
-	"testing"
 )
 
 type pubKeyMatcher struct {
@@ -285,7 +286,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					PublicKey:  &pk,
+					PublicKey:   &pk,
 				},
 			},
 			PlainText: plaintext,
@@ -339,7 +340,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=Failed to encrypt plainText: failed to decode PEM block containing public key, key is of the wrong type"
+		expected := "code=400, message=invalid key in encryptRequestSubjects"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
@@ -353,8 +354,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "test"}
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPairFor(legalEntity)
-	pubKey, _ := client.C.PublicKeyInPEM(legalEntity)
-	encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
+	pubKey, _ := client.C.PublicKeyInJWK(legalEntity)
+	encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
 
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

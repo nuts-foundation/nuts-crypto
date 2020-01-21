@@ -21,8 +21,6 @@ package pkg
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,8 +154,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
-		pubKey, _ := client.PublicKeyInPEM(legalEntity)
-		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
+		pubKey, _ := client.PublicKeyInJWK(legalEntity)
+		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -271,7 +269,7 @@ func TestCrypto_VerifyWith(t *testing.T) {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		pub, err := client.PublicKeyInPEM(legalEntity)
+		pub, err := client.PublicKeyInJWK(legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -531,25 +529,6 @@ func TestCrypto_pemToPublicKey(t *testing.T) {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
 	})
-}
-
-func TestCrypto_crossLanguageCase(t *testing.T) {
-	attHex := "4D15851551A9E5DAF8114C98D0F8D4B18CC97ABD31424D5EA9E3CC84C5F9B45C"
-	base64Sign := "QeztwzJgxCuW+ZlUsUyFn7zESuyEFpPCP546hJdcXarzvsWWuTzA3RFLOIJJRqjz7sccGAcidi+rKDlI1Rj4gOSFLhJKkOABXLt+X2kcqpDguta5/i03j4jAN0dI2Sanp5gc7AHJ0r4791KEYrEbve6rVGN6kSd7kvWFyfTtFgD4R+Yp4T3e5oG5yMFdAmiNK8ko6o8nmzoY0yOWdHneUFaAjGAPkGGGsspQ7U3UYAyVdkXdspF4Ryeh8LbbePFSQkO6Pzj9gVMWBY1LrGIRSPhGQEXj7P6PTar8gs/AkX5gyAQLS383MEcg3fCOiEAbRgQLYsRgo04hl3IChfOW2w=="
-	pemPub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwm7FBfggHaAfapO7TdFv\n0OwS+Ip9Wi7gyhddjmdZBZDzfYMUPr4+0utGM3Ry8JtCfxmsHL3ZmvG04GV1doeC\nLjLywm6OFfoEQCpliRiCyarpd2MrxKWjkSwOl9MJdVm3xpb7BWJdXkKEwoU4lBk8\ncZPay32juPzAV5eb6UCnq53PZ5O0H80J02oPLpBs2D6ASjUQpRf2xP0bvaP2W92P\nZYzJwrSA3zdxPmrMVApOoIZL7OHBE+y0I9ZUt+zmxD8TzRdN9Etf9wjLD7psu9aL\n/XHIHR0xMkYV8cr/nCbJ6H0PbDd3yIQvYPjLEVS5LeieN+DzIlYO6Y7kpws6k0rx\newIDAQAB\n-----END PUBLIC KEY-----\n"
-
-	client := defaultBackend(t.Name())
-	h, _ := hex.DecodeString(attHex)
-
-	bds, _ := base64.StdEncoding.DecodeString(base64Sign)
-
-	b, err := client.VerifyWith(h, bds, pemPub)
-	if !b {
-		t.Error("Expected verify to be true")
-	}
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
 }
 
 func TestJwkToMap(t *testing.T) {
