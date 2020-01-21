@@ -99,7 +99,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	var pubKeys []string
 	var legalEntities []Identifier
 	for _, e := range encryptRequest.EncryptRequestSubjects {
-		pubKeys = append(pubKeys, string(e.PublicKey))
+		pubKeys = append(pubKeys, string(*e.PublicKey))
 		legalEntities = append(legalEntities, e.LegalEntity)
 	}
 
@@ -301,8 +301,8 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	if len(verifyRequest.PublicKey) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing publicKey in verifyRequest")
+	if verifyRequest.PublicKey == nil && verifyRequest.Jwk == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing publicKey/JWK in verifyRequest")
 	}
 
 	if len(verifyRequest.Signature) == 0 {
@@ -327,7 +327,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
+	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, string(*verifyRequest.PublicKey))
 
 	if err != nil {
 		logrus.Error(err.Error())

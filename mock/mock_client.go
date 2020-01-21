@@ -167,3 +167,17 @@ func (mr *MockClientMockRecorder) SignJwtFor(claims, legalEntity interface{}) *g
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJwtFor", reflect.TypeOf((*MockClient)(nil).SignJwtFor), claims, legalEntity)
 }
+
+// KeyExistsFor mocks base method
+func (m *MockClient) KeyExistsFor(legalEntity types.LegalEntity) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "KeyExistsFor", legalEntity)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// KeyExistsFor indicates an expected call of KeyExistsFor
+func (mr *MockClientMockRecorder) KeyExistsFor(legalEntity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KeyExistsFor", reflect.TypeOf((*MockClient)(nil).KeyExistsFor), legalEntity)
+}

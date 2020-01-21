@@ -4,9 +4,11 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
 	"net/http"
 )
 
@@ -31,8 +33,9 @@ type EncryptRequest struct {
 
 // EncryptRequestSubject defines model for EncryptRequestSubject.
 type EncryptRequestSubject struct {
+	Jwk         *JWK       `json:"jwk,omitempty"`
 	LegalEntity Identifier `json:"legalEntity"`
-	PublicKey   PublicKey  `json:"publicKey"`
+	PublicKey   *PublicKey `json:"publicKey,omitempty"`
 }
 
 // EncryptResponse defines model for EncryptResponse.
@@ -63,6 +66,11 @@ type ExternalIdResponse struct {
 // Identifier defines model for Identifier.
 type Identifier string
 
+// JWK defines model for JWK.
+type JWK struct {
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // PublicKey defines model for PublicKey.
 type PublicKey string
 
@@ -85,9 +93,10 @@ type SignResponse struct {
 
 // VerifyRequest defines model for VerifyRequest.
 type VerifyRequest struct {
-	PlainText string    `json:"plainText"`
-	PublicKey PublicKey `json:"publicKey"`
-	Signature string    `json:"signature"`
+	Jwk       *JWK       `json:"jwk,omitempty"`
+	PlainText string     `json:"plainText"`
+	PublicKey *PublicKey `json:"publicKey,omitempty"`
+	Signature string     `json:"signature"`
 }
 
 // VerifyResponse defines model for VerifyResponse.
@@ -135,6 +144,59 @@ type SignJwtJSONRequestBody signJwtJSONBody
 
 // VerifyRequestBody defines body for Verify for application/json ContentType.
 type VerifyJSONRequestBody verifyJSONBody
+
+// Getter for additional properties for JWK. Returns the specified
+// element and whether it was found
+func (a JWK) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for JWK
+func (a *JWK) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for JWK to handle AdditionalProperties
+func (a *JWK) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("error unmarshaling field %s", fieldName))
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for JWK to handle AdditionalProperties
+func (a JWK) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("error marshaling '%s'", fieldName))
+		}
+	}
+	return json.Marshal(object)
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -271,3 +333,4 @@ func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
 	router.POST("/crypto/verify", wrapper.Verify)
 
 }
+

@@ -167,11 +167,12 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemKey)
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier(legalEntity.URI),
-					PublicKey:   PublicKey(pemKey),
+					PublicKey:   &pk,
 				},
 			},
 			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -245,11 +246,12 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemKey)
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier(legalEntity.URI),
-					PublicKey:   PublicKey(pemKey),
+					PublicKey:   &pk,
 				},
 			},
 		}
@@ -278,11 +280,12 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemKey)
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					PublicKey:   PublicKey(pemKey),
+					PublicKey:  &pk,
 				},
 			},
 			PlainText: plaintext,
@@ -312,11 +315,12 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemKey[1:])
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					PublicKey:   PublicKey(pemKey[1:]),
+					PublicKey:   &pk,
 				},
 			},
 			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -986,7 +990,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=missing publicKey in verifyRequest"
+		expected := "code=400, message=missing publicKey/JWK in verifyRequest"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
 		}
@@ -1019,8 +1023,9 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemPubKey)
 		jsonRequest := VerifyRequest{
-			PublicKey: PublicKey(pemPubKey),
+			PublicKey: &pk,
 			Signature: hexSignature,
 		}
 
@@ -1048,9 +1053,10 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemPubKey)
 		jsonRequest := VerifyRequest{
 			PlainText: plainText,
-			PublicKey: PublicKey(pemPubKey),
+			PublicKey: &pk,
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -1083,9 +1089,10 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
+		pk := PublicKey(pemPubKey)
 		jsonRequest := VerifyRequest{
 			Signature: hexSignature,
-			PublicKey: PublicKey(pemPubKey),
+			PublicKey: &pk,
 			PlainText: base64PlainText,
 		}
 
