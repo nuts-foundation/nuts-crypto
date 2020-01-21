@@ -23,16 +23,19 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCryptoBackend(t *testing.T) {
@@ -429,6 +432,21 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	})
 }
 
+func TestCrypto_KeyExistsFor(t *testing.T) {
+	client := defaultBackend(t.Name())
+	legalEntity := types.LegalEntity{URI: "exists"}
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp(t.Name())
+
+	t.Run("returns true for existing key", func(t *testing.T) {
+		assert.True(t, client.KeyExistsFor(legalEntity))
+	})
+
+	t.Run("returns false for non-existing key", func(t *testing.T) {
+		assert.False(t, client.KeyExistsFor(types.LegalEntity{URI: "does_not_exists"}))
+	})
+}
+
 func TestCrypto_Configure(t *testing.T) {
 	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
 		e := defaultBackend(t.Name())
@@ -532,6 +550,41 @@ func TestCrypto_crossLanguageCase(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
+}
+
+func TestJwkToMap(t *testing.T) {
+	t.Run("Generates map for RSA key", func(t *testing.T) {
+		rsa, _ := rsa.GenerateKey(rand.Reader, 1024)
+		jwk, _ := jwk.New(rsa)
+
+		jwkMap, err := JwkToMap(jwk)
+
+		if assert.NoError(t, err) {
+			assert.Equal(t, jwa.KeyType("RSA"), jwkMap["kty"])
+		}
+	})
+}
+
+func TestMapToJwk(t *testing.T) {
+	t.Run("Generates Jwk from map", func(t *testing.T) {
+		jwkAsJson := `{"d":"Ce3obeVsZeU3QaKBTQ-Qn-EaUfhEVViHbnP3gnLDrXNbiUf09s0Ti3RXd4601G8fAJ3zKlZmdEop59mK5BjAE8NOBmvP4uI7PYlJsDAE76mKghVxvN94qb-KwW4p0wix9RoC8TEtoE3EYCr428v-k4nTpMWXQcC_xkHVIfpoA6E","dp":"LGJtrCIxo2DlCSccu0ivH8YzUS9uUbsKyOgNEpV3IB3vqZToi_k8TkwN9XNXCMXkRYIGtRwkxvp9TWLtIEKMtQ","dq":"XhBVCRvFE_ccZ7rxzfu7LToeSNBPW07v68tM94pEV2MFfVBHdWJd-gHbIPGVwC55Th9vAh9dDmv0TvBVkiblkQ","e":"AQAB","kty":"RSA","n":"n5KqvPI1MPDhazTKXLYn4_we09e3iEccb7QJ8dRxApN1rpxTymRWabUafC56fArDF0lvIZ7fZl0LzX5Z_3mrqulebEPTFRrbdDwwcqa2KZ7Tctfh6MgUFm5xOAwRG33NlX3Ny1dP-Ek2irXJOHt9AecbEZFZKmpgrsrTyG6Ekfs","p":"1LoOk3MFiJpsjJCkMkaDb0TXXMxuZ5f9-iMVgR1ZoammzQziBj-72CrD21Rxmuuc6en8w4HtHLSOlPQtcOKzMw","q":"wAiSzr1NVdsYulhGYAa1ONZSKVxlFS7N_UAjPQgFf-xTYog2RbZfolheDv92mJp2qqFJdVMzQkbeMeTj9xqmGQ","qi":"eFqCOgR0wnpkjZGwh63pV8aNhh1-GfhYjqF2jSrh6rnsVHnhz3LRROSzUDarms7LjW3eHiygyHHSF2-ejTMMKQ"}`
+
+		jwkMap := map[string]interface{}{}
+		json.Unmarshal([]byte(jwkAsJson), &jwkMap)
+
+		jwk, err := MapToJwk(jwkMap)
+
+		if assert.NoError(t, err) {
+			assert.Equal(t, jwa.KeyType("RSA"), jwk.KeyType())
+		}
+	})
+
+	t.Run("with missing data", func(t *testing.T) {
+		jwkMap := map[string]interface{}{}
+		_, err := MapToJwk(jwkMap)
+
+		assert.Error(t, err)
+	})
 }
 
 func defaultBackend(name string) Crypto {

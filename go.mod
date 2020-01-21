@@ -11,6 +11,7 @@ require (
 	github.com/lestrrat-go/jwx v0.9.0
 	github.com/magiconair/properties v1.8.0
 	github.com/nuts-foundation/nuts-go-core v0.0.0-20191218133145-27ebcf628fab
+	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5

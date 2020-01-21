@@ -301,6 +301,14 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 	return signature, err
 }
 
+// KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
+func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
+	if _, err := client.Storage.GetPrivateKey(legalEntity); err != nil {
+		return false
+	}
+	return true
+}
+
 // VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
 	key, err := PemToPublicKey([]byte(pemKey))
@@ -457,4 +465,23 @@ func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	})
 
 	return string(pubBytes), err
+}
+
+// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization
+func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
+	set := &jwk.Set{}
+	root := map[string]interface{}{}
+	root["keys"] = []interface{}{jwkAsMap}
+	if err := set.ExtractMap(root); err != nil {
+		return nil, err
+	}
+	return set.Keys[0], nil
+}
+
+// JwkToMap transforms a Jwk key to a map. Can be used for json serialization
+func JwkToMap(jwk jwk.Key) (map[string]interface{}, error) {
+	root := map[string]interface{}{}
+	// unreachable err
+	_ = jwk.PopulateMap(root)
+	return root, nil
 }

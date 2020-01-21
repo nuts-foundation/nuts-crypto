@@ -43,6 +43,8 @@ type Client interface {
 	PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error)
 	// SignJwtFor creates a signed JWT given a legalEntity and map of claims
 	SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error)
+	// KeyExistsFor returns a simple true if a key has been generated for the given legal entity
+	KeyExistsFor(legalEntity types.LegalEntity) bool
 }
 
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
