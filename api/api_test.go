@@ -1000,12 +1000,13 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	client.C.GenerateKeyPairFor(legalEntity)
 
 	pemPubKey, _ := client.C.PublicKeyInPEM(legalEntity)
+	jwk, _ := client.C.PublicKeyInJWK(legalEntity)
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
 	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
 	hexSignature := hex.EncodeToString(signature)
 
-	t.Run("Missing publicKey returns 400", func(t *testing.T) {
+	t.Run("Missing publicKey/JWK returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1024,13 +1025,8 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		err := client.Verify(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=missing publicKey/JWK in verifyRequest"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing publicKey/JWK in verifyRequest")
 		}
 	})
 
@@ -1045,14 +1041,8 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		err := client.Verify(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=missing body in request"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing body in request")
 		}
 	})
 
@@ -1076,13 +1066,8 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		err := client.Verify(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=missing plainText in verifyRequest"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing plainText in verifyRequest")
 		}
 	})
 
@@ -1106,13 +1091,8 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		err := client.Verify(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=missing signature in verifyRequest"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %s, got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing signature in verifyRequest")
 		}
 	})
 
@@ -1127,26 +1107,104 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
 
-		pk := PublicKey(pemPubKey)
-		jsonRequest := VerifyRequest{
-			Signature: hexSignature,
-			PublicKey: &pk,
-			PlainText: base64PlainText,
-		}
+		t.Run("using public key", func(t *testing.T) {
+			pk := PublicKey(pemPubKey)
+			jsonRequest := VerifyRequest{
+				Signature: hexSignature,
+				PublicKey: &pk,
+				PlainText: base64PlainText,
+			}
 
-		json, _ := json.Marshal(jsonRequest)
-		request := &http.Request{
-			Body: ioutil.NopCloser(bytes.NewReader(json)),
-		}
+			json, _ := json.Marshal(jsonRequest)
+			request := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewReader(json)),
+			}
 
-		echo.EXPECT().Request().Return(request)
-		echo.EXPECT().JSON(http.StatusOK, gomock.Any())
+			echo.EXPECT().Request().Return(request)
+			echo.EXPECT().JSON(http.StatusOK, gomock.Any())
 
-		err := client.Verify(echo)
+			err := client.Verify(echo)
 
-		if err != nil {
-			t.Errorf("Expected no error got [%s]", err.Error())
-		}
+			assert.NoError(t, err)
+		})
+
+		t.Run("using jwk", func(t *testing.T) {
+			pk, _ := pkg.JwkToMap(jwk)
+			jsonRequest := VerifyRequest{
+				Signature: hexSignature,
+				Jwk:       &JWK{AdditionalProperties: pk},
+				PlainText: base64PlainText,
+			}
+
+			json, _ := json.Marshal(jsonRequest)
+			request := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewReader(json)),
+			}
+
+			echo.EXPECT().Request().Return(request)
+			echo.EXPECT().JSON(http.StatusOK, gomock.Any())
+
+			err := client.Verify(echo)
+
+			assert.NoError(t, err)
+		})
+	})
+
+	t.Run("Broken key returns 400", func(t *testing.T) {
+		client := apiWrapper()
+		defer emptyTemp()
+
+		legalEntity := types.LegalEntity{URI: "test"}
+		client.C.GenerateKeyPairFor(legalEntity)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		t.Run("using public key", func(t *testing.T) {
+			pk := PublicKey(pemPubKey[1:])
+			jsonRequest := VerifyRequest{
+				Signature: hexSignature,
+				PublicKey: &pk,
+				PlainText: base64PlainText,
+			}
+
+			json, _ := json.Marshal(jsonRequest)
+			request := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewReader(json)),
+			}
+
+			echo.EXPECT().Request().Return(request)
+
+			err := client.Verify(echo)
+
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), "invalid publicKey in verifyRequest")
+			}
+		})
+
+		t.Run("using jwk", func(t *testing.T) {
+			pk, _ := pkg.JwkToMap(jwk)
+			pk["kty"] = "unknown"
+			jsonRequest := VerifyRequest{
+				Signature: hexSignature,
+				Jwk:       &JWK{AdditionalProperties: pk},
+				PlainText: base64PlainText,
+			}
+
+			json, _ := json.Marshal(jsonRequest)
+			request := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewReader(json)),
+			}
+
+			echo.EXPECT().Request().Return(request)
+
+			err := client.Verify(echo)
+
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), "invalid JWK in verifyRequest")
+			}
+		})
 	})
 }
 
