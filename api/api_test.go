@@ -336,13 +336,65 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 
 		err := client.Encrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "invalid key in encryptRequestSubjects")
+		}
+	})
+
+	t.Run("Broken jwk gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
+				{
+					LegalEntity: Identifier("UNKNOWN"),
+					Jwk:         &JWK{AdditionalProperties: map[string]interface{}{}},
+				},
+			},
+			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
 		}
 
-		expected := "code=400, message=invalid key in encryptRequestSubjects"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "invalid key in encryptRequestSubjects")
+		}
+	})
+
+	t.Run("Missing key gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := EncryptRequest{
+			EncryptRequestSubjects: []EncryptRequestSubject{
+				{
+					LegalEntity: Identifier("UNKNOWN"),
+				},
+			},
+			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Encrypt(echo)
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing key in encryptRequestSubjects")
 		}
 	})
 }
@@ -380,6 +432,32 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		client.Decrypt(echo)
 	})
 
+	t.Run("Decrypt API call returns 400 for broken cipherText", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		jsonRequest := DecryptRequest{
+			LegalEntity:   Identifier(legalEntity.URI),
+			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText[1:]),
+			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
+			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
+		}
+
+		json, _ := json.Marshal(jsonRequest)
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(json)),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.Decrypt(echo)
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "error decrypting request")
+		}
+	})
+
 	t.Run("Missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -391,14 +469,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=missing body in request"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing body in request")
 		}
 	})
 
@@ -415,13 +487,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-		}
-
-		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "Error unmarshalling json: unexpected end of JSON input")
 		}
 	})
 
@@ -438,14 +505,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=error reading request: error"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "error reading request: error")
 		}
 	})
 
@@ -465,14 +526,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=missing legalEntityURI in request"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "missing legalEntityURI in request")
 		}
 	})
 
@@ -496,14 +551,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=error decrypting request: illegal nonce given"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "error decrypting request: illegal nonce given")
 		}
 	})
 
@@ -527,14 +576,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=error decrypting request: cipher: message authentication failed"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "error decrypting request: cipher: message authentication failed")
 		}
 	})
 
@@ -558,14 +601,8 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 
 		err := client.Decrypt(echo)
 
-		if err == nil {
-			t.Error("Expected error got nothing")
-			return
-		}
-
-		expected := "code=400, message=error decrypting request: crypto/rsa: decryption error"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "error decrypting request: crypto/rsa: decryption error")
 		}
 	})
 }

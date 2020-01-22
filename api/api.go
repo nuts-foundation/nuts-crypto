@@ -44,6 +44,7 @@ type ApiWrapper struct {
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 // It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
+	var err error
 	le := types.LegalEntity{URI: string(params.LegalEntity)}
 	if err := w.C.GenerateKeyPairFor(le); err != nil {
 		return err
@@ -51,10 +52,9 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 
 	acceptHeader := ctx.Request().Header.Get("Accept")
 
-	// starts with so we can ignore any +
 	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
-		jwk, err := w.C.PublicKeyInJWK(le)
-		if err != nil {
+		var jwk jwk.Key
+		if jwk, err = w.C.PublicKeyInJWK(le); err != nil {
 			return err
 		}
 
@@ -171,7 +171,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
-		msg := fmt.Sprintf("error decrypting request: %v", err)
+		msg := fmt.Sprintf("error decrypting request: %w", err)
 		logrus.Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
