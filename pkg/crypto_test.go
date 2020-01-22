@@ -19,6 +19,8 @@
 package pkg
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -145,6 +147,21 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 	})
 }
 
+func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
+	client := defaultBackend(t.Name())
+	t.Run("returns error for unsupported algorithm", func(t *testing.T) {
+		plaintext := "for your eyes only"
+
+		sKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		pKey, _ := jwk.New(sKey.Public())
+		_, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pKey})
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "invalid algorithm for public key")
+		}
+	})
+}
+
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 	legalEntity := types.LegalEntity{URI: "testDecrypt"}
@@ -157,19 +174,12 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 		pubKey, _ := client.PublicKeyInJWK(legalEntity)
 		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
 
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-			return
-		}
+		if assert.NoError(t, err) {
+			decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
 
-		decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		if string(decryptedText) != plaintext {
-			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
+			if assert.NoError(t, err) {
+				assert.Equal(t, plaintext, decryptedText)
+			}
 		}
 	})
 
