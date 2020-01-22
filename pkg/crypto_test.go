@@ -178,7 +178,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
 
 			if assert.NoError(t, err) {
-				assert.Equal(t, plaintext, decryptedText)
+				assert.Equal(t, plaintext, string(decryptedText))
 			}
 		}
 	})
