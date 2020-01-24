@@ -44,7 +44,6 @@ type ApiWrapper struct {
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 // It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
-	var err error
 	le := types.LegalEntity{URI: string(params.LegalEntity)}
 	if err := w.C.GenerateKeyPairFor(le); err != nil {
 		return err
@@ -54,6 +53,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 
 	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
 		var jwk jwk.Key
+		var err error
 		if jwk, err = w.C.PublicKeyInJWK(le); err != nil {
 			return err
 		}
