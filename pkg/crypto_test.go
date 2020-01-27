@@ -19,20 +19,23 @@
 package pkg
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCryptoBackend(t *testing.T) {
@@ -144,6 +147,21 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 	})
 }
 
+func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
+	client := defaultBackend(t.Name())
+	t.Run("returns error for unsupported algorithm", func(t *testing.T) {
+		plaintext := "for your eyes only"
+
+		sKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		pKey, _ := jwk.New(sKey.Public())
+		_, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pKey})
+
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "invalid algorithm for public key")
+		}
+	})
+}
+
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 	legalEntity := types.LegalEntity{URI: "testDecrypt"}
@@ -153,22 +171,15 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
-		pubKey, _ := client.PublicKeyInPEM(legalEntity)
-		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []string{pubKey})
+		pubKey, _ := client.PublicKeyInJWK(legalEntity)
+		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
 
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-			return
-		}
+		if assert.NoError(t, err) {
+			decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
 
-		decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		if string(decryptedText) != plaintext {
-			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
+			if assert.NoError(t, err) {
+				assert.Equal(t, plaintext, string(decryptedText))
+			}
 		}
 	})
 
@@ -268,7 +279,7 @@ func TestCrypto_VerifyWith(t *testing.T) {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		pub, err := client.PublicKeyInPEM(legalEntity)
+		pub, err := client.PublicKeyInJWK(legalEntity)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -429,6 +440,21 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	})
 }
 
+func TestCrypto_KeyExistsFor(t *testing.T) {
+	client := defaultBackend(t.Name())
+	legalEntity := types.LegalEntity{URI: "exists"}
+	client.GenerateKeyPairFor(legalEntity)
+	defer emptyTemp(t.Name())
+
+	t.Run("returns true for existing key", func(t *testing.T) {
+		assert.True(t, client.KeyExistsFor(legalEntity))
+	})
+
+	t.Run("returns false for non-existing key", func(t *testing.T) {
+		assert.False(t, client.KeyExistsFor(types.LegalEntity{URI: "does_not_exists"}))
+	})
+}
+
 func TestCrypto_Configure(t *testing.T) {
 	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
 		e := defaultBackend(t.Name())
@@ -515,23 +541,51 @@ func TestCrypto_pemToPublicKey(t *testing.T) {
 	})
 }
 
-func TestCrypto_crossLanguageCase(t *testing.T) {
-	attHex := "4D15851551A9E5DAF8114C98D0F8D4B18CC97ABD31424D5EA9E3CC84C5F9B45C"
-	base64Sign := "QeztwzJgxCuW+ZlUsUyFn7zESuyEFpPCP546hJdcXarzvsWWuTzA3RFLOIJJRqjz7sccGAcidi+rKDlI1Rj4gOSFLhJKkOABXLt+X2kcqpDguta5/i03j4jAN0dI2Sanp5gc7AHJ0r4791KEYrEbve6rVGN6kSd7kvWFyfTtFgD4R+Yp4T3e5oG5yMFdAmiNK8ko6o8nmzoY0yOWdHneUFaAjGAPkGGGsspQ7U3UYAyVdkXdspF4Ryeh8LbbePFSQkO6Pzj9gVMWBY1LrGIRSPhGQEXj7P6PTar8gs/AkX5gyAQLS383MEcg3fCOiEAbRgQLYsRgo04hl3IChfOW2w=="
-	pemPub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwm7FBfggHaAfapO7TdFv\n0OwS+Ip9Wi7gyhddjmdZBZDzfYMUPr4+0utGM3Ry8JtCfxmsHL3ZmvG04GV1doeC\nLjLywm6OFfoEQCpliRiCyarpd2MrxKWjkSwOl9MJdVm3xpb7BWJdXkKEwoU4lBk8\ncZPay32juPzAV5eb6UCnq53PZ5O0H80J02oPLpBs2D6ASjUQpRf2xP0bvaP2W92P\nZYzJwrSA3zdxPmrMVApOoIZL7OHBE+y0I9ZUt+zmxD8TzRdN9Etf9wjLD7psu9aL\n/XHIHR0xMkYV8cr/nCbJ6H0PbDd3yIQvYPjLEVS5LeieN+DzIlYO6Y7kpws6k0rx\newIDAQAB\n-----END PUBLIC KEY-----\n"
+func TestJwkToMap(t *testing.T) {
+	t.Run("Generates map for RSA key", func(t *testing.T) {
+		rsa, _ := rsa.GenerateKey(rand.Reader, 1024)
+		jwk, _ := jwk.New(rsa)
 
-	client := defaultBackend(t.Name())
-	h, _ := hex.DecodeString(attHex)
+		jwkMap, err := JwkToMap(jwk)
 
-	bds, _ := base64.StdEncoding.DecodeString(base64Sign)
+		if assert.NoError(t, err) {
+			assert.Equal(t, jwa.KeyType("RSA"), jwkMap["kty"])
+		}
+	})
+}
 
-	b, err := client.VerifyWith(h, bds, pemPub)
-	if !b {
-		t.Error("Expected verify to be true")
-	}
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+func TestMapToJwk(t *testing.T) {
+	t.Run("Generates Jwk from map", func(t *testing.T) {
+		jwkAsJSON := `{"d":"Ce3obeVsZeU3QaKBTQ-Qn-EaUfhEVViHbnP3gnLDrXNbiUf09s0Ti3RXd4601G8fAJ3zKlZmdEop59mK5BjAE8NOBmvP4uI7PYlJsDAE76mKghVxvN94qb-KwW4p0wix9RoC8TEtoE3EYCr428v-k4nTpMWXQcC_xkHVIfpoA6E","dp":"LGJtrCIxo2DlCSccu0ivH8YzUS9uUbsKyOgNEpV3IB3vqZToi_k8TkwN9XNXCMXkRYIGtRwkxvp9TWLtIEKMtQ","dq":"XhBVCRvFE_ccZ7rxzfu7LToeSNBPW07v68tM94pEV2MFfVBHdWJd-gHbIPGVwC55Th9vAh9dDmv0TvBVkiblkQ","e":"AQAB","kty":"RSA","n":"n5KqvPI1MPDhazTKXLYn4_we09e3iEccb7QJ8dRxApN1rpxTymRWabUafC56fArDF0lvIZ7fZl0LzX5Z_3mrqulebEPTFRrbdDwwcqa2KZ7Tctfh6MgUFm5xOAwRG33NlX3Ny1dP-Ek2irXJOHt9AecbEZFZKmpgrsrTyG6Ekfs","p":"1LoOk3MFiJpsjJCkMkaDb0TXXMxuZ5f9-iMVgR1ZoammzQziBj-72CrD21Rxmuuc6en8w4HtHLSOlPQtcOKzMw","q":"wAiSzr1NVdsYulhGYAa1ONZSKVxlFS7N_UAjPQgFf-xTYog2RbZfolheDv92mJp2qqFJdVMzQkbeMeTj9xqmGQ","qi":"eFqCOgR0wnpkjZGwh63pV8aNhh1-GfhYjqF2jSrh6rnsVHnhz3LRROSzUDarms7LjW3eHiygyHHSF2-ejTMMKQ"}`
+
+		jwkMap := map[string]interface{}{}
+		json.Unmarshal([]byte(jwkAsJSON), &jwkMap)
+
+		jwk, err := MapToJwk(jwkMap)
+
+		if assert.NoError(t, err) {
+			assert.Equal(t, jwa.KeyType("RSA"), jwk.KeyType())
+		}
+	})
+
+	t.Run("with missing data", func(t *testing.T) {
+		jwkMap := map[string]interface{}{}
+		_, err := MapToJwk(jwkMap)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestPemToJwk(t *testing.T) {
+	t.Run("generated jwk from pem", func(t *testing.T) {
+		pub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9wJQN59PYsvIsTrFuTqS\nLoUBgwdRfpJxOa5L8nOALxNk41MlAg7xnPbvnYrOHFucfWBTDOMTKBMSmD4WDkaF\ndVrXAML61z85Le8qsXfX6f7TbKMDm2u1O3cye+KdJe8zclK9sTFzSD0PP0wfw7wf\nlACe+PfwQgeOLPUWHaR6aDfaA64QEdfIzk/IL3S595ixaEn0huxMHgXFX35Vok+o\nQdbnclSTo6HUinkqsHUu/hGHApkE3UfT6GD6SaLiB9G4rAhlrDQ71ai872t4FfoK\n7skhe8sP2DstzAQRMf9FcetrNeTxNL7Zt4F/qKm80cchRZiFYPMCYyjQphyBCoJf\n0wIDAQAB\n-----END PUBLIC KEY-----"
+
+		jwk, err := PemToJwk([]byte(pub))
+
+		if assert.NoError(t, err) {
+			assert.Equal(t, jwa.KeyType("RSA"), jwk.KeyType())
+		}
+	})
 }
 
 func defaultBackend(name string) Crypto {

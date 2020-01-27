@@ -24,15 +24,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"mime"
 	"net/http"
 	"regexp"
+
+	"github.com/labstack/echo/v4"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 type ApiWrapper struct {
@@ -49,10 +51,10 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 
 	acceptHeader := ctx.Request().Header.Get("Accept")
 
-	// starts with so we can ignore any +
 	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
-		jwk, err := w.C.PublicKeyInJWK(le)
-		if err != nil {
+		var jwk jwk.Key
+		var err error
+		if jwk, err = w.C.PublicKeyInJWK(le); err != nil {
 			return err
 		}
 
@@ -96,10 +98,32 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	var pubKeys []string
+	var pubKeys []jwk.Key
 	var legalEntities []Identifier
 	for _, e := range encryptRequest.EncryptRequestSubjects {
-		pubKeys = append(pubKeys, string(e.PublicKey))
+		if e.PublicKey == nil && e.Jwk == nil {
+			msg := "missing key in encryptRequestSubjects"
+			logrus.Error(msg)
+			return echo.NewHTTPError(http.StatusBadRequest, msg)
+		}
+
+		var (
+			j   jwk.Key
+			err error
+		)
+		if e.Jwk != nil {
+			if j, err = pkg.MapToJwk(e.Jwk.AdditionalProperties); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid key in encryptRequestSubjects")
+			}
+		}
+
+		if j == nil && e.PublicKey != nil {
+			if j, err = pkg.PemToJwk([]byte(*e.PublicKey)); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid key in encryptRequestSubjects")
+			}
+		}
+
+		pubKeys = append(pubKeys, j)
 		legalEntities = append(legalEntities, e.LegalEntity)
 	}
 
@@ -147,7 +171,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
-		msg := fmt.Sprintf("error decrypting request: %v", err)
+		msg := fmt.Sprintf("error decrypting request: %w", err)
 		logrus.Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
@@ -301,8 +325,8 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	if len(verifyRequest.PublicKey) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing publicKey in verifyRequest")
+	if verifyRequest.PublicKey == nil && verifyRequest.Jwk == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing publicKey/JWK in verifyRequest")
 	}
 
 	if len(verifyRequest.Signature) == 0 {
@@ -327,7 +351,19 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, string(verifyRequest.PublicKey))
+	var j jwk.Key
+	if verifyRequest.Jwk != nil {
+		if j, err = pkg.MapToJwk(verifyRequest.Jwk.AdditionalProperties); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid JWK in verifyRequest")
+		}
+	}
+	if j == nil && verifyRequest.PublicKey != nil {
+		if j, err = pkg.PemToJwk([]byte(*verifyRequest.PublicKey)); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid publicKey in verifyRequest")
+		}
+	}
+
+	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, j)
 
 	if err != nil {
 		logrus.Error(err.Error())

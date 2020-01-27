@@ -241,12 +241,13 @@ components:
       description: "A legalEntity and its public key. Only the public key is used. The resulting object will match the encrypted key to the given legalEntity"
       required:
         - legalEntity
-        - publicKey
       properties:
         legalEntity:
           $ref: "#/components/schemas/Identifier"
         publicKey:
           $ref: "#/components/schemas/PublicKey"
+        jwk:
+          $ref: '#/components/schemas/JWK'
     EncryptResponse:
       required:
         - cipherText
@@ -347,13 +348,14 @@ components:
       required:
         - plainText
         - signature
-        - publicKey
       properties:
         plainText:
           type: string
           description: "Base64 encoded binary data"
         publicKey:
           $ref: '#/components/schemas/PublicKey'
+        jwk:
+          $ref: '#/components/schemas/JWK'
         signature:
           type: string
           description: "hex encoded signature"
@@ -367,6 +369,11 @@ components:
     PublicKey:
       type: string
       description: "PEM encoded public key"
+      deprecated: true
+    JWK:
+      type: object
+      description: as described by https://tools.ietf.org/html/rfc7517. Modelled as object so libraries can parse the tokens themselves.
+      additionalProperties: {}
     Identifier:
       type: string
       description: >

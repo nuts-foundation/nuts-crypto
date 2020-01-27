@@ -27,22 +27,24 @@ import (
 type Client interface {
 	// decrypt a cipherText for the given legalEntity
 	DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error)
-	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given PEM encoded public key
-	EncryptKeyAndPlainTextWith(plainText []byte, pemKey []string) (types.DoubleEncryptedCipherText, error)
+	// EncryptKeyAndPlainTextFor encrypts a piece of data for the given public keys
+	EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error)
 	// ExternalIdFor calculates an externalId for a (custodian, subject, actor) triple. Where the custodian is needed for private key selection
 	ExternalIdFor(subject string, actor string, entity types.LegalEntity) ([]byte, error)
 	// GenerateKeyPairFor creates a KeyPair on the storage for given legalEntity
 	GenerateKeyPairFor(legalEntity types.LegalEntity) error
 	// SignFor signs a piece of data for a legal entity
 	SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error)
-	// VerifyWith verifies a signature for a given PEM encoded public key
-	VerifyWith(data []byte, sig []byte, pemKey string) (bool, error)
+	// VerifyWith verifies a signature for a given jwk
+	VerifyWith(data []byte, sig []byte, jwk jwk.Key) (bool, error)
 	// PublicKeyInPEM returns the PEM encoded PublicKey for a given legal entity
 	PublicKeyInPEM(legalEntity types.LegalEntity) (string, error)
 	// PublicKeyInJWK returns the JWK encoded PublicKey for a given legal entity
 	PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error)
 	// SignJwtFor creates a signed JWT given a legalEntity and map of claims
 	SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error)
+	// KeyExistsFor returns a simple true if a key has been generated for the given legal entity
+	KeyExistsFor(legalEntity types.LegalEntity) bool
 }
 
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.

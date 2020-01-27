@@ -30,14 +30,15 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"io"
+	"strings"
+	"sync"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
-	"io"
-	"strings"
-	"sync"
 )
 
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
@@ -60,6 +61,9 @@ var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing pub
 
 // ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
 var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
+
+// ErrInvalidAlgorithm indicates an invalid public key was used
+var ErrInvalidAlgorithm = core.NewError("invalid algorithm for public key", false)
 
 type CryptoConfig struct {
 	Keysize int
@@ -186,7 +190,7 @@ func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncrypte
 }
 
 // EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string) (types.DoubleEncryptedCipherText, error) {
+func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
 	cipherBytes, cipher, err := generateSymmetricKey()
 
 	if err != nil {
@@ -201,17 +205,22 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []string
 
 	var cipherTextKeys [][]byte
 
-	for _, pemKey := range keys {
-		pk, err := PemToPublicKey([]byte(pemKey))
+	for _, jwk := range keys {
+		pk, err := jwk.Materialize()
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}
 
-		encSymKey, err := client.encryptPlainTextWith(cipherBytes, pk)
-		if err != nil {
-			return types.DoubleEncryptedCipherText{}, err
+		// todo support EC
+		if rsaPk, ok := pk.(*rsa.PublicKey); ok {
+			encSymKey, err := client.encryptPlainTextWith(cipherBytes, rsaPk)
+			if err != nil {
+				return types.DoubleEncryptedCipherText{}, err
+			}
+			cipherTextKeys = append(cipherTextKeys, encSymKey)
+		} else {
+			return types.DoubleEncryptedCipherText{}, ErrInvalidAlgorithm
 		}
-		cipherTextKeys = append(cipherTextKeys, encSymKey)
 	}
 
 	return types.DoubleEncryptedCipherText{
@@ -301,20 +310,39 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 	return signature, err
 }
 
-// VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
-func (client *Crypto) VerifyWith(data []byte, sig []byte, pemKey string) (bool, error) {
-	key, err := PemToPublicKey([]byte(pemKey))
+// KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
+func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
+	if _, err := client.Storage.GetPrivateKey(legalEntity); err != nil {
+		return false
+	}
+	return true
+}
 
+// VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
+func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, error) {
+	hashedData := sha256.Sum256(data)
+
+	mKey, err := key.Materialize()
 	if err != nil {
 		return false, err
 	}
 
-	hashedData := sha256.Sum256(data)
-	if err := rsa.VerifyPKCS1v15(key, crypto.SHA256, hashedData[:], sig); err != nil {
-		return false, err
+	if k, ok := mKey.(*rsa.PublicKey); ok {
+		if err := rsa.VerifyPKCS1v15(k, crypto.SHA256, hashedData[:], sig); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 
-	return true, nil
+	// todo support EC sigs
+	//if k, ok := mKey.(*ecdsa.PublicKey); ok {
+	//	if err := ecdsa.Verify(k, crypto.SHA256, hashedData[:], sig); err != nil {
+	//		return false, err
+	//	}
+	//	return true, nil
+	//}
+
+	return false, ErrInvalidAlgorithm
 }
 
 // PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
@@ -457,4 +485,33 @@ func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	})
 
 	return string(pubBytes), err
+}
+
+// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization
+func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
+	set := &jwk.Set{}
+	root := map[string]interface{}{}
+	root["keys"] = []interface{}{jwkAsMap}
+	if err := set.ExtractMap(root); err != nil {
+		return nil, err
+	}
+	return set.Keys[0], nil
+}
+
+// JwkToMap transforms a Jwk key to a map. Can be used for json serialization
+func JwkToMap(jwk jwk.Key) (map[string]interface{}, error) {
+	root := map[string]interface{}{}
+	// unreachable err
+	_ = jwk.PopulateMap(root)
+	return root, nil
+}
+
+// PemToJwk transforms pem to jwk for PublicKey
+func PemToJwk(pub []byte) (jwk.Key, error) {
+	pk, err := PemToPublicKey(pub)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwk.New(pk)
 }
