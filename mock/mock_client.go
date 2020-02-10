@@ -5,8 +5,10 @@
 package mock
 
 import (
+	crypto "crypto"
 	gomock "github.com/golang/mock/gomock"
 	jwk "github.com/lestrrat-go/jwx/jwk"
+	pkg "github.com/nuts-foundation/nuts-crypto/pkg"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
 	reflect "reflect"
 )
@@ -106,6 +108,36 @@ func (m *MockClient) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte
 func (mr *MockClientMockRecorder) SignFor(data, legalEntity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignFor", reflect.TypeOf((*MockClient)(nil).SignFor), data, legalEntity)
+}
+
+// SignCertificate mocks base method
+func (m *MockClient) SignCertificate(entity, ca types.LegalEntity, pkcs10 []byte, profile pkg.CertificateProfile) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SignCertificate", entity, ca, pkcs10, profile)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SignCertificate indicates an expected call of SignCertificate
+func (mr *MockClientMockRecorder) SignCertificate(entity, ca, pkcs10, profile interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignCertificate", reflect.TypeOf((*MockClient)(nil).SignCertificate), entity, ca, pkcs10, profile)
+}
+
+// GetPrivateKey mocks base method
+func (m *MockClient) GetPrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPrivateKey", entity)
+	ret0, _ := ret[0].(crypto.Signer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPrivateKey indicates an expected call of GetPrivateKey
+func (mr *MockClientMockRecorder) GetPrivateKey(entity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrivateKey", reflect.TypeOf((*MockClient)(nil).GetPrivateKey), entity)
 }
 
 // VerifyWith mocks base method
