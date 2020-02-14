@@ -22,7 +22,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"encoding/pem"
 	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwe/aescbc"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -41,6 +43,13 @@ func Test_serialNumberUniqueness(t *testing.T) {
 		}
 		r[serial] = true
 	}
+}
+
+func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
+	t.Run("nonce empty", func(t *testing.T) {
+		_, err := decryptWithSymmetricKey(make([]byte, 0), aescbc.AesCbcHmac{}, make([]byte, 0))
+		assert.EqualErrorf(t, err, ErrIllegalNonce.Error(), "error")
+	})
 }
 
 func TestCrypto_encryptPlainTextWith(t *testing.T) {
@@ -63,6 +72,26 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
+	})
+}
+
+func TestCrypto_PublicKeyToPem(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		result, err := PublicKeyToPem(&key.PublicKey)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, result)
+		assert.Contains(t, result, "-----BEGIN PUBLIC KEY-----")
+		assert.Contains(t, result, "-----END PUBLIC KEY-----")
+		decoded, rest := pem.Decode([]byte(result))
+		assert.Len(t, rest, 0)
+		assert.NotNil(t, decoded)
+	})
+	t.Run("wrong public key gives error", func(t *testing.T) {
+		_, err := PublicKeyToPem(&rsa.PublicKey{})
+		assert.Error(t, err)
 	})
 }
 
@@ -126,5 +155,9 @@ func TestPemToJwk(t *testing.T) {
 		if assert.NoError(t, err) {
 			assert.Equal(t, jwa.KeyType("RSA"), jwk.KeyType())
 		}
+	})
+	t.Run("invalid PEM", func(t *testing.T) {
+		_, err := PemToJwk([]byte("hello world"))
+		assert.Error(t, err)
 	})
 }

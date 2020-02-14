@@ -40,7 +40,6 @@ func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, err
 }
 
 func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
-
 	if len(nonce) == 0 {
 		return nil, ErrIllegalNonce
 	}
