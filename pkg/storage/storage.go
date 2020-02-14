@@ -24,6 +24,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
@@ -39,6 +40,9 @@ type Storage interface {
 // shared function to convert bytes to a RSA private key
 func bytesToPrivateKey(priv []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(priv)
+	if block == nil {
+		return nil, errors.New("malformed PEM block")
+	}
 	b := block.Bytes
 	key, err := x509.ParsePKCS1PrivateKey(b)
 	if err != nil {

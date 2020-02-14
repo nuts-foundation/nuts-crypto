@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -51,7 +53,101 @@ func Test_fs_SaveThenLoadCertificate(t *testing.T) {
 	})
 }
 
-func createTempStorage(name string) Storage {
+func Test_fs_GetCertificate(t *testing.T) {
+	entity := types.LegalEntity{URI: "Some Entity"}
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("entry does not exist", func(t *testing.T) {
+		certificate, err := storage.GetCertificate(types.LegalEntity{URI: "abc"})
+		assert.Nil(t, certificate)
+		assert.Error(t, err)
+	})
+	t.Run("incorrect certificate", func(t *testing.T) {
+		storage.SaveCertificate(entity, []byte{1, 2, 3})
+		certificate, err := storage.GetCertificate(entity)
+		assert.Nil(t, certificate)
+		assert.Error(t, err)
+	})
+	t.Run("trailing bytes", func(t *testing.T) {
+		block, _ := pem.Decode([]byte(cert))
+		err := storage.SaveCertificate(entity, block.Bytes)
+		if !assert.NoError(t, err) {
+			return
+		}
+		path := storage.getEntryPath(entity, certificateFilePostfix)
+		file, _ := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		_, err = file.WriteString("some trailing bytes")
+		if !assert.NoError(t, err) {
+			return
+		}
+		certificate, err := storage.GetCertificate(entity)
+		assert.Nil(t, certificate)
+		assert.Error(t, err)
+	})
+}
+
+func Test_fs_GetPublicKey(t *testing.T) {
+	entity := types.LegalEntity{URI: "Some Entity"}
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+	t.Run("non-existing entry", func(t *testing.T) {
+		key, err := storage.GetPublicKey(entity)
+		assert.EqualError(t, err, "could not open entry for legalEntity: Some Entity with filename temp/Test_fs_GetPublicKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		assert.Nil(t, key)
+	})
+	t.Run("ok", func(t *testing.T) {
+		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
+		err := storage.SavePrivateKey(entity, pk)
+		if !assert.NoError(t, err) {
+			return
+		}
+		key, err := storage.GetPublicKey(entity)
+		assert.NoError(t, err)
+		if !assert.NotNil(t, key) {
+			return
+		}
+		assert.Equal(t, &pk.PublicKey, key)
+	})
+}
+
+func Test_fs_GetPrivateKey(t *testing.T) {
+	entity := types.LegalEntity{URI: "Some Entity"}
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("non-existing entry", func(t *testing.T) {
+		key, err := storage.GetPrivateKey(entity)
+		assert.EqualError(t, err, "could not open entry for legalEntity: Some Entity with filename temp/Test_fs_GetPrivateKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		assert.Nil(t, key)
+	})
+	t.Run("private key invalid", func(t *testing.T) {
+		path := storage.getEntryPath(entity, privateKeyFilePostfix)
+		file, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+		_, err := file.WriteString("hello world")
+		if !assert.NoError(t, err) {
+			return
+		}
+		key, err := storage.GetPrivateKey(entity)
+		assert.Nil(t, key)
+		assert.Error(t, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
+		err := storage.SavePrivateKey(entity, pk)
+		if !assert.NoError(t, err) {
+			return
+		}
+		key, err := storage.GetPrivateKey(entity)
+		assert.NoError(t, err)
+		if !assert.NotNil(t, key) {
+			return
+		}
+		assert.Equal(t, pk, key)
+	})
+}
+
+func createTempStorage(name string) *fileSystemBackend {
 	b, _ := NewFileSystemBackend(fmt.Sprintf("temp/%s", name))
 	return b
 }

@@ -118,7 +118,6 @@ func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa
 
 // Load the public key from disk, it load the private key and extract the public key from it.
 func (fsc *fileSystemBackend) GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error) {
-
 	key, err := fsc.GetPrivateKey(legalEntity)
 
 	if err != nil {
