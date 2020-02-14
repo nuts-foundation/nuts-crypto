@@ -53,10 +53,13 @@ type Client interface {
 	KeyExistsFor(legalEntity types.LegalEntity) bool
 }
 
+// CertificateProfile is used to specify input parameters for certificate issuance.
 type CertificateProfile struct {
 	KeyUsage     x509.KeyUsage
 	IsCA         bool
+	// MaxPathLen is ignored is IsCa = false
 	MaxPathLen   int
+	// NumDaysValid is the number of days the certificate is valid, starting today
 	NumDaysValid int
 }
 

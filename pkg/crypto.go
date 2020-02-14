@@ -108,18 +108,16 @@ func (k key) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signat
 	return k.signFn(rand, digest, opts)
 }
 
+// GetPrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
 func (client *Crypto) GetPrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
 	priv, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := client.Storage.GetPublicKey(entity)
-	if err != nil {
-		return nil, err
-	}
-	return key{publicKey: publicKey, signFn: priv.Sign}, nil
+	return key{publicKey: &priv.PublicKey, signFn: priv.Sign}, nil
 }
 
+// SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
 func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEntity, pkcs10 []byte, profile CertificateProfile) ([]byte, error) {
 	csr, err := x509.ParseCertificateRequest(pkcs10)
 	if err != nil {

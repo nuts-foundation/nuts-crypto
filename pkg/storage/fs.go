@@ -40,6 +40,7 @@ type FileOpenError struct {
 	err         error
 }
 
+// ErrNotFound indicates that the specified crypto storage entry couldn't be found.
 var ErrNotFound = errors.New("entry not found")
 
 // Error returns the string representation

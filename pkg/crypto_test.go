@@ -27,6 +27,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
 	"testing"
@@ -165,9 +166,9 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 	legalEntity := types.LegalEntity{URI: "testDecrypt"}
 	client.GenerateKeyPairFor(legalEntity)
-	defer emptyTemp(t.Name())
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
@@ -271,8 +272,8 @@ func TestCrypto_VerifyWith(t *testing.T) {
 		data := []byte("hello")
 		legalEntity := types.LegalEntity{URI: "test"}
 		client := defaultBackend(t.Name())
-		client.GenerateKeyPairFor(legalEntity)
 		defer emptyTemp(t.Name())
+		client.GenerateKeyPairFor(legalEntity)
 
 		sig, err := client.SignFor(data, legalEntity)
 
@@ -362,8 +363,8 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 func TestCrypto_PublicKeyInPem(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "testPK"}
 	client := defaultBackend(t.Name())
-	client.GenerateKeyPairFor(legalEntity)
 	defer emptyTemp(t.Name())
+	client.GenerateKeyPairFor(legalEntity)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKeyInPEM(legalEntity)
@@ -393,8 +394,8 @@ func TestCrypto_PublicKeyInPem(t *testing.T) {
 func TestCrypto_PublicKeyInJWK(t *testing.T) {
 	legalEntity := types.LegalEntity{URI: "testPK"}
 	client := defaultBackend(t.Name())
-	client.GenerateKeyPairFor(legalEntity)
 	defer emptyTemp(t.Name())
+	client.GenerateKeyPairFor(legalEntity)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
 		pub, err := client.PublicKeyInJWK(legalEntity)
@@ -416,9 +417,9 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 
 func TestCrypto_SignJwtFor(t *testing.T) {
 	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 	legalEntity := types.LegalEntity{URI: "testSignJwt"}
 	client.GenerateKeyPairFor(legalEntity)
-	defer emptyTemp(t.Name())
 
 	t.Run("creates valid JWT", func(t *testing.T) {
 		tokenString, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, legalEntity)
@@ -443,12 +444,12 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 
 func TestCrypto_SignCertificate(t *testing.T) {
 	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 	ca := types.LegalEntity{URI: "Root CA"}
 	client.GenerateKeyPairFor(ca)
 	caPrivateKey, _ := client.GetPrivateKey(ca)
 	endEntity := types.LegalEntity{URI: "End Entity"}
 	intermediateCa := types.LegalEntity{URI: "Intermediate CA"}
-	defer emptyTemp(t.Name())
 
 	roots := x509.NewCertPool()
 
@@ -457,27 +458,34 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		client = defaultBackend(t.Name())
 	}
 
-	var signRoot = func() (*x509.Certificate, error) {
+	var signRoot = func() *x509.Certificate {
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: ca.URI},
 		}
-		csr, _ := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
+		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
+		if err != nil {
+			logrus.Fatalf("unable to create CSR: %v", err)
+			return nil
+		}
 		certBytes, err := client.SignCertificate(ca, ca, csr, CertificateProfile{
 			IsCA:         true,
 			MaxPathLen:   1,
 			NumDaysValid: 1,
 		})
 		if err != nil {
-			return nil, err
+			logrus.Fatalf("unable to sign certificate: %v", err)
+			return nil
 		}
-		return x509.ParseCertificate(certBytes)
+		certificate, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			logrus.Fatalf("unable to parse certificate: %v", err)
+			return nil
+		}
+		return certificate
 	}
 
 	t.Run("self-sign CSR", func(t *testing.T) {
-		certificate, err := signRoot()
-		if !assert.NoError(t, err) {
-			return
-		}
+		certificate := signRoot()
 		assert.True(t, certificate.IsCA)
 		assert.Equal(t, 1, certificate.MaxPathLen)
 		assert.Equal(t, ca.URI, certificate.Subject.CommonName)
@@ -493,7 +501,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("sign CSR for end-entity under root CA", func(t *testing.T) {
 		// Setup
-		root, _ := signRoot()
+		root := signRoot()
 		roots.AddCert(root)
 		client.GenerateKeyPairFor(endEntity)
 		endEntityPrivKey, _ := client.GetPrivateKey(endEntity)
@@ -529,7 +537,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("sign CSR for intermediate CA", func(t *testing.T) {
 		// Setup
-		root, _ := signRoot()
+		root := signRoot()
 		roots.AddCert(root)
 		client.GenerateKeyPairFor(intermediateCa)
 		intermediateCaPrivKey, _ := client.GetPrivateKey(intermediateCa)
@@ -632,11 +640,38 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	})
 }
 
+func TestCrypto_GetPrivateKey(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	entity := types.LegalEntity{URI: "En. Ti. Ti. Y."}
+	t.Run("private key not found", func(t *testing.T) {
+		pk, err := client.GetPrivateKey(entity)
+		assert.Nil(t, pk)
+		assert.Error(t, err)
+	})
+	t.Run("get private key, assert non-exportable", func(t *testing.T) {
+		client.GenerateKeyPairFor(entity)
+		pk, err := client.GetPrivateKey(entity)
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.NotNil(t, pk) {
+			return
+		}
+		// Assert that we don't accidentally return the actual RSA/ECDSA key, because they should stay in the storage
+		// and be non-exportable.
+		_, ok := pk.(*rsa.PrivateKey)
+		assert.False(t, ok)
+		_, ok = pk.(*ecdsa.PrivateKey)
+		assert.False(t, ok)
+	})
+}
+
 func TestCrypto_KeyExistsFor(t *testing.T) {
 	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 	legalEntity := types.LegalEntity{URI: "exists"}
 	client.GenerateKeyPairFor(legalEntity)
-	defer emptyTemp(t.Name())
 
 	t.Run("returns true for existing key", func(t *testing.T) {
 		assert.True(t, client.KeyExistsFor(legalEntity))
