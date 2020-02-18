@@ -95,26 +95,26 @@ type Crypto struct {
 	_logger    *logrus.Entry
 }
 
-type key struct {
+type opaquePrivateKey struct {
 	publicKey crypto.PublicKey
 	signFn    func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
 }
 
-func (k key) Public() crypto.PublicKey {
+func (k opaquePrivateKey) Public() crypto.PublicKey {
 	return k.publicKey
 }
 
-func (k key) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	return k.signFn(rand, digest, opts)
 }
 
-// GetPrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
-func (client *Crypto) GetPrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+// GetOpqauePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
+func (client *Crypto) GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
 	priv, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
 	}
-	return key{publicKey: &priv.PublicKey, signFn: priv.Sign}, nil
+	return opaquePrivateKey{publicKey: &priv.PublicKey, signFn: priv.Sign}, nil
 }
 
 // SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
@@ -143,7 +143,7 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 		NotBefore:             time.Now(),
 		KeyUsage:              profile.KeyUsage,
 		NotAfter:              time.Now().AddDate(0, 0, profile.NumDaysValid),
-		ExtraExtensions:       csr.ExtraExtensions,
+		ExtraExtensions:       csr.Extensions,
 		PublicKey:             csr.PublicKey,
 	}
 	if profile.IsCA {
