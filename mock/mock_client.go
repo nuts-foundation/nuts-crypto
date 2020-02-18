@@ -135,7 +135,7 @@ func (m *MockClient) GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signe
 }
 
 // GetOpqauePrivateKey indicates an expected call of GetOpqauePrivateKey
-func (mr *MockClientMockRecorder) GetPrivateKey(entity interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetOpqauePrivateKey(entity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpqauePrivateKey", reflect.TypeOf((*MockClient)(nil).GetOpqauePrivateKey), entity)
 }
