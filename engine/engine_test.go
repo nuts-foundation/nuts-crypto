@@ -119,7 +119,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		err := cmd.Execute()
 
 		if assert.NoError(t, err) {
-			expected := "Error printing publicKey: could not open private key for legalEntity: legalEntityMissing with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: key not found"
+			expected := "Error printing publicKey: could not open entry for legalEntity: legalEntityMissing with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: entry not found"
 			assert.Contains(t, buf.String(), expected)
 		}
 	})

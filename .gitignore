@@ -17,3 +17,5 @@
 #sphinx
 _build
 *.pem
+
+nuts-crypto

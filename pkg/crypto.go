@@ -28,11 +28,14 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
+	errors2 "github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"io"
+	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -65,6 +68,18 @@ var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA 
 // ErrInvalidAlgorithm indicates an invalid public key was used
 var ErrInvalidAlgorithm = core.NewError("invalid algorithm for public key", false)
 
+// ErrUnableToParseCSR indicates the CSR is invalid
+var ErrUnableToParseCSR = core.NewError("unable to parse CSR", false)
+
+// ErrCSRSignatureInvalid indicates the signature on the CSR (Proof of Possesion) is invalid
+var ErrCSRSignatureInvalid = core.NewError("CSR signature is invalid", false)
+
+// ErrUnknownCA indicates that the signing CA is unknown (e.g. its keys are unavailable for signing)
+var ErrUnknownCA = core.NewError("unknown CA", false)
+
+// ModuleName == Registry
+const ModuleName = "Crypto"
+
 type CryptoConfig struct {
 	Keysize int
 	Storage string
@@ -73,11 +88,90 @@ type CryptoConfig struct {
 
 // default implementation for CryptoInstance
 type Crypto struct {
-	Storage storage.Storage
-	//keyCache map[string]rsa.PrivateKey
+	Storage    storage.Storage
 	Config     CryptoConfig
 	configOnce sync.Once
 	configDone bool
+	_logger    *logrus.Entry
+}
+
+type opaquePrivateKey struct {
+	publicKey crypto.PublicKey
+	signFn    func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
+}
+
+func (k opaquePrivateKey) Public() crypto.PublicKey {
+	return k.publicKey
+}
+
+func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	return k.signFn(rand, digest, opts)
+}
+
+// GetOpqauePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
+func (client *Crypto) GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+	priv, err := client.Storage.GetPrivateKey(entity)
+	if err != nil {
+		return nil, err
+	}
+	return opaquePrivateKey{publicKey: &priv.PublicKey, signFn: priv.Sign}, nil
+}
+
+// SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
+func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEntity, pkcs10 []byte, profile CertificateProfile) ([]byte, error) {
+	csr, err := x509.ParseCertificateRequest(pkcs10)
+	if err != nil {
+		return nil, errors2.Wrap(err, ErrUnableToParseCSR.Error())
+	}
+	client.logger().Infof("Issuing certificate for CSR, ca=%s, entity=%s, subject=%s, self-signed=%t", ca.URI, entity.URI, csr.Subject.String(), entity == ca)
+	err = csr.CheckSignature()
+	if err != nil {
+		return nil, errors2.Wrap(err, ErrCSRSignatureInvalid.Error())
+	}
+	key, err := client.Storage.GetPrivateKey(ca)
+	if err != nil || key == nil {
+		return nil, errors2.Wrap(err, ErrUnknownCA.Error())
+	}
+
+	serialNumber, err := serialNumber()
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to generate serial number")
+	}
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(serialNumber),
+		Subject:               csr.Subject,
+		NotBefore:             time.Now(),
+		KeyUsage:              profile.KeyUsage,
+		NotAfter:              time.Now().AddDate(0, 0, profile.NumDaysValid),
+		ExtraExtensions:       csr.Extensions,
+		PublicKey:             csr.PublicKey,
+	}
+	if profile.IsCA {
+		template.IsCA = true
+		template.MaxPathLen = profile.MaxPathLen
+		template.BasicConstraintsValid = true
+	}
+	var parentTemplate *x509.Certificate
+	if entity == ca {
+		// self-signed
+		parentTemplate = template
+	} else {
+		parentCertificate, err := client.Storage.GetCertificate(ca)
+		if err != nil {
+			return nil, errors2.Wrap(err, ErrUnknownCA.Error())
+		}
+		parentTemplate = parentCertificate
+	}
+	certificate, err := x509.CreateCertificate(rand.Reader, template, parentTemplate, csr.PublicKey, key)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to create certificate")
+	}
+	err = client.Storage.SaveCertificate(entity, certificate)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to save certificate to store")
+	}
+	client.logger().Infof("Issued certificate, subject=%s, serialNumber=%d", template.Subject.String(), template.SerialNumber)
+	return certificate, nil
 }
 
 var instance *Crypto
@@ -124,7 +218,7 @@ func (client *Crypto) newCryptoStorage() (storage.Storage, error) {
 		return storage.NewFileSystemBackend(fspath)
 	}
 
-	return nil, errors.New("Only fs backend available for now")
+	return nil, errors.New("only fs backend available for now")
 }
 
 // generate a new rsa keypair for the given legalEntity. The legalEntity uri is base64 encoded and used as filename
@@ -145,11 +239,6 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 	}
 
 	err = client.Storage.SavePrivateKey(legalEntity, key)
-
-	//if err == nil {
-	//	// also store key in cache
-	//	client.keyCache[legalEntity.URI] = *key
-	//}
 
 	return err
 }
@@ -425,93 +514,11 @@ func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey)
 		return nil, err
 	}
 	return ciphertext, nil
-
-	return nil, nil
 }
 
-func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
-	hash := sha512.New()
-	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
-	if err != nil {
-		return nil, err
+func (client *Crypto) logger() *logrus.Entry {
+	if client._logger == nil {
+		client._logger = logrus.StandardLogger().WithField("module", ModuleName)
 	}
-	return plaintext, nil
-}
-
-func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
-
-	if len(nonce) == 0 {
-		return nil, ErrIllegalNonce
-	}
-
-	plaintext, err := key.Open(nil, nonce, cipherText, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
-
-// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
-func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
-	block, _ := pem.Decode(pub)
-	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, ErrWrongPublicKey
-	}
-
-	b := block.Bytes
-	key, err := x509.ParsePKIXPublicKey(b)
-	if err != nil {
-		return nil, err
-	}
-	finalKey, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return nil, ErrRsaPubKeyConversion
-	}
-
-	return finalKey, nil
-}
-
-// PublicKeyToPem converts an rsa.PublicKeyInPEM to PEM encoding
-func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
-	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
-
-	if err != nil {
-		return "", err
-	}
-
-	pubBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubASN1,
-	})
-
-	return string(pubBytes), err
-}
-
-// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization
-func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
-	set := &jwk.Set{}
-	root := map[string]interface{}{}
-	root["keys"] = []interface{}{jwkAsMap}
-	if err := set.ExtractMap(root); err != nil {
-		return nil, err
-	}
-	return set.Keys[0], nil
-}
-
-// JwkToMap transforms a Jwk key to a map. Can be used for json serialization
-func JwkToMap(jwk jwk.Key) (map[string]interface{}, error) {
-	root := map[string]interface{}{}
-	// unreachable err
-	_ = jwk.PopulateMap(root)
-	return root, nil
-}
-
-// PemToJwk transforms pem to jwk for PublicKey
-func PemToJwk(pub []byte) (jwk.Key, error) {
-	pk, err := PemToPublicKey(pub)
-	if err != nil {
-		return nil, err
-	}
-
-	return jwk.New(pk)
+	return client._logger
 }
