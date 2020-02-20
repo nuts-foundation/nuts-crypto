@@ -194,12 +194,16 @@ func (client *Crypto) Configure() error {
 	var err error
 
 	client.configOnce.Do(func() {
-		if client.Config.Keysize < 2048 {
-			err = ErrInvalidKeySize
-			return
+		// The crypto engine doesn't have a REST API and is only used as library, so it makes no sense to initialize
+		// the crypto storage when not in server mode. When using the nuts application as CLI, there should be no
+		// local crypto storage since keys are stored on the remote nuts server.
+		if core.NutsConfig().GetEngineMode("") == core.ServerEngineMode {
+			if client.Config.Keysize < 2048 {
+				err = ErrInvalidKeySize
+				return
+			}
+			client.Storage, err = client.newCryptoStorage()
 		}
-
-		client.Storage, err = client.newCryptoStorage()
 		client.configDone = true
 	})
 
