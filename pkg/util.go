@@ -24,6 +24,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha512"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"github.com/lestrrat-go/jwx/jwk"
 	"math/big"
@@ -99,10 +100,16 @@ func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
 }
 
 // JwkToMap transforms a Jwk key to a map. Can be used for json serialization
-func JwkToMap(jwk jwk.Key) (map[string]interface{}, error) {
+func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
 	root := map[string]interface{}{}
 	// unreachable err
-	_ = jwk.PopulateMap(root)
+	_ = key.PopulateMap(root)
+	if root[jwk.X509CertChainKey] != nil {
+		// Bug in JWK library: X.509 certificate chain isn't marshalled correctly
+		// Reported: https://github.com/lestrrat-go/jwx/issues/139
+		chain := root[jwk.X509CertChainKey].([]*x509.Certificate)
+		root[jwk.X509CertChainKey] = marshalX509CertChain(chain)
+	}
 	return root, nil
 }
 
@@ -114,6 +121,27 @@ func PemToJwk(pub []byte) (jwk.Key, error) {
 	}
 
 	return jwk.New(pk)
+}
+
+// CertificateToJWK constructs a new JWK based on the given X.509 certificate.
+func CertificateToJWK(cert *x509.Certificate) (jwk.Key, error) {
+	key, err := jwk.New(cert.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	err = key.Set(jwk.X509CertChainKey, base64.StdEncoding.EncodeToString(cert.Raw))
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+func marshalX509CertChain(chain []*x509.Certificate) []string {
+	encodedCerts := make([]string, len(chain))
+	for idx, cert := range chain {
+		encodedCerts[idx] = base64.StdEncoding.EncodeToString(cert.Raw)
+	}
+	return encodedCerts
 }
 
 func serialNumber() (int64, error) {
