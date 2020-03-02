@@ -171,7 +171,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
-		msg := fmt.Sprintf("error decrypting request: %w", err)
+		msg := fmt.Sprintf("error decrypting request: %v", err)
 		logrus.Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
