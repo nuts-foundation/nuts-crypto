@@ -136,6 +136,48 @@ func CertificateToJWK(cert *x509.Certificate) (jwk.Key, error) {
 	return key, nil
 }
 
+func MapToX509CertChain(jwkAsMap map[string]interface{}) ([]*x509.Certificate, error) {
+	key, err := MapToJwk(jwkAsMap)
+	if err != nil {
+		return nil, err
+	}
+	return GetX509ChainFromHeaders(key)
+}
+
+// GetX509ChainFromHeaders tries to retrieve the X.509 certificate chain ("x5c") from the JWK/JWS and parse it.
+// If it doesn't contain the "x5c" header, nil is returned. If the header is present but it couldn't be parsed,
+// an error is returned.
+func GetX509ChainFromHeaders(headers jwkHeaderReader) ([]*x509.Certificate, error) {
+	chainInterf, _ := headers.Get(jwk.X509CertChainKey)
+	if chainInterf == nil {
+		return nil, nil
+	}
+	// For JWKs we don't need to do unmarshalling
+	chain, ok := chainInterf.([]*x509.Certificate)
+	if ok {
+		// No further parsing needed
+		return chain, nil
+	}
+	// For the case of JWS the returned header is either a string slice
+	return unmarshalX509CertChain(chainInterf.([]string))
+}
+
+func unmarshalX509CertChain(chain []string) ([]*x509.Certificate, error) {
+	certs := make([]*x509.Certificate, len(chain))
+	for idx, entry := range chain {
+		asn1cert, err := base64.StdEncoding.DecodeString(entry)
+		if err != nil {
+			return nil, err
+		}
+		cert, err := x509.ParseCertificate(asn1cert)
+		if err != nil {
+			return nil, err
+		}
+		certs[idx] = cert
+	}
+	return certs, nil
+}
+
 func marshalX509CertChain(chain []*x509.Certificate) []string {
 	encodedCerts := make([]string, len(chain))
 	for idx, cert := range chain {
@@ -151,4 +193,8 @@ func serialNumber() (int64, error) {
 		return 0, err
 	}
 	return time.Now().UnixNano() ^ (*n).Int64(), nil
+}
+
+type jwkHeaderReader interface {
+	Get(string) (interface{}, bool)
 }

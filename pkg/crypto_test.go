@@ -19,18 +19,23 @@
 package pkg
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/jws/sign"
 	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -439,6 +444,122 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 		_, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, types.LegalEntity{URI: "notFound"})
 
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+// Tests both JWSSignEphemeral and VerifyJWS functions
+func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	selfSignCertificate := func(entity types.LegalEntity) *x509.Certificate {
+		client.GenerateKeyPairFor(entity)
+		privateKey, _ := client.GetOpaquePrivateKey(entity)
+		csr, _ := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
+			Subject:   pkix.Name{CommonName: entity.URI},
+			PublicKey: privateKey.Public(),
+		}, privateKey)
+		asn1Cert, _ := client.SignCertificate(entity, entity, csr, CertificateProfile{NumDaysValid: 10, IsCA: true})
+		cert, _ := x509.ParseCertificate(asn1Cert)
+		return cert
+	}
+
+	entity := types.LegalEntity{URI: "testJWSSignEphemeral"}
+	certPool := x509.NewCertPool()
+	caCertificate := selfSignCertificate(entity)
+	certPool.AddCert(caCertificate)
+
+	var sourceStruct = struct {
+		Field1 string
+		Field2 string
+	}{
+		Field1: "Hello",
+		Field2: "World",
+	}
+	dataToBeSigned, _ := json.Marshal(sourceStruct)
+
+	t.Run("ok - roundtrip", func(t *testing.T) {
+		signature, err := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: entity.URI},
+		}, time.Now())
+		if !assert.NoError(t, err) {
+			return
+		}
+		payload, err := client.VerifyJWS(signature,  time.Now(), certPool)
+		if !assert.NoError(t, err) {
+			return
+		}
+		// Verify actual contents of JWS
+		assert.Equal(t, payload, dataToBeSigned)
+		parsedSignature, err := jws.Parse(bytes.NewReader(signature))
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.Len(t, parsedSignature.Signatures(), 1) {
+			return
+		}
+		parsedHeaders := parsedSignature.Signatures()[0].ProtectedHeaders()
+		assert.Equal(t, "RS256", parsedHeaders.Algorithm().String())
+		assert.Equal(t, dataToBeSigned, parsedSignature.Payload())
+	})
+	t.Run("error - certificate not trusted", func(t *testing.T) {
+		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: entity.URI},
+		}, time.Now())
+		payload, err := client.VerifyJWS(signature,  time.Now(), x509.NewCertPool())
+		assert.EqualError(t, err, "X.509 certificate not trusted: x509: certificate signed by unknown authority")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - certificate not valid at time of signing", func(t *testing.T) {
+		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: entity.URI},
+		}, time.Now())
+		payload, err := client.VerifyJWS(signature, time.Time{}, certPool)
+		assert.Equal(t, err, ErrCertificateNotValidAtSigningTime)
+		assert.Nil(t, payload)
+	})
+	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		h := jws.StandardHeaders{}
+		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{caCertificate}))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		payload, err := client.VerifyJWS(sig,  time.Now(), certPool)
+		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - invalid JWS format", func(t *testing.T) {
+		payload, err := client.VerifyJWS([]byte{1, 2, 3, 4},  time.Now(), x509.NewCertPool())
+		assert.Contains(t, err.Error(), "unable to parse signature")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - multiple signatures", func(t *testing.T) {
+		signer, _ := sign.New(jwa.HS256)
+		sharedKey := []byte("foobar")
+		sig, _ := jws.SignMulti(dataToBeSigned, jws.WithSigner(signer, sharedKey, nil, nil), jws.WithSigner(signer, sharedKey, nil, nil))
+		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		assert.Contains(t, err.Error(), "JWS contains more than 1 signature")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - incorrect signing algorithm", func(t *testing.T) {
+		sig, _ := jws.Sign(dataToBeSigned, jwa.HS256, []byte("foobar"))
+		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		assert.Contains(t, err.Error(), "JWS is signed with incorrect algorithm (expected = RS256, actual = HS256)")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - no X.509 chain", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key)
+		payload, err := client.VerifyJWS(sig, time.Now(), x509.NewCertPool())
+		assert.Contains(t, err.Error(), "JWK doesn't contain X509 chain header (x5c) header")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - invalid X.509 chain", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		h := jws.StandardHeaders{}
+		h.JWSx509CertChain = []string{"invalid-cert"}
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		assert.Contains(t, err.Error(), ErrInvalidCertChain.Error())
+		assert.Nil(t, payload)
 	})
 }
 
