@@ -125,19 +125,19 @@ func (mr *MockClientMockRecorder) SignCertificate(entity, ca, pkcs10, profile in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignCertificate", reflect.TypeOf((*MockClient)(nil).SignCertificate), entity, ca, pkcs10, profile)
 }
 
-// GetOpqauePrivateKey mocks base method
-func (m *MockClient) GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+// GetOpaquePrivateKey mocks base method
+func (m *MockClient) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOpqauePrivateKey", entity)
+	ret := m.ctrl.Call(m, "GetOpaquePrivateKey", entity)
 	ret0, _ := ret[0].(crypto.Signer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOpqauePrivateKey indicates an expected call of GetOpqauePrivateKey
-func (mr *MockClientMockRecorder) GetOpqauePrivateKey(entity interface{}) *gomock.Call {
+// GetOpaquePrivateKey indicates an expected call of GetOpaquePrivateKey
+func (mr *MockClientMockRecorder) GetOpaquePrivateKey(entity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpqauePrivateKey", reflect.TypeOf((*MockClient)(nil).GetOpqauePrivateKey), entity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpaquePrivateKey", reflect.TypeOf((*MockClient)(nil).GetOpaquePrivateKey), entity)
 }
 
 // VerifyWith mocks base method

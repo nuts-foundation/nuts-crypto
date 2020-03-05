@@ -39,8 +39,8 @@ type Client interface {
 	SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error)
 	// SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
 	SignCertificate(entity types.LegalEntity, ca types.LegalEntity, pkcs10 []byte, profile CertificateProfile) ([]byte, error)
-	// GetOpqauePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
-	GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signer, error)
+	// GetOpaquePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
+	GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error)
 	// VerifyWith verifies a signature for a given jwk
 	VerifyWith(data []byte, sig []byte, jwk jwk.Key) (bool, error)
 	// PublicKeyInPEM returns the PEM encoded PublicKey for a given legal entity
