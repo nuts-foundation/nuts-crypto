@@ -108,8 +108,8 @@ func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 	return k.signFn(rand, digest, opts)
 }
 
-// GetOpqauePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
-func (client *Crypto) GetOpqauePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+// GetOpaquePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
+func (client *Crypto) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
 	priv, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err

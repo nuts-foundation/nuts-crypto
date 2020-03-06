@@ -447,7 +447,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	defer emptyTemp(t.Name())
 	ca := types.LegalEntity{URI: "Root CA"}
 	client.GenerateKeyPairFor(ca)
-	caPrivateKey, _ := client.GetOpqauePrivateKey(ca)
+	caPrivateKey, _ := client.GetOpaquePrivateKey(ca)
 	endEntity := types.LegalEntity{URI: "End Entity"}
 	intermediateCa := types.LegalEntity{URI: "Intermediate CA"}
 
@@ -504,7 +504,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		root := signRoot()
 		roots.AddCert(root)
 		client.GenerateKeyPairFor(endEntity)
-		endEntityPrivKey, _ := client.GetOpqauePrivateKey(endEntity)
+		endEntityPrivKey, _ := client.GetOpaquePrivateKey(endEntity)
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: endEntity.URI},
 		}
@@ -540,7 +540,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		root := signRoot()
 		roots.AddCert(root)
 		client.GenerateKeyPairFor(intermediateCa)
-		intermediateCaPrivKey, _ := client.GetOpqauePrivateKey(intermediateCa)
+		intermediateCaPrivKey, _ := client.GetOpaquePrivateKey(intermediateCa)
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: intermediateCa.URI},
 		}
@@ -583,8 +583,8 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("invalid CSR: signature", func(t *testing.T) {
 		client.GenerateKeyPairFor(endEntity)
-		endEntityPrivKey, _ := client.GetOpqauePrivateKey(endEntity)
-		otherPrivKey, _ := client.GetOpqauePrivateKey(ca)
+		endEntityPrivKey, _ := client.GetOpaquePrivateKey(endEntity)
+		otherPrivKey, _ := client.GetOpaquePrivateKey(ca)
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: endEntity.URI},
 		}
@@ -645,13 +645,13 @@ func TestCrypto_GetPrivateKey(t *testing.T) {
 	defer emptyTemp(t.Name())
 	entity := types.LegalEntity{URI: "En. Ti. Ti. Y."}
 	t.Run("private key not found", func(t *testing.T) {
-		pk, err := client.GetOpqauePrivateKey(entity)
+		pk, err := client.GetOpaquePrivateKey(entity)
 		assert.Nil(t, pk)
 		assert.Error(t, err)
 	})
 	t.Run("get private key, assert non-exportable", func(t *testing.T) {
 		client.GenerateKeyPairFor(entity)
-		pk, err := client.GetOpqauePrivateKey(entity)
+		pk, err := client.GetOpaquePrivateKey(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
