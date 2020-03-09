@@ -401,10 +401,7 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 
 // KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
 func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
-	if _, err := client.Storage.GetPrivateKey(legalEntity); err != nil {
-		return false
-	}
-	return true
+	return client.Storage.KeyExistsFor(legalEntity)
 }
 
 // VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
