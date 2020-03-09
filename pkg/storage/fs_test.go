@@ -147,6 +147,22 @@ func Test_fs_GetPrivateKey(t *testing.T) {
 	})
 }
 
+
+func Test_fs_KeyExistsFor(t *testing.T) {
+	entity := types.LegalEntity{URI: "Some Entity"}
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("non-existing entry", func(t *testing.T) {
+		assert.False(t, storage.KeyExistsFor(entity))
+	})
+	t.Run("existing entry", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		storage.SavePrivateKey(entity, key)
+		assert.True(t, storage.KeyExistsFor(entity))
+	})
+}
+
 func createTempStorage(name string) *fileSystemBackend {
 	b, _ := NewFileSystemBackend(fmt.Sprintf("temp/%s", name))
 	return b

@@ -73,6 +73,11 @@ func NewFileSystemBackend(fspath string) (*fileSystemBackend, error) {
 	return fsc, nil
 }
 
+func (fsc *fileSystemBackend) KeyExistsFor(entity types.LegalEntity) bool {
+	_, err := os.Stat(fsc.getEntryPath(entity, privateKeyFilePostfix))
+	return err == nil
+}
+
 func (fsc *fileSystemBackend) SaveCertificate(entity types.LegalEntity, certificate []byte) error {
 	filenamePath := fsc.getEntryPath(entity, certificateFilePostfix)
 	outFile, err := os.Create(filenamePath)
