@@ -6,11 +6,13 @@ package mock
 
 import (
 	crypto "crypto"
+	x509 "crypto/x509"
 	gomock "github.com/golang/mock/gomock"
 	jwk "github.com/lestrrat-go/jwx/jwk"
 	pkg "github.com/nuts-foundation/nuts-crypto/pkg"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
 	reflect "reflect"
+	time "time"
 )
 
 // MockClient is a mock of Client interface
@@ -198,6 +200,36 @@ func (m *MockClient) SignJwtFor(claims map[string]interface{}, legalEntity types
 func (mr *MockClientMockRecorder) SignJwtFor(claims, legalEntity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJwtFor", reflect.TypeOf((*MockClient)(nil).SignJwtFor), claims, legalEntity)
+}
+
+// JWSSignEphemeral mocks base method
+func (m *MockClient) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "JWSSignEphemeral", payload, ca, csr, signingTime)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// JWSSignEphemeral indicates an expected call of JWSSignEphemeral
+func (mr *MockClientMockRecorder) JWSSignEphemeral(payload, ca, csr, signingTime interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JWSSignEphemeral", reflect.TypeOf((*MockClient)(nil).JWSSignEphemeral), payload, ca, csr, signingTime)
+}
+
+// VerifyJWS mocks base method
+func (m *MockClient) VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyJWS", signature, signingTime, trustedCerts)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// VerifyJWS indicates an expected call of VerifyJWS
+func (mr *MockClientMockRecorder) VerifyJWS(signature, signingTime, trustedCerts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyJWS", reflect.TypeOf((*MockClient)(nil).VerifyJWS), signature, signingTime, trustedCerts)
 }
 
 // KeyExistsFor mocks base method

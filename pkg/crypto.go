@@ -19,6 +19,7 @@
 package pkg
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
@@ -29,6 +30,9 @@ import (
 	"crypto/sha512"
 	"crypto/x509"
 	"errors"
+	"fmt"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jws"
 	errors2 "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -77,8 +81,24 @@ var ErrCSRSignatureInvalid = core.NewError("CSR signature is invalid", false)
 // ErrUnknownCA indicates that the signing CA is unknown (e.g. its keys are unavailable for signing)
 var ErrUnknownCA = core.NewError("unknown CA", false)
 
+// ErrInvalidCertChain indicates that the provided X.509 certificate chain is invalid
+// noinspection GoErrorStringFormat
+var ErrInvalidCertChain = errors.New("X.509 certificate chain is invalid")
+
+// ErrCertificateNotTrusted indicates that the X.509 certificate is not trusted
+// noinspection GoErrorStringFormat
+var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
+
+// ErrCertificateNotValidAtSigningTime indicates the X.509 certificate was not valid (NotBefore/NotAfter) at the time
+// at which the signing took place.
+// noinspection GoErrorStringFormat
+var ErrCertificateNotValidAtSigningTime = errors.New("X.509 certificate was not valid at the time of signing")
+
 // ModuleName == Registry
 const ModuleName = "Crypto"
+
+// jwsAlgorithm holds the supported (required) JWS signing algorithm
+const jwsAlgorithm = jwa.RS256
 
 type CryptoConfig struct {
 	Keysize int
@@ -128,6 +148,19 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrCSRSignatureInvalid.Error())
 	}
+	certificate, err := client.signCertificate(csr, ca, profile, entity == ca)
+	if err != nil {
+		return nil, err
+	}
+	err = client.Storage.SaveCertificate(entity, certificate)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to save certificate to store")
+	}
+
+	return certificate, nil
+}
+
+func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.LegalEntity, profile CertificateProfile, selfSigned bool) ([]byte, error) {
 	key, err := client.Storage.GetPrivateKey(ca)
 	if err != nil || key == nil {
 		return nil, errors2.Wrap(err, ErrUnknownCA.Error())
@@ -138,13 +171,17 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 		return nil, errors2.Wrap(err, "unable to generate serial number")
 	}
 	template := &x509.Certificate{
-		SerialNumber:          big.NewInt(serialNumber),
-		Subject:               csr.Subject,
-		NotBefore:             time.Now(),
-		KeyUsage:              profile.KeyUsage,
-		NotAfter:              time.Now().AddDate(0, 0, profile.NumDaysValid),
-		ExtraExtensions:       csr.Extensions,
-		PublicKey:             csr.PublicKey,
+		SerialNumber:    big.NewInt(serialNumber),
+		Subject:         csr.Subject,
+		NotBefore:       time.Now(),
+		KeyUsage:        profile.KeyUsage,
+		NotAfter:        time.Now().AddDate(0, 0, profile.NumDaysValid),
+		ExtraExtensions: csr.Extensions,
+		PublicKey:       csr.PublicKey,
+	}
+	if !profile.notBefore.IsZero() && !profile.notAfter.IsZero() {
+		template.NotBefore = profile.notBefore
+		template.NotAfter = profile.notAfter
 	}
 	if profile.IsCA {
 		template.IsCA = true
@@ -152,8 +189,7 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 		template.BasicConstraintsValid = true
 	}
 	var parentTemplate *x509.Certificate
-	if entity == ca {
-		// self-signed
+	if selfSigned {
 		parentTemplate = template
 	} else {
 		parentCertificate, err := client.Storage.GetCertificate(ca)
@@ -165,10 +201,6 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 	certificate, err := x509.CreateCertificate(rand.Reader, template, parentTemplate, csr.PublicKey, key)
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to create certificate")
-	}
-	err = client.Storage.SaveCertificate(entity, certificate)
-	if err != nil {
-		return nil, errors2.Wrap(err, "unable to save certificate to store")
 	}
 	client.logger().Infof("Issued certificate, subject=%s, serialNumber=%d", template.Subject.String(), template.SerialNumber)
 	return certificate, nil
@@ -230,9 +262,7 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 		return ErrMissingLegalEntityURI
 	}
 
-	reader := rand.Reader
-
-	key, err := rsa.GenerateKey(reader, client.Config.Keysize)
+	key, err := client.generateKeyPair()
 
 	if err != nil {
 		return err
@@ -317,6 +347,10 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Ke
 		CipherText:     cipherText,
 		CipherTextKeys: cipherTextKeys,
 	}, nil
+}
+
+func (client *Crypto) generateKeyPair() (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(rand.Reader, client.Config.Keysize)
 }
 
 func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) (cipherText []byte, nonce []byte, error error) {
@@ -468,6 +502,69 @@ func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity type
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	return token.SignedString(rsaPrivateKey)
+}
+
+func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
+	// Generate ephemeral key and certificate
+	entityPrivateKey, err := client.generateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+	csr.PublicKey = &entityPrivateKey.PublicKey
+	asn1Cert, err := client.signCertificate(&csr, ca, CertificateProfile{
+		KeyUsage:  x509.KeyUsageDigitalSignature,
+		notBefore: signingTime,
+		notAfter:  signingTime.Add(time.Minute),
+	}, false)
+	if err != nil {
+		return nil, err
+	}
+	certificate, err := x509.ParseCertificate(asn1Cert)
+	if err != nil {
+		return nil, err
+	}
+	// Now sign
+	headers := jws.StandardHeaders{
+		JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{certificate}),
+	}
+	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(&headers))
+}
+
+func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error) {
+	m, err := jws.Parse(bytes.NewReader(signature))
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to parse signature")
+	}
+	if len(m.Signatures()) == 0 {
+		return nil, errors.New("JWS contains no signatures")
+	}
+	if len(m.Signatures()) > 1 {
+		return nil, errors.New("JWS contains more than 1 signature")
+	}
+
+	sig := m.Signatures()[0]
+	if sig.ProtectedHeaders().Algorithm() != jwsAlgorithm {
+		return nil, fmt.Errorf("JWS is signed with incorrect algorithm (expected = %v, actual = %v)", jwsAlgorithm, sig.ProtectedHeaders().Algorithm())
+	}
+
+	// Parse X509 certificate chain
+	certChain, err := GetX509ChainFromHeaders(sig.ProtectedHeaders())
+	if err != nil {
+		return nil, errors2.Wrap(err, ErrInvalidCertChain.Error())
+	}
+	if len(certChain) == 0 {
+		return nil, fmt.Errorf("JWK doesn't contain X509 chain header (%s) header", jws.X509CertChainKey)
+	}
+	signingCert := certChain[0]
+	_, err = signingCert.Verify(x509.VerifyOptions{Roots: trustedCerts})
+	if err != nil {
+		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
+	}
+	if signingTime.Before(signingCert.NotBefore) || signingTime.After(signingCert.NotAfter) {
+		return nil, ErrCertificateNotValidAtSigningTime
+	}
+	// TODO: CRL checking
+	return jws.Verify(signature, sig.ProtectedHeaders().Algorithm(), signingCert.PublicKey)
 }
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.

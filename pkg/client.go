@@ -23,6 +23,7 @@ import (
 	"crypto/x509"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"time"
 )
 
 // CryptoClient defines the functions than can be called by a Cmd, Direct or via rest call.
@@ -49,6 +50,21 @@ type Client interface {
 	PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error)
 	// SignJwtFor creates a signed JWT given a legalEntity and map of claims
 	SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error)
+	// JWSSignEphemeral signs payload according to the JWS spec with a temporary key and certificate which are generated just for this operation.
+	// In other words, the key and certificate are not stored and cannot be used for any other cryptographic operation.
+	// The certificate's validity is as short as possible, just spanning the instant of signing.
+	//  payload:     data to be signed
+	//  ca:          Certificate Authority which should issue the certificate.
+	//  csr:         Certificate Signing Request which is used for issuing the X.509 certificate which is included in the JWS.
+	//               The CSR indicates which entity (e.g. vendor, organization, etc) is signing the payload.
+	//  signingTime: instant which is checked later when verifying the signature. The certificate will just span this instant.
+	JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error)
+	// VerifyJWS verifies a JWS ("signature"): it parses the JWS, checks if it's been signed with the expected algorithm,
+	// if it's signed with a certificate supplied in the "x5c" field of the JWS, if the certificate is trusted given
+	// the "trustedCerts" certificate pool and whether the certificate was valid at the time of signing ("signingTime").
+	// If the verification succeeds the payload that the JWS protects is returned.
+	// If any of the verifications fail an error is returned (and no payload).
+	VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error)
 	// KeyExistsFor returns a simple true if a key has been generated for the given legal entity
 	KeyExistsFor(legalEntity types.LegalEntity) bool
 }
@@ -61,6 +77,9 @@ type CertificateProfile struct {
 	MaxPathLen   int
 	// NumDaysValid is the number of days the certificate is valid, starting today
 	NumDaysValid int
+	// notBefore overrides (if also notAfter has been set) the NumDaysValid property.
+	notBefore    time.Time
+	notAfter     time.Time
 }
 
 // NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
