@@ -1,2 +1,3 @@
 ignore:
   - "api/generated.go" # ignore generated code
+  - "test/*"
