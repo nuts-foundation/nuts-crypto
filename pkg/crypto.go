@@ -48,8 +48,11 @@ import (
 	core "github.com/nuts-foundation/nuts-go-core"
 )
 
+// MinKeySize defines the minimum (RSA) key size
+const MinKeySize = 2048
+
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
-var ErrInvalidKeySize = core.NewError("invalid keySize, needs to be at least 2048 bits", false)
+var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits", MinKeySize), false)
 
 // ErrMissingLegalEntityURI is returned when a required legal entity is missing
 var ErrMissingLegalEntityURI = core.NewError("missing legalEntity URI", false)
@@ -226,7 +229,7 @@ func (client *Crypto) Configure() error {
 	var err error
 
 	client.configOnce.Do(func() {
-		if client.Config.Keysize < 2048 {
+		if client.Config.Keysize < MinKeySize {
 			err = ErrInvalidKeySize
 			return
 		}
@@ -556,10 +559,17 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, trusted
 		return nil, fmt.Errorf("JWK doesn't contain X509 chain header (%s) header", jws.X509CertChainKey)
 	}
 	signingCert := certChain[0]
+	// Check key strength. Cast should be safe since we checked the algorithm.
+	signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey)
+	if !ok || signingPubKey.Size() * 8 < MinKeySize {
+		return nil, ErrInvalidKeySize
+	}
+	// Check certificate is trusted
 	_, err = signingCert.Verify(x509.VerifyOptions{Roots: trustedCerts})
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
+	// Check if the data was signed while the certificate was valid
 	if signingTime.Before(signingCert.NotBefore) || signingTime.After(signingCert.NotAfter) {
 		return nil, ErrCertificateNotValidAtSigningTime
 	}

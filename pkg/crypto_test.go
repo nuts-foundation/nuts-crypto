@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
+	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
@@ -543,6 +544,20 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		sig, _ := jws.Sign(dataToBeSigned, jwa.HS256, []byte("foobar"))
 		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
 		assert.Contains(t, err.Error(), "JWS is signed with incorrect algorithm (expected = RS256, actual = HS256)")
+		assert.Nil(t, payload)
+	})
+	t.Run("error - key strength insufficient", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 1024)
+		certBytes := test.GenerateCertificateEx(time.Now(), 2, key)
+		cert, _ := x509.ParseCertificate(certBytes)
+		headers := jws.StandardHeaders{
+			JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{cert}),
+		}
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&headers))
+		pool := x509.NewCertPool()
+		pool.AddCert(cert)
+		payload, err := client.VerifyJWS(sig,  time.Now(), pool)
+		assert.EqualError(t, err, ErrInvalidKeySize.Error())
 		assert.Nil(t, payload)
 	})
 	t.Run("error - no X.509 chain", func(t *testing.T) {
