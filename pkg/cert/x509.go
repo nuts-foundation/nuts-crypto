@@ -9,25 +9,31 @@ import (
 	"time"
 )
 
+// GetCertificate converts the given JWK to a X.509 certificate chain, returning the topmost certificate. If the JWK
+// does not contain any certificates, nil is returned.
+func GetCertificate(jwkAsMap interface{}) *x509.Certificate {
+	chain, err := jwkMapToCertChain(jwkAsMap)
+	if err != nil {
+		return nil
+	}
+	if len(chain) == 0 {
+		return nil
+	}
+	return chain[0]
+}
+
 // GetActiveCertificates converts the given JWKs to X509 certificates and returns them sorted,
 // longest valid certificate first. Expired certificates aren't returned.
 func GetActiveCertificates(jwks []interface{}, instant time.Time) []*x509.Certificate {
 	var activeCertificates []*x509.Certificate
 	for _, keyAsMap := range jwks {
-		chain, err := jwkMapToCertChain(keyAsMap)
-		if err != nil {
-			continue
-		}
-		if len(chain) == 0 {
-			continue
-		}
-		certificate := chain[0]
-		if instant.Before(certificate.NotBefore) || instant.After(certificate.NotAfter) {
+		certificate := GetCertificate(keyAsMap)
+		if certificate == nil || instant.Before(certificate.NotBefore) || instant.After(certificate.NotAfter) {
 			continue
 		}
 		activeCertificates = append(activeCertificates, certificate)
 	}
-	sort.Slice(activeCertificates, func(i, j int) bool {
+	sort.Slice(activeCertificates, func( i, j int) bool {
 		first := activeCertificates[i]
 		second := activeCertificates[j]
 		return first.NotAfter.UnixNano()-instant.UnixNano() > second.NotAfter.UnixNano()-instant.UnixNano()
