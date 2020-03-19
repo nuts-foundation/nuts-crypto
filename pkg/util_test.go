@@ -30,6 +30,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/stretchr/testify/assert"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -186,7 +187,6 @@ func TestMapToJwk(t *testing.T) {
 	})
 }
 
-
 func TestMapsToJwkSet(t *testing.T) {
 	t.Run("Generates set from maps", func(t *testing.T) {
 		jwkAsJSON := `{"d":"Ce3obeVsZeU3QaKBTQ-Qn-EaUfhEVViHbnP3gnLDrXNbiUf09s0Ti3RXd4601G8fAJ3zKlZmdEop59mK5BjAE8NOBmvP4uI7PYlJsDAE76mKghVxvN94qb-KwW4p0wix9RoC8TEtoE3EYCr428v-k4nTpMWXQcC_xkHVIfpoA6E","dp":"LGJtrCIxo2DlCSccu0ivH8YzUS9uUbsKyOgNEpV3IB3vqZToi_k8TkwN9XNXCMXkRYIGtRwkxvp9TWLtIEKMtQ","dq":"XhBVCRvFE_ccZ7rxzfu7LToeSNBPW07v68tM94pEV2MFfVBHdWJd-gHbIPGVwC55Th9vAh9dDmv0TvBVkiblkQ","e":"AQAB","kty":"RSA","n":"n5KqvPI1MPDhazTKXLYn4_we09e3iEccb7QJ8dRxApN1rpxTymRWabUafC56fArDF0lvIZ7fZl0LzX5Z_3mrqulebEPTFRrbdDwwcqa2KZ7Tctfh6MgUFm5xOAwRG33NlX3Ny1dP-Ek2irXJOHt9AecbEZFZKmpgrsrTyG6Ekfs","p":"1LoOk3MFiJpsjJCkMkaDb0TXXMxuZ5f9-iMVgR1ZoammzQziBj-72CrD21Rxmuuc6en8w4HtHLSOlPQtcOKzMw","q":"wAiSzr1NVdsYulhGYAa1ONZSKVxlFS7N_UAjPQgFf-xTYog2RbZfolheDv92mJp2qqFJdVMzQkbeMeTj9xqmGQ","qi":"eFqCOgR0wnpkjZGwh63pV8aNhh1-GfhYjqF2jSrh6rnsVHnhz3LRROSzUDarms7LjW3eHiygyHHSF2-ejTMMKQ"}`
@@ -252,4 +252,19 @@ func TestMapToX509CertChain(t *testing.T) {
 		}
 		assert.Len(t, chain, 1)
 	})
+}
+
+func Test_deepCopyMap(t *testing.T) {
+	expected := map[string]interface{}{}
+	expected["flat"] = "foobar"
+	expected["nested"] = map[string]interface{}{
+		"nested": map[string]interface{}{
+			"nested": map[string]interface{}{
+				"value": "ok",
+			},
+		},
+	}
+
+	actual := deepCopyMap(expected)
+	assert.True(t, reflect.DeepEqual(actual, expected))
 }
