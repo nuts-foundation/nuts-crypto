@@ -88,7 +88,7 @@ func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	return string(pubBytes), err
 }
 
-// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization
+// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization.
 func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
 	set, err := MapsToJwkSet([]map[string]interface{}{jwkAsMap})
 	if err != nil {
@@ -97,6 +97,7 @@ func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
 	return set.Keys[0], nil
 }
 
+// MapsToJwkSet transforms JWKs in map structures to a JWK set, just like MapToJwk.
 func MapsToJwkSet(maps []map[string]interface{}) (*jwk.Set, error) {
 	set := &jwk.Set{}
 	var keys []interface{}
