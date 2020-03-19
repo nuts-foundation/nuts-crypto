@@ -267,4 +267,7 @@ func Test_deepCopyMap(t *testing.T) {
 
 	actual := deepCopyMap(expected)
 	assert.True(t, reflect.DeepEqual(actual, expected))
+	// Assert it's actually a copy
+	delete(expected, "flat")
+	assert.False(t, reflect.DeepEqual(actual, expected))
 }
