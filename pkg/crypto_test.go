@@ -452,21 +452,21 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	selfSignCertificate := func(entity types.LegalEntity) *x509.Certificate {
+	selfSignCertificate := func(entity types.LegalEntity, keyUsage x509.KeyUsage) *x509.Certificate {
 		client.GenerateKeyPairFor(entity)
 		privateKey, _ := client.GetOpaquePrivateKey(entity)
 		csr, _ := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
 			Subject:   pkix.Name{CommonName: entity.URI},
 			PublicKey: privateKey.Public(),
 		}, privateKey)
-		asn1Cert, _ := client.SignCertificate(entity, entity, csr, CertificateProfile{NumDaysValid: 10, IsCA: true})
+		asn1Cert, _ := client.SignCertificate(entity, entity, csr, CertificateProfile{NumDaysValid: 10, IsCA: true, KeyUsage: keyUsage})
 		cert, _ := x509.ParseCertificate(asn1Cert)
 		return cert
 	}
 
 	entity := types.LegalEntity{URI: "testJWSSignEphemeral"}
 	certPool := x509.NewCertPool()
-	caCertificate := selfSignCertificate(entity)
+	caCertificate := selfSignCertificate(entity, 0)
 	certPool.AddCert(caCertificate)
 
 	var sourceStruct = struct {
@@ -518,12 +518,25 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		assert.Equal(t, err, ErrCertificateNotValidAtSigningTime)
 		assert.Nil(t, payload)
 	})
+	t.Run("error - certificate not meant for signing", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		h := jws.StandardHeaders{}
+		certificate := selfSignCertificate(entity, 0)
+		certPool.AddCert(certificate)
+		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		payload, err := client.VerifyJWS(sig, time.Now(), certPool)
+		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
+		assert.Nil(t, payload)
+	})
 	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
-		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{caCertificate}))
+		certificate := selfSignCertificate(entity, x509.KeyUsageDigitalSignature)
+		certPool.AddCert(certificate)
+		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
-		payload, err := client.VerifyJWS(sig,  time.Now(), certPool)
+		payload, err := client.VerifyJWS(sig, time.Now(), certPool)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
 		assert.Nil(t, payload)
 	})
