@@ -60,11 +60,11 @@ type Client interface {
 	//  signingTime: instant which is checked later when verifying the signature. The certificate will just span this instant.
 	JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error)
 	// VerifyJWS verifies a JWS ("signature"): it parses the JWS, checks if it's been signed with the expected algorithm,
-	// if it's signed with a certificate supplied in the "x5c" field of the JWS, if the certificate is trusted given
-	// the "trustedCerts" certificate pool and whether the certificate was valid at the time of signing ("signingTime").
+	// if it's signed with a certificate supplied in the "x5c" field of the JWS, if the certificate is trusted according
+	// to the certificate verifier and whether the certificate was valid at the time of signing ("signingTime").
 	// If the verification succeeds the payload that the JWS protects is returned.
 	// If any of the verifications fail an error is returned (and no payload).
-	VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error)
+	VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error)
 	// KeyExistsFor returns a simple true if a key has been generated for the given legal entity
 	KeyExistsFor(legalEntity types.LegalEntity) bool
 }

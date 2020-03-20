@@ -218,18 +218,18 @@ func (mr *MockClientMockRecorder) JWSSignEphemeral(payload, ca, csr, signingTime
 }
 
 // VerifyJWS mocks base method
-func (m *MockClient) VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error) {
+func (m *MockClient) VerifyJWS(signature []byte, signingTime time.Time, certVerifier pkg.CertificateVerifier) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyJWS", signature, signingTime, trustedCerts)
+	ret := m.ctrl.Call(m, "VerifyJWS", signature, signingTime, certVerifier)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // VerifyJWS indicates an expected call of VerifyJWS
-func (mr *MockClientMockRecorder) VerifyJWS(signature, signingTime, trustedCerts interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) VerifyJWS(signature, signingTime, certVerifier interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyJWS", reflect.TypeOf((*MockClient)(nil).VerifyJWS), signature, signingTime, trustedCerts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyJWS", reflect.TypeOf((*MockClient)(nil).VerifyJWS), signature, signingTime, certVerifier)
 }
 
 // KeyExistsFor mocks base method
