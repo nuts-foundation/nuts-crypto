@@ -54,24 +54,37 @@ func jwkMapToCertChain(keyAsMap interface{}) ([]*x509.Certificate, error) {
 	return chainInterf.([]*x509.Certificate), nil
 }
 
-
+// The structs below look funky, but are required to marshal SubjectAlternativeName.otherName the same way OpenSSL does.
+type otherNameValue struct {
+	Value asn1.RawValue
+}
+type otherNameTypeAndValue struct {
+	Type  asn1.ObjectIdentifier
+	Value otherNameValue `asn1:"tag:0"`
+}
+type otherName struct {
+	TypeAndValue otherNameTypeAndValue `asn1:"tag:0"`
+}
 
 func MarshalOtherSubjectAltName(valueType asn1.ObjectIdentifier, value string) ([]byte, error) {
-	// The structs below look funky, but are required to marshal SubjectAlternativeName.otherName the same way OpenSSL does.
-	type otherNameValue struct {
-		Value asn1.RawValue
-	}
-	type otherNameTypeAndValue struct {
-		Type  asn1.ObjectIdentifier
-		Value otherNameValue `asn1:"tag:0"`
-	}
-	type otherName struct {
-		TypeAndValue otherNameTypeAndValue `asn1:"tag:0"`
-	}
 	return asn1.Marshal(otherName{TypeAndValue: otherNameTypeAndValue{
 		Type:  valueType,
 		Value: otherNameValue{asn1.RawValue{Tag: asn1.TagUTF8String, Bytes: []byte(value)}},
 	}})
+}
+
+// UnmarshalOtherSubjectAltName tries to unmarshal an SubjectAlternativeName otherName entry (marshalled by MarshalOtherSubjectAltName)
+// with the given OID type (valueType). It returns the value as string. If an otherName with the given type wasn't found,
+// an empty string is returned. If an errors occurs during unmarshalling, it is returned.
+func UnmarshalOtherSubjectAltName(valueType asn1.ObjectIdentifier, data []byte) (string, error) {
+	value := otherName{}
+	if _, err := asn1.Unmarshal(data, &value); err != nil {
+		return "", err
+	}
+	if !value.TypeAndValue.Type.Equal(valueType) {
+		return "", nil
+	}
+	return string(value.TypeAndValue.Value.Value.Bytes), nil
 }
 
 func MarshalNutsDomain(domain string) ([]byte, error) {
@@ -79,4 +92,14 @@ func MarshalNutsDomain(domain string) ([]byte, error) {
 		Tag:   asn1.TagUTF8String,
 		Bytes: []byte(domain),
 	})
+}
+
+// UnmarshalNutsDomain tries to unmarshal the ASN.1 encoded Nuts Domain extension in a X.509 certificate.
+// It returns the value as a string, or an error if one occurs.
+func UnmarshalNutsDomain(data []byte)(string, error) {
+	value := asn1.RawValue{}
+	if _, err := asn1.Unmarshal(data, &value); err != nil {
+		return "", err
+	}
+	return string(value.Bytes), nil
 }

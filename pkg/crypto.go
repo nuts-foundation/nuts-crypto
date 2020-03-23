@@ -535,7 +535,12 @@ func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr 
 	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(&headers))
 }
 
-func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, trustedCerts *x509.CertPool) ([]byte, error) {
+type CertificateVerifier interface {
+
+	Verify(*x509.Certificate) error
+}
+
+func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error) {
 	m, err := jws.Parse(bytes.NewReader(signature))
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to parse signature")
@@ -567,8 +572,7 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, trusted
 		return nil, ErrInvalidKeySize
 	}
 	// Check certificate is trusted
-	_, err = signingCert.Verify(x509.VerifyOptions{Roots: trustedCerts})
-	if err != nil {
+	if err := certVerifier.Verify(signingCert); err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing

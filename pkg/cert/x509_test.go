@@ -88,10 +88,48 @@ func TestMarshalOtherSubjectAltName(t *testing.T) {
 	assert.Equal(t, []byte{0x30, 0xf, 0xa0, 0xd, 0x6, 0x1, 0x2a, 0xa0, 0x8, 0xc, 0x6, 0x46, 0x6f, 0x6f, 0x62, 0x61, 0x72}, bytes)
 }
 
+func TestUnmarshalOtherSubjectAltName(t *testing.T) {
+	input := []byte{0x30, 0xf, 0xa0, 0xd, 0x6, 0x1, 0x2a, 0xa0, 0x8, 0xc, 0x6, 0x46, 0x6f, 0x6f, 0x62, 0x61, 0x72}
+	t.Run("ok", func(t *testing.T) {
+		name, err := UnmarshalOtherSubjectAltName(asn1.ObjectIdentifier{1, 2}, input)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, "Foobar", name)
+	})
+	t.Run("ok - not found", func(t *testing.T) {
+		name, err := UnmarshalOtherSubjectAltName(asn1.ObjectIdentifier{1}, input)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Empty(t, name)
+	})
+	t.Run("error", func(t *testing.T) {
+		name, err := UnmarshalOtherSubjectAltName(asn1.ObjectIdentifier{1}, []byte{0x30, 0xf, 0xa0, 0xd, 0x6, 0x1, 0xa0, 0x8, 0xc, 0x6, 0x46, 0x6f, 0x6f, 0x62, 0x61, 0x72})
+		assert.Error(t, err)
+		assert.Empty(t, name)
+	})
+}
+
 func TestMarshalNutsDomain(t *testing.T) {
 	data, err := MarshalNutsDomain("healthcare")
 	if !assert.NoError(t, err) {
 		return
 	}
 	assert.Equal(t, []byte{0xc, 0xa, 0x68, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x63, 0x61, 0x72, 0x65}, data)
+}
+
+func TestUnmarshalNutsDomain(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		domain, err := UnmarshalNutsDomain([]byte{0xc, 0xa, 0x68, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x63, 0x61, 0x72, 0x65})
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, "healthcare", domain)
+	})
+	t.Run("error", func(t *testing.T) {
+		domain, err := UnmarshalNutsDomain([]byte{0x68, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x63, 0x61, 0x72, 0x65})
+		assert.Error(t, err)
+		assert.Empty(t, domain)
+	})
 }

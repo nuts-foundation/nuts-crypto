@@ -448,6 +448,18 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	})
 }
 
+type poolCertVerifier struct {
+	pool *x509.CertPool
+}
+
+func (n poolCertVerifier) Verify(cert *x509.Certificate) error {
+	if n.pool == nil {
+		return nil
+	}
+	_, err := cert.Verify(x509.VerifyOptions{Roots: n.pool})
+	return err
+}
+
 // Tests both JWSSignEphemeral and VerifyJWS functions
 func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	client := defaultBackend(t.Name())
@@ -465,9 +477,9 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	}
 
 	entity := types.LegalEntity{URI: "testJWSSignEphemeral"}
-	certPool := x509.NewCertPool()
+	verifier := poolCertVerifier{pool: x509.NewCertPool()}
 	caCertificate := selfSignCertificate(entity, 0)
-	certPool.AddCert(caCertificate)
+	verifier.pool.AddCert(caCertificate)
 
 	var sourceStruct = struct {
 		Field1 string
@@ -485,7 +497,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		payload, err := client.VerifyJWS(signature,  time.Now(), certPool)
+		payload, err := client.VerifyJWS(signature, time.Now(), verifier)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -506,7 +518,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: entity.URI},
 		}, time.Now())
-		payload, err := client.VerifyJWS(signature,  time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS(signature, time.Now(), poolCertVerifier{pool: x509.NewCertPool()})
 		assert.EqualError(t, err, "X.509 certificate not trusted: x509: certificate signed by unknown authority")
 		assert.Nil(t, payload)
 	})
@@ -514,7 +526,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: entity.URI},
 		}, time.Now())
-		payload, err := client.VerifyJWS(signature, time.Time{}, certPool)
+		payload, err := client.VerifyJWS(signature, time.Time{}, verifier)
 		assert.Equal(t, err, ErrCertificateNotValidAtSigningTime)
 		assert.Nil(t, payload)
 	})
@@ -522,10 +534,10 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(entity, 0)
-		certPool.AddCert(certificate)
+		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
-		payload, err := client.VerifyJWS(sig, time.Now(), certPool)
+		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
 		assert.Nil(t, payload)
 	})
@@ -533,15 +545,15 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(entity, x509.KeyUsageDigitalSignature)
-		certPool.AddCert(certificate)
+		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
-		payload, err := client.VerifyJWS(sig, time.Now(), certPool)
+		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - invalid JWS format", func(t *testing.T) {
-		payload, err := client.VerifyJWS([]byte{1, 2, 3, 4},  time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS([]byte{1, 2, 3, 4}, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "unable to parse signature")
 		assert.Nil(t, payload)
 	})
@@ -549,13 +561,13 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		signer, _ := sign.New(jwa.HS256)
 		sharedKey := []byte("foobar")
 		sig, _ := jws.SignMulti(dataToBeSigned, jws.WithSigner(signer, sharedKey, nil, nil), jws.WithSigner(signer, sharedKey, nil, nil))
-		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "JWS contains more than 1 signature")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - incorrect signing algorithm", func(t *testing.T) {
 		sig, _ := jws.Sign(dataToBeSigned, jwa.HS256, []byte("foobar"))
-		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "JWS is signed with incorrect algorithm (expected = RS256, actual = HS256)")
 		assert.Nil(t, payload)
 	})
@@ -569,14 +581,14 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&headers))
 		pool := x509.NewCertPool()
 		pool.AddCert(cert)
-		payload, err := client.VerifyJWS(sig,  time.Now(), pool)
+		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.EqualError(t, err, ErrInvalidKeySize.Error())
 		assert.Nil(t, payload)
 	})
 	t.Run("error - no X.509 chain", func(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key)
-		payload, err := client.VerifyJWS(sig, time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "JWK doesn't contain X509 chain header (x5c) header")
 		assert.Nil(t, payload)
 	})
@@ -585,7 +597,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		h := jws.StandardHeaders{}
 		h.JWSx509CertChain = []string{"invalid-cert"}
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
-		payload, err := client.VerifyJWS(sig,  time.Now(), x509.NewCertPool())
+		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), ErrInvalidCertChain.Error())
 		assert.Nil(t, payload)
 	})
@@ -608,8 +620,10 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	}
 
 	var signRoot = func() *x509.Certificate {
+		extension := pkix.Extension{Id: []int{1, 2}, Critical: false, Value: []byte("test")}
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: ca.URI},
+			Subject:         pkix.Name{CommonName: ca.URI},
+			ExtraExtensions: []pkix.Extension{extension},
 		}
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
 		if err != nil {
@@ -630,6 +644,13 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			logrus.Fatalf("unable to parse certificate: %v", err)
 			return nil
 		}
+		containsExtension := false
+		for _, ext := range certificate.Extensions {
+			if reflect.DeepEqual(ext, extension) {
+				containsExtension = true
+			}
+		}
+		assert.True(t, containsExtension, "certificate doesn't contain custom extension")
 		return certificate
 	}
 
