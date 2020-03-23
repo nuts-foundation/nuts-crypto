@@ -88,17 +88,42 @@ func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	return string(pubBytes), err
 }
 
-// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization
+// MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization.
 func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
-	set := &jwk.Set{}
-	root := map[string]interface{}{}
-	root["keys"] = []interface{}{jwkAsMap}
-	if err := set.ExtractMap(root); err != nil {
+	set, err := MapsToJwkSet([]map[string]interface{}{jwkAsMap})
+	if err != nil {
 		return nil, err
 	}
 	return set.Keys[0], nil
 }
 
+// MapsToJwkSet transforms JWKs in map structures to a JWK set, just like MapToJwk.
+func MapsToJwkSet(maps []map[string]interface{}) (*jwk.Set, error) {
+	set := &jwk.Set{}
+	var keys []interface{}
+	for _, m := range maps {
+		keys = append(keys, deepCopyMap(m))
+	}
+	root := map[string]interface{}{"keys": keys}
+	if err := set.ExtractMap(root); err != nil {
+		return set, err
+	}
+	return set, nil
+}
+
+// deepCopyMap is needed since the jwkSet.extractMap consumes the contents
+func deepCopyMap(m map[string]interface{}) map[string]interface{} {
+	cp := make(map[string]interface{})
+	for k, v := range m {
+		vm, ok := v.(map[string]interface{})
+		if ok {
+			cp[k] = deepCopyMap(vm)
+		} else {
+			cp[k] = v
+		}
+	}
+	return cp
+}
 // JwkToMap transforms a Jwk key to a map. Can be used for json serialization
 func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
 	root := map[string]interface{}{}
