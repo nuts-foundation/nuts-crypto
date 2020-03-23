@@ -190,6 +190,8 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.Leg
 		template.IsCA = true
 		template.MaxPathLen = profile.MaxPathLen
 		template.BasicConstraintsValid = true
+		template.KeyUsage |= x509.KeyUsageCRLSign
+		template.KeyUsage |= x509.KeyUsageCertSign
 	}
 	var parentTemplate *x509.Certificate
 	if selfSigned {
@@ -568,6 +570,10 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, trusted
 	_, err = signingCert.Verify(x509.VerifyOptions{Roots: trustedCerts})
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
+	}
+	// Check if the KeyUsage of the certificate is applicable for signing
+	if signingCert.KeyUsage & x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
+		return nil, errors.New("certificate is not meant for signing (keyUsage != digitalSignature)")
 	}
 	// Check if the data was signed while the certificate was valid
 	if signingTime.Before(signingCert.NotBefore) || signingTime.After(signingCert.NotAfter) {
