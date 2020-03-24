@@ -26,7 +26,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"github.com/lestrrat-go/jwx/jwk"
+	errors2 "github.com/pkg/errors"
 	"math/big"
 	"time"
 )
@@ -109,6 +111,23 @@ func MapsToJwkSet(maps []map[string]interface{}) (*jwk.Set, error) {
 		return set, err
 	}
 	return set, nil
+}
+
+// ValidateJWK tests whether the given map (all) can is a parsable representation of a JWK. If not, an error is returned.
+// If nil is returned, all supplied maps are parsable as JWK.
+func ValidateJWK(maps ...interface{}) error {
+	var stringMaps []map[string]interface{}
+	for _, currMap := range maps {
+		keyAsMap, ok := currMap.(map[string]interface{})
+		if !ok {
+			return errors.New("invalid JWK, it is not map[string]interface{}")
+		}
+		stringMaps = append(stringMaps, keyAsMap)
+	}
+	if _, err := MapsToJwkSet(stringMaps); err != nil {
+		return errors2.Wrap(err, "invalid JWK")
+	}
+	return nil
 }
 
 // deepCopyMap is needed since the jwkSet.extractMap consumes the contents
