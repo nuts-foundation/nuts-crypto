@@ -21,33 +21,17 @@
 package storage
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
-	"encoding/pem"
-	"errors"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
 // Storage interface containing functions for storing and retrieving keys
 type Storage interface {
-	GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error)
-	GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error)
+	GetPrivateKey(legalEntity types.LegalEntity) (crypto.Signer, error)
+	GetPublicKey(legalEntity types.LegalEntity) (interface{}, error)
 	KeyExistsFor(legalEntity types.LegalEntity) bool
-	SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error
+	SavePrivateKey(legalEntity types.LegalEntity, key interface{}) error
 	SaveCertificate(entity types.LegalEntity, certificate []byte) error
 	GetCertificate(entity types.LegalEntity) (*x509.Certificate, error)
-}
-
-// shared function to convert bytes to a RSA private key
-func bytesToPrivateKey(priv []byte) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode(priv)
-	if block == nil {
-		return nil, errors.New("malformed PEM block")
-	}
-	b := block.Bytes
-	key, err := x509.ParsePKCS1PrivateKey(b)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
 }

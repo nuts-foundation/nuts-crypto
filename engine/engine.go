@@ -21,6 +21,7 @@ package engine
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -50,13 +51,13 @@ func NewCryptoEngine() *engine.Engine {
 	}
 }
 
-// FlagSet returns the configuration possibilities for crypto: --backend, --fspath, --keysize
+// FlagSet returns the configuration possibilities for crypto: --backend, --fspath, --keytype
 func flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("crypto", pflag.ContinueOnError)
 
 	flags.String(types.ConfigStorage, types.ConfigStorageFs, "storage to use, 'fs' for file system (default)")
 	flags.String(types.ConfigFSPath, types.ConfigFSPathDefault, "when file system is used as storage, this configures the path where keys are stored (default .)")
-	flags.Int(types.ConfigKeySize, types.ConfigKeySizeDefault, "number of bits to use when creating new RSA keys")
+	flags.String(types.ConfigKeyType, types.ConfigKeyTypeDefault, fmt.Sprintf("cryptographic key type to use when generating new keys e.g. RSA-4096 (default %s)", types.ConfigKeyTypeDefault))
 
 	return flags
 }

@@ -36,7 +36,7 @@ func TestNewCryptoClient(t *testing.T) {
 
 	t.Run("panics for illegal config", func(t *testing.T) {
 		instance := CryptoInstance()
-		instance.Config.Keysize = 1
+		instance.Config.KeyType = "FOOBAR"
 		instance.configDone = false
 		instance.configOnce = sync.Once{}
 
@@ -44,7 +44,7 @@ func TestNewCryptoClient(t *testing.T) {
 			if r := recover(); r == nil {
 				t.Error("Expected panic")
 			}
-			instance.Config.Keysize = types.ConfigKeySizeDefault
+			instance.Config.KeyType = types.ConfigKeyTypeDefault
 			instance.configDone = false
 			instance.configOnce = sync.Once{}
 		}()

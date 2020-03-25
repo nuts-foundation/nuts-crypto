@@ -19,6 +19,8 @@
 // types and interfaces used by all other packages
 package types
 
+import "github.com/nuts-foundation/nuts-crypto/pkg/algo"
+
 // --storage config flag
 const ConfigStorage string = "storage"
 
@@ -31,11 +33,11 @@ const ConfigFSPath string = "fspath"
 // default setting for --fspath "./"
 const ConfigFSPathDefault string = "./"
 
-// --keysize config flag
-const ConfigKeySize string = "keysize"
+// --keytype config flag
+const ConfigKeyType string = "keytype"
 
-// default setting for --keysize "2048"
-const ConfigKeySizeDefault int = 2048
+// default setting for --keytype
+var ConfigKeyTypeDefault = algo.RecommendedKeyTypes()[0].Identifier()
 
 // type identifying the legalEntity responsible for the Patient/medical data
 type LegalEntity struct {

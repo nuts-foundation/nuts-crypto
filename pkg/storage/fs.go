@@ -20,12 +20,13 @@ package storage
 
 import (
 	"bytes"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/nuts-foundation/nuts-crypto/pkg/algo"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"os"
@@ -105,51 +106,49 @@ func (fsc *fileSystemBackend) GetCertificate(entity types.LegalEntity) (*x509.Ce
 }
 
 // Load the privatekey for the given legalEntity from disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
-func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error) {
+func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (crypto.Signer, error) {
 	data, err := fsc.readEntry(legalEntity, privateKeyFilePostfix)
 	if err != nil {
 		return nil, err
 	}
-
-	var key *rsa.PrivateKey
-	key, err = bytesToPrivateKey(data)
-
+	key, err := algo.UnmarshalPEM(string(data))
 	if err != nil {
 		return nil, err
 	}
-
-	return key, nil
+	signer, ok := key.(crypto.Signer)
+	if !ok {
+		return nil, errors.New("can't sign with unmarshalled key")
+	}
+	return signer, nil
 }
 
 // Load the public key from disk, it load the private key and extract the public key from it.
-func (fsc *fileSystemBackend) GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error) {
+func (fsc *fileSystemBackend) GetPublicKey(legalEntity types.LegalEntity) (interface{}, error) {
 	key, err := fsc.GetPrivateKey(legalEntity)
-
 	if err != nil {
 		return nil, err
 	}
-
-	return &key.PublicKey, nil
+	return algo.GetPublicKey(key), nil
 }
 
 // Save the private key for the given legalEntity to disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
-func (fsc *fileSystemBackend) SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error {
+func (fsc *fileSystemBackend) SavePrivateKey(legalEntity types.LegalEntity, key interface{}) error {
 	filenamePath := fsc.getEntryPath(legalEntity, privateKeyFilePostfix)
 	outFile, err := os.Create(filenamePath)
-
 	if err != nil {
 		return err
 	}
-
 	defer outFile.Close()
 
-	var privateKey = &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	keyType, err := algo.GetKeyTypeFromKey(key)
+	if err != nil {
+		return err
 	}
-
-	err = pem.Encode(outFile, privateKey)
-
+	data, err := keyType.MarshalPEM(key)
+	if err != nil {
+		return err
+	}
+	_, err = outFile.Write([]byte(data))
 	return err
 }
 

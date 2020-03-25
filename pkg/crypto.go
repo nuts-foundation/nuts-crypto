@@ -33,8 +33,11 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
+	jwt2 "github.com/lestrrat-go/jwx/jwt"
+	"github.com/nuts-foundation/nuts-crypto/pkg/algo"
 	errors2 "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"math/big"
 	"strings"
@@ -47,12 +50,6 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
 )
-
-// MinKeySize defines the minimum (RSA) key size
-const MinKeySize = 2048
-
-// ErrInvalidKeySize is returned when the keySize for new keys is too short
-var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits", MinKeySize), false)
 
 // ErrMissingLegalEntityURI is returned when a required legal entity is missing
 var ErrMissingLegalEntityURI = core.NewError("missing legalEntity URI", false)
@@ -100,11 +97,8 @@ var ErrCertificateNotValidAtSigningTime = errors.New("X.509 certificate was not 
 // ModuleName == Registry
 const ModuleName = "Crypto"
 
-// jwsAlgorithm holds the supported (required) JWS signing algorithm
-const jwsAlgorithm = jwa.RS256
-
 type CryptoConfig struct {
-	Keysize int
+	KeyType string
 	Storage string
 	Fspath  string
 }
@@ -118,26 +112,9 @@ type Crypto struct {
 	_logger    *logrus.Entry
 }
 
-type opaquePrivateKey struct {
-	publicKey crypto.PublicKey
-	signFn    func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
-}
-
-func (k opaquePrivateKey) Public() crypto.PublicKey {
-	return k.publicKey
-}
-
-func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
-	return k.signFn(rand, digest, opts)
-}
-
 // GetOpaquePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
 func (client *Crypto) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
-	priv, err := client.Storage.GetPrivateKey(entity)
-	if err != nil {
-		return nil, err
-	}
-	return opaquePrivateKey{publicKey: &priv.PublicKey, signFn: priv.Sign}, nil
+	return client.Storage.GetPrivateKey(entity)
 }
 
 // SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
@@ -219,7 +196,7 @@ func CryptoInstance() *Crypto {
 	oneBackend.Do(func() {
 		instance = &Crypto{
 			Config: CryptoConfig{
-				Keysize: types.ConfigKeySizeDefault,
+				KeyType: types.ConfigKeyTypeDefault,
 			},
 		}
 	})
@@ -231,8 +208,8 @@ func (client *Crypto) Configure() error {
 	var err error
 
 	client.configOnce.Do(func() {
-		if client.Config.Keysize < MinKeySize {
-			err = ErrInvalidKeySize
+		if _, err := algo.GetKeyTypeFromIdentifier(client.Config.KeyType); err != nil {
+			err = fmt.Errorf("unsupported key type: %s", client.Config.KeyType)
 			return
 		}
 
@@ -267,13 +244,13 @@ func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
 		return ErrMissingLegalEntityURI
 	}
 
-	key, err := client.generateKeyPair()
+	privKey, _, err := client.generateKeyPair()
 
 	if err != nil {
 		return err
 	}
 
-	err = client.Storage.SavePrivateKey(legalEntity, key)
+	err = client.Storage.SavePrivateKey(legalEntity, privKey)
 
 	return err
 }
@@ -354,8 +331,12 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Ke
 	}, nil
 }
 
-func (client *Crypto) generateKeyPair() (*rsa.PrivateKey, error) {
-	return rsa.GenerateKey(rand.Reader, client.Config.Keysize)
+func (client *Crypto) generateKeyPair() (privKey interface{}, pubKey interface{}, err error) {
+	kt, err := algo.GetKeyTypeFromIdentifier(client.Config.KeyType)
+	if err != nil {
+		return nil, nil, err
+	}
+	return kt.Generate()
 }
 
 func encryptWithSymmetricKey(plainText []byte, key cipher.AEAD) (cipherText []byte, nonce []byte, error error) {
@@ -416,26 +397,26 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 }
 
 // SignFor signs a piece of data for a legal entity. This requires the private key for the legal entity to be present.
-// It is expected that the plain data is given. It uses the SHA256 hashing function
-// todo: SHA_256?
+// It is expected that the plain data is given. It uses the recommended signature algorithm for the entity's private key.
+//
+// Backwards compatibility: if it concerns an RSA-2048 bits key fallback to PKCS1v15 SHA-256 signatures
+// while we're using plain signatures instead of JWS (https://github.com/nuts-foundation/nuts-crypto/issues/15).
 func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
-	// random
-	rng := rand.Reader
-
-	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
-	hashedData := sha256.Sum256(data)
-
+	privateKey, err := client.Storage.GetPrivateKey(legalEntity)
+	// If key = RSA-2048, fallback to PKCS1v15 SHA-256
+	keyType, err := algo.GetKeyTypeFromKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
-
-	signature, err := rsa.SignPKCS1v15(rng, rsaPrivateKey, crypto.SHA256, hashedData[:])
-
+	if keyType.Identifier() == "RSA-2048" {
+		return hashAndSignRSAWithSHA256(privateKey, data)
+	}
+	// Otherwise, sign using JWS
+	alg, err := algo.RecommendedSigningAlgorithm(privateKey)
 	if err != nil {
 		return nil, err
 	}
-
-	return signature, err
+	return jws.Sign(data, jwa.SignatureAlgorithm(alg.JWAIdentifier()), privateKey)
 }
 
 // KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
@@ -443,31 +424,28 @@ func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
 	return client.Storage.KeyExistsFor(legalEntity)
 }
 
-// VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
-func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, error) {
-	hashedData := sha256.Sum256(data)
-
-	mKey, err := key.Materialize()
+// VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the recommended signature algorithm for the entity's key.
+//
+// Backwards compatibility: if it concerns an RSA-2048 bits key fallback to PKCS1v15 SHA-256 signatures
+// while we're using plain signatures instead of JWS (https://github.com/nuts-foundation/nuts-crypto/issues/15).
+func (client *Crypto) VerifyWith(data []byte, sig []byte, keyAsJwk jwk.Key) (bool, error) {
+	key, err := keyAsJwk.Materialize()
+	// If key = RSA-2048, fallback to PKCS1v15 SHA-256
+	keyType, err := algo.GetKeyTypeFromKey(key)
 	if err != nil {
 		return false, err
 	}
-
-	if k, ok := mKey.(*rsa.PublicKey); ok {
-		if err := rsa.VerifyPKCS1v15(k, crypto.SHA256, hashedData[:], sig); err != nil {
+	if keyType.Identifier() == "RSA-2048" {
+		rsa.VerifyPKCS1v15()
+	} else {
+		// Otherwise interpret it as JWS
+		message, err := parseJWS(sig)
+		if err != nil {
 			return false, err
 		}
-		return true, nil
+		sig := message.Signatures()[0]
+		protectedData, err := jws.Verify(sig.Signature(), sig.ProtectedHeaders().Algorithm(), key)
 	}
-
-	// todo support EC sigs
-	//if k, ok := mKey.(*ecdsa.PublicKey); ok {
-	//	if err := ecdsa.Verify(k, crypto.SHA256, hashedData[:], sig); err != nil {
-	//		return false, err
-	//	}
-	//	return true, nil
-	//}
-
-	return false, ErrInvalidAlgorithm
 }
 
 // PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
@@ -494,28 +472,34 @@ func (client *Crypto) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, er
 
 // SignJwtFor creates a signed JWT given a legalEntity and map of claims
 func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error) {
-	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
-
+	key, err := client.Storage.GetPrivateKey(legalEntity)
 	if err != nil {
 		return "", err
 	}
-
-	c := jwt.MapClaims{}
+	token := jwt2.New()
 	for k, v := range claims {
-		c[k] = v
+		if err := token.Set(k, v); err != nil {
+			return "", err
+		}
 	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	return token.SignedString(rsaPrivateKey)
+	alg, err := algo.RecommendedSigningAlgorithm(key)
+	if err != nil {
+		return "", err
+	}
+	signedToken, err := token.Sign(jwa.SignatureAlgorithm(alg.JWAIdentifier()), key)
+	if err != nil {
+		return "", err
+	}
+	return string(signedToken), nil
 }
 
 func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	// Generate ephemeral key and certificate
-	entityPrivateKey, err := client.generateKeyPair()
+	entityPrivateKey, entityPubKey, err := client.generateKeyPair()
 	if err != nil {
 		return nil, err
 	}
-	csr.PublicKey = &entityPrivateKey.PublicKey
+	csr.PublicKey = &entityPubKey
 	asn1Cert, err := client.signCertificate(&csr, ca, CertificateProfile{
 		KeyUsage:  x509.KeyUsageDigitalSignature,
 		notBefore: signingTime,
@@ -532,31 +516,23 @@ func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr 
 	headers := jws.StandardHeaders{
 		JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{certificate}),
 	}
-	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(&headers))
+	algorithm, err := algo.RecommendedSigningAlgorithm(entityPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	return jws.Sign(payload, jwa.SignatureAlgorithm(algorithm.JWAIdentifier()), entityPrivateKey, jws.WithHeaders(&headers))
 }
 
 type CertificateVerifier interface {
-
 	Verify(*x509.Certificate) error
 }
 
 func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error) {
-	m, err := jws.Parse(bytes.NewReader(signature))
+	message, err := parseJWS(signature)
 	if err != nil {
-		return nil, errors2.Wrap(err, "unable to parse signature")
+		return nil, err
 	}
-	if len(m.Signatures()) == 0 {
-		return nil, errors.New("JWS contains no signatures")
-	}
-	if len(m.Signatures()) > 1 {
-		return nil, errors.New("JWS contains more than 1 signature")
-	}
-
-	sig := m.Signatures()[0]
-	if sig.ProtectedHeaders().Algorithm() != jwsAlgorithm {
-		return nil, fmt.Errorf("JWS is signed with incorrect algorithm (expected = %v, actual = %v)", jwsAlgorithm, sig.ProtectedHeaders().Algorithm())
-	}
-
+	sig := message.Signatures()[0]
 	// Parse X509 certificate chain
 	certChain, err := GetX509ChainFromHeaders(sig.ProtectedHeaders())
 	if err != nil {
@@ -566,17 +542,17 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 		return nil, fmt.Errorf("JWK doesn't contain X509 chain header (%s) header", jws.X509CertChainKey)
 	}
 	signingCert := certChain[0]
-	// Check key strength. Cast should be safe since we checked the algorithm.
-	signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey)
-	if !ok || signingPubKey.Size() * 8 < MinKeySize {
-		return nil, ErrInvalidKeySize
+	// Check key type is supported
+	_, err = algo.GetKeyTypeFromKey(signingCert.PublicKey)
+	if err != nil {
+		return nil, errors2.Wrap(err, "certificate in JWS used unsupported key type")
 	}
 	// Check certificate is trusted
 	if err := certVerifier.Verify(signingCert); err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing
-	if signingCert.KeyUsage & x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
+	if signingCert.KeyUsage&x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
 		return nil, errors.New("certificate is not meant for signing (keyUsage != digitalSignature)")
 	}
 	// Check if the data was signed while the certificate was valid
@@ -635,4 +611,31 @@ func (client *Crypto) logger() *logrus.Entry {
 		client._logger = logrus.StandardLogger().WithField("module", ModuleName)
 	}
 	return client._logger
+}
+
+func parseJWS(signature []byte) (*jws.Message, error) {
+	m, err := jws.Parse(bytes.NewReader(signature))
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to parse signature")
+	}
+	if len(m.Signatures()) == 0 {
+		return nil, errors.New("JWS contains no signatures")
+	}
+	if len(m.Signatures()) > 1 {
+		return nil, errors.New("JWS contains more than 1 signature")
+	}
+	sig := m.Signatures()[0]
+	if algo.SigningAlgorithmFromJWAIdentifier(sig.ProtectedHeaders().Algorithm().String()) == nil {
+		return nil, fmt.Errorf("JWS is signed with unsupported algorithm (%v)", sig.ProtectedHeaders().Algorithm())
+	}
+	return m, nil
+}
+
+func hashAndSignRSAWithSHA256(key interface{}, dataToBeSigned []byte) ([]byte, error) {
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("key should be *rsa.PrivateKey")
+	}
+	hash := sha256.Sum256(dataToBeSigned)
+	return rsaKey.Sign(rand.Reader, hash[:], crypto.SHA256)
 }

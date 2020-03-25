@@ -1274,7 +1274,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 func apiWrapper() *ApiWrapper {
 	backend := pkg.Crypto{
 		Storage: createTempStorage(),
-		Config:  pkg.CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  pkg.CryptoConfig{KeyType: types.ConfigKeyTypeDefault},
 	}
 
 	return &ApiWrapper{C: &backend}
