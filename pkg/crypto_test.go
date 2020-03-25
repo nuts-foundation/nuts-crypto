@@ -59,8 +59,8 @@ func TestCryptoBackend(t *testing.T) {
 	t.Run("CryptoInstance with default keysize", func(t *testing.T) {
 		client := CryptoInstance()
 
-		if client.Config.Keysize != types.ConfigKeySizeDefault {
-			t.Errorf("Expected keySize to be %d, got %d", types.ConfigKeySizeDefault, client.Config.Keysize)
+		if client.Config.KeyType != types.ConfigKeyTypeDefault {
+			t.Errorf("Expected keySize to be %d, got %d", types.ConfigKeyTypeDefault, client.Config.KeyType)
 		}
 	})
 }

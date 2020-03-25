@@ -75,7 +75,7 @@ func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 }
 
 // PublicKeyToPem converts an rsa.PublicKeyInPEM to PEM encoding
-func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
+func PublicKeyToPem(pub interface{}) (string, error) {
 	pubASN1, err := x509.MarshalPKIXPublicKey(pub)
 
 	if err != nil {
