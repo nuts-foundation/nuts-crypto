@@ -20,14 +20,15 @@ package api
 
 import (
 	"errors"
-	"github.com/golang/mock/gomock"
-	"github.com/labstack/echo/v4"
-	"github.com/magiconair/properties/assert"
-	"github.com/nuts-foundation/nuts-go-core/mock"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/labstack/echo/v4"
+	"github.com/magiconair/properties/assert"
+	"github.com/nuts-foundation/nuts-go-core/mock"
 )
 
 type testServerInterface struct {
