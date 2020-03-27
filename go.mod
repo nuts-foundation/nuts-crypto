@@ -7,7 +7,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.3.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/labstack/echo/v4 v4.1.11
+	github.com/labstack/echo/v4 v4.1.15
 	github.com/lestrrat-go/jwx v0.9.1
 	github.com/magiconair/properties v1.8.1
 	github.com/nuts-foundation/nuts-go-core v0.0.0-20200130105519-4620adf455e9
