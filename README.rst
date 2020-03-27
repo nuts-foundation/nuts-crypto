@@ -3,8 +3,8 @@ nuts-crypto
 
 Go crypto lib for Nuts service space
 
-.. image:: https://travis-ci.org/nuts-foundation/nuts-crypto.svg?branch=master
-    :target: https://travis-ci.org/nuts-foundation/nuts-crypto
+.. image:: https://circleci.com/gh/nuts-foundation/nuts-crypto.svg?style=svg
+    :target: https://circleci.com/gh/nuts-foundation/nuts-crypto
     :alt: Build Status
 
 .. image:: https://readthedocs.org/projects/nuts-crypto/badge/?version=latest
