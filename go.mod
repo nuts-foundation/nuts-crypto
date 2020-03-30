@@ -11,7 +11,7 @@ require (
 	github.com/lestrrat-go/jwx v0.9.1
 	github.com/magiconair/properties v1.8.1
 	github.com/mattn/go-colorable v0.1.6 // indirect
-	github.com/nuts-foundation/nuts-go-core v0.0.0-20200327150009-4443715cec5f
+	github.com/nuts-foundation/nuts-go-core v0.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/cobra v0.0.7
