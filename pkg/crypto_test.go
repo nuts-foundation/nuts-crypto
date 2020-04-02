@@ -452,11 +452,11 @@ type poolCertVerifier struct {
 	pool *x509.CertPool
 }
 
-func (n poolCertVerifier) Verify(cert *x509.Certificate) error {
+func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error {
 	if n.pool == nil {
 		return nil
 	}
-	_, err := cert.Verify(x509.VerifyOptions{Roots: n.pool})
+	_, err := cert.Verify(x509.VerifyOptions{Roots: n.pool, CurrentTime: moment})
 	return err
 }
 
@@ -523,11 +523,12 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		assert.Nil(t, payload)
 	})
 	t.Run("error - certificate not valid at time of signing", func(t *testing.T) {
+		signingTime := time.Now().AddDate(-1, 0, 0)
 		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: entity.URI},
-		}, time.Now())
-		payload, err := client.VerifyJWS(signature, time.Time{}, verifier)
-		assert.Equal(t, err, ErrCertificateNotValidAtSigningTime)
+		}, signingTime)
+		payload, err := client.VerifyJWS(signature, time.Now(), verifier)
+		assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - certificate not meant for signing", func(t *testing.T) {

@@ -92,11 +92,6 @@ var ErrInvalidCertChain = errors.New("X.509 certificate chain is invalid")
 // noinspection GoErrorStringFormat
 var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
 
-// ErrCertificateNotValidAtSigningTime indicates the X.509 certificate was not valid (NotBefore/NotAfter) at the time
-// at which the signing took place.
-// noinspection GoErrorStringFormat
-var ErrCertificateNotValidAtSigningTime = errors.New("X.509 certificate was not valid at the time of signing")
-
 // ModuleName == Registry
 const ModuleName = "Crypto"
 
@@ -536,8 +531,8 @@ func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr 
 }
 
 type CertificateVerifier interface {
-
-	Verify(*x509.Certificate) error
+	// Verify verifies the given certificate. The validity of the certificate is checked against the given moment in time.
+	Verify(*x509.Certificate, time.Time) error
 }
 
 func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error) {
@@ -568,20 +563,16 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	signingCert := certChain[0]
 	// Check key strength. Cast should be safe since we checked the algorithm.
 	signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey)
-	if !ok || signingPubKey.Size() * 8 < MinKeySize {
+	if !ok || signingPubKey.Size()*8 < MinKeySize {
 		return nil, ErrInvalidKeySize
 	}
 	// Check certificate is trusted
-	if err := certVerifier.Verify(signingCert); err != nil {
+	if err := certVerifier.Verify(signingCert, signingTime); err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing
-	if signingCert.KeyUsage & x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
+	if signingCert.KeyUsage&x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
 		return nil, errors.New("certificate is not meant for signing (keyUsage != digitalSignature)")
-	}
-	// Check if the data was signed while the certificate was valid
-	if signingTime.Before(signingCert.NotBefore) || signingTime.After(signingCert.NotAfter) {
-		return nil, ErrCertificateNotValidAtSigningTime
 	}
 	// TODO: CRL checking
 	return jws.Verify(signature, sig.ProtectedHeaders().Algorithm(), signingCert.PublicKey)
