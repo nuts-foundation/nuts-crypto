@@ -33,23 +33,20 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
-	jwt2 "github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/nuts-foundation/nuts-crypto/pkg/algo"
+	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	core "github.com/nuts-foundation/nuts-go-core"
 	errors2 "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dgrijalva/jwt-go"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	core "github.com/nuts-foundation/nuts-go-core"
 )
 
 // ErrMissingLegalEntityURI is returned when a required legal entity is missing
@@ -374,21 +371,23 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 	if len(strings.TrimSpace(subject)) == 0 {
 		return nil, ErrMissingSubject
 	}
-
 	if len(strings.TrimSpace(actor)) == 0 {
 		return nil, ErrMissingActor
 	}
-
 	pk, err := client.Storage.GetPrivateKey(entity)
 	if err != nil {
 		return nil, err
 	}
-
-	// Create a new HMAC
-	h := hmac.New(sha256.New, pk.D.Bytes())
+	keyType, err := algo.GetKeyTypeFromKey(pk)
+	if err != nil {
+		return nil, err
+	}
+	h, err := keyType.CreateHMAC(keyType)
+	if err != nil {
+		return nil, err
+	}
 	h.Write([]byte(subject))
 	h.Write([]byte(actor))
-
 	return h.Sum(nil), nil
 }
 
@@ -426,12 +425,18 @@ func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
 // while we're using plain signatures instead of JWS (https://github.com/nuts-foundation/nuts-crypto/issues/15).
 func (client *Crypto) VerifyWith(data []byte, sig []byte, keyAsJwk jwk.Key) (bool, error) {
 	key, err := keyAsJwk.Materialize()
-	// If key = RSA-2048, fallback to PKCS1v15 SHA-256
+	// If key = RSA-2048, fallback to plain PKCS1v15 SHA-256
 	keyType, err := algo.GetKeyTypeFromKey(key)
 	if err != nil {
 		return false, err
 	}
 	if keyType.Identifier() == "RSA-2048" {
+		// TODO
+		hashedData := sha256.Sum256(data)
+		if err := rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA256, hashedData[:], sig); err != nil {
+			return false, err
+		}
+
 		rsa.VerifyPKCS1v15()
 	} else {
 		// Otherwise interpret it as JWS
@@ -472,7 +477,7 @@ func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity type
 	if err != nil {
 		return "", err
 	}
-	token := jwt2.New()
+	token := jwt.New()
 	for k, v := range claims {
 		if err := token.Set(k, v); err != nil {
 			return "", err
@@ -590,7 +595,6 @@ func (client *Crypto) encryptPlainTextFor(plaintext []byte, legalEntity types.Le
 
 // Encrypt a piece of data with the given public key
 func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey) ([]byte, error) {
-
 	hash := sha512.New()
 	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, key, plaintext, nil)
 	if err != nil {

@@ -2,12 +2,15 @@ package algo
 
 import (
 	"crypto"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
+	"hash"
 )
 
 func getRSAKeyTypes() []KeyType {
@@ -25,6 +28,14 @@ type rsaKey struct {
 
 func (e rsaKey) SigningAlgorithm() SigningAlgorithm {
 	return rsaSigningAlgorithm{jwa: jwa.RS256.String(), hash: crypto.SHA256}
+}
+
+func (e rsaKey) CreateHMAC(privKey interface{}) (hash.Hash, error) {
+	rsaKey, ok := privKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, UnsupportedKeyTypeError(privKey)
+	}
+	return hmac.New(sha256.New, rsaKey.D.Bytes()), nil
 }
 
 func (e rsaKey) MarshalPEM(key interface{}) (string, error) {

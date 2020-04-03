@@ -89,10 +89,10 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 		}
 	})
 
-	t.Run("A keySize too small generates an error", func(t *testing.T) {
+	t.Run("unknown key type generates an error", func(t *testing.T) {
 		client := Crypto{
 			Storage: createTempStorage(t.Name()),
-			Config:  CryptoConfig{Keysize: 1},
+			Config:  CryptoConfig{KeyType: "fubar"},
 		}
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
@@ -537,7 +537,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		certificate := selfSignCertificate(entity, 0)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
 		assert.Nil(t, payload)
@@ -548,7 +548,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		certificate := selfSignCertificate(entity, x509.KeyUsageDigitalSignature)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
 		assert.Nil(t, payload)
@@ -583,12 +583,12 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		pool := x509.NewCertPool()
 		pool.AddCert(cert)
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
-		assert.EqualError(t, err, ErrInvalidKeySize.Error())
+		assert.EqualError(t, err, "TODO")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - no X.509 chain", func(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key)
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key)
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "JWK doesn't contain X509 chain header (x5c) header")
 		assert.Nil(t, payload)
@@ -597,7 +597,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
 		h.JWSx509CertChain = []string{"invalid-cert"}
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), ErrInvalidCertChain.Error())
 		assert.Nil(t, payload)
@@ -854,9 +854,9 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 }
 
 func TestCrypto_Configure(t *testing.T) {
-	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
+	t.Run("Configure returns an error when keyType is unsupported", func(t *testing.T) {
 		e := defaultBackend(t.Name())
-		e.Config.Keysize = 2047
+		e.Config.KeyType = "fubar"
 		err := e.Configure()
 
 		if err == nil {
@@ -864,7 +864,7 @@ func TestCrypto_Configure(t *testing.T) {
 			return
 		}
 
-		if !errors.Is(err, ErrInvalidKeySize) {
+		if !errors.Is(err, errors.New("TODO")) {
 			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
 		}
 	})
@@ -897,7 +897,7 @@ func TestNewCryptoBackend(t *testing.T) {
 func defaultBackend(name string) Crypto {
 	backend := Crypto{
 		Storage: createTempStorage(name),
-		Config:  CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  CryptoConfig{KeyType: types.ConfigKeyTypeDefault},
 	}
 
 	return backend

@@ -64,6 +64,14 @@ func (e ecKey) SigningAlgorithm() SigningAlgorithm {
 	return &ecSigningAlgorithm{jwa: jwa.ES256.String(), hash: crypto.SHA256}
 }
 
+func (e ecKey) CreateHMAC(privKey interface{}) (hash.Hash, error) {
+	ecKey, ok := privKey.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, UnsupportedKeyTypeError(privKey)
+	}
+	return hmac.New(sha256.New, ecKey.D.Bytes()), nil
+}
+
 func (e ecKey) MarshalPEM(key interface{}) (string, error) {
 	pubK, ok := key.(*ecdsa.PublicKey)
 	if ok {

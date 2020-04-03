@@ -1,6 +1,9 @@
 package algo
 
-import "fmt"
+import (
+	"fmt"
+	"hash"
+)
 
 type KeyType interface {
 	Identifier() string
@@ -9,6 +12,7 @@ type KeyType interface {
 	MarshalPEM(key interface{}) (string, error)
 	// SigningAlgorithm returns the recommended signing algorithm for this key type
 	SigningAlgorithm() SigningAlgorithm
+	CreateHMAC(privKey interface{}) (hash.Hash, error)
 }
 
 type SigningAlgorithm interface {
