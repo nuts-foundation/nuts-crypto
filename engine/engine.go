@@ -21,6 +21,7 @@ package engine
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -57,6 +58,7 @@ func flagSet() *pflag.FlagSet {
 	flags.String(types.ConfigStorage, types.ConfigStorageFs, "storage to use, 'fs' for file system (default)")
 	flags.String(types.ConfigFSPath, types.ConfigFSPathDefault, "when file system is used as storage, this configures the path where keys are stored (default .)")
 	flags.Int(types.ConfigKeySize, types.ConfigKeySizeDefault, "number of bits to use when creating new RSA keys")
+	flags.String(types.ConfigSignatureFormat, types.ConfigSignatureFormatDefault, fmt.Sprintf("signature format to use when signing (%s, %s)", types.SignatureFormatPlainRSA, types.SignatureFormatJWS))
 
 	return flags
 }

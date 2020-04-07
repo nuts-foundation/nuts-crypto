@@ -50,18 +50,12 @@ func TestCryptoBackend(t *testing.T) {
 	t.Run("CryptoInstance always returns same instance", func(t *testing.T) {
 		client := CryptoInstance()
 		client2 := CryptoInstance()
-
-		if client != client2 {
-			t.Error("Expected instances to be the same")
-		}
+		assert.Equal(t, client, client2, "Expected instances to be the same")
 	})
 
 	t.Run("CryptoInstance with default keysize", func(t *testing.T) {
 		client := CryptoInstance()
-
-		if client.Config.Keysize != types.ConfigKeySizeDefault {
-			t.Errorf("Expected keySize to be %d, got %d", types.ConfigKeySizeDefault, client.Config.Keysize)
-		}
+		assert.Equalf(t, types.ConfigKeySizeDefault, client.Config.Keysize, "Expected keySize to be %d, got %d", types.ConfigKeySizeDefault, client.Config.Keysize)
 	})
 }
 
@@ -71,22 +65,12 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
+		assert.NoError(t, err)
 	})
 
 	t.Run("Missing legalEntity generates error", func(t *testing.T) {
 		err := client.GenerateKeyPairFor(types.LegalEntity{})
-
-		if err == nil {
-			t.Errorf("Expected error, Got nothing")
-		}
-
-		if !errors.Is(err, ErrMissingLegalEntityURI) {
-			t.Errorf("Expected error [%v], got [%v]", ErrMissingLegalEntityURI, err)
-		}
+		assert.EqualError(t, err, ErrMissingLegalEntityURI.Error())
 	})
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
@@ -96,12 +80,7 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 		}
 
 		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
-
-		if err == nil {
-			t.Errorf("Expected error got nothing")
-		} else if err.Error() != "crypto/rsa: too few primes of given length to generate an RSA key" {
-			t.Errorf("Expected error [crypto/rsa: too few primes of given length to generate an RSA key] got: [%s]", err.Error())
-		}
+		assert.Error(t, err, "crypto/rsa: too few primes of given length to generate an RSA key")
 	})
 }
 
@@ -116,20 +95,15 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 		client.GenerateKeyPairFor(legalEntity)
 
 		cipherText, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
+		if !assert.NoError(t, err) {
+			return
 		}
 
 		decryptedText, err := client.decryptCipherTextFor(cipherText, legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
+		if !assert.NoError(t, err) {
+			return
 		}
-
-		if string(decryptedText) != plaintext {
-			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
-		}
+		assert.Equal(t, plaintext, string(decryptedText))
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
@@ -198,14 +172,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			},
 		}
 		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
-
-		if err == nil {
-			t.Errorf("Expected error, Got nothing")
-		}
-
-		if !errors.Is(err, rsa.ErrDecryption) {
-			t.Errorf("Expected error [%v], got [%v]", rsa.ErrDecryption, err)
-		}
+		assert.EqualError(t, err, rsa.ErrDecryption.Error())
 	})
 
 	t.Run("Missing pub key returns error", func(t *testing.T) {
@@ -273,36 +240,103 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	})
 }
 
-func TestCrypto_VerifyWith(t *testing.T) {
-	t.Run("A signed piece of data can be verified", func(t *testing.T) {
-		data := []byte("hello")
-		legalEntity := types.LegalEntity{URI: "test"}
+func TestCrypto_SignFor(t *testing.T) {
+	t.Run("error - private key not found", func(t *testing.T) {
 		client := defaultBackend(t.Name())
 		defer emptyTemp(t.Name())
-		client.GenerateKeyPairFor(legalEntity)
 
-		sig, err := client.SignFor(data, legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		pub, err := client.PublicKeyInJWK(legalEntity)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		bool, err := client.VerifyWith(data, sig, pub)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
-		}
-
-		if !bool {
-			t.Error("Expected signature to be valid")
-		}
+		sig, err := client.SignFor([]byte{1, 2, 3}, types.LegalEntity{URI: "non-existent"})
+		assert.Nil(t, sig)
+		assert.Error(t, err)
 	})
+}
+
+func TestCrypto_VerifyWith(t *testing.T) {
+	dataToBeSigned := []byte{1, 2, 3}
+	randomPrivateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
+	t.Run("error - invalid JWK", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		defer emptyTemp(t.Name())
+
+		ok, err := client.VerifyWith(dataToBeSigned, []byte{3, 2, 1}, &jwk.RSAPublicKey{})
+		assert.False(t, ok)
+		assert.Error(t, err)
+	})
+	t.Run("error - JWK doesn't contain *rsa.PublicKey", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		defer emptyTemp(t.Name())
+
+		privateKeyAsJWK, _ := jwk.New(randomPrivateKey)
+		ok, err := client.VerifyWith(dataToBeSigned, []byte{3, 2, 1}, privateKeyAsJWK)
+		assert.False(t, ok)
+		assert.Equal(t, err, ErrInvalidAlgorithm)
+	})
+	doTest := func(format string) {
+		t.Run(format, func(t *testing.T) {
+			client := defaultBackend(t.Name())
+			client.Config.SignatureFormat = format
+			defer emptyTemp(t.Name())
+			entity := types.LegalEntity{URI: "entity"}
+			client.GenerateKeyPairFor(entity)
+			t.Run("signature verification failed (incorrect key)", func(t *testing.T) {
+				publicKeyAsJWK, _ := jwk.New(&randomPrivateKey.PublicKey)
+				sig, _ := client.SignFor(dataToBeSigned, entity)
+				ok, err := client.VerifyWith(dataToBeSigned, sig, publicKeyAsJWK)
+				assert.False(t, ok)
+				assert.Error(t, err)
+			})
+			t.Run("signature verification failed (incorrect payload)", func(t *testing.T) {
+				publicKeyAsJWK, _ := client.PublicKeyInJWK(entity)
+				sig, _ := client.SignFor(dataToBeSigned, entity)
+				ok, err := client.VerifyWith([]byte{3, 2, 1}, sig, publicKeyAsJWK)
+				assert.False(t, ok)
+				assert.Error(t, err)
+			})
+		})
+	}
+	doTest(types.SignatureFormatJWS)
+	doTest(types.SignatureFormatPlainRSA)
+}
+
+func TestCrypto_SignFor_VerifyWith(t *testing.T) {
+	doTest := func(format string) {
+		t.Run(format, func(t *testing.T) {
+			t.Run("A signed piece of data can be verified", func(t *testing.T) {
+				data := []byte("hello")
+				legalEntity := types.LegalEntity{URI: "test"}
+				client := defaultBackend(t.Name())
+				client.Config.SignatureFormat = format
+				defer emptyTemp(t.Name())
+				client.GenerateKeyPairFor(legalEntity)
+
+				sig, err := client.SignFor(data, legalEntity)
+				opem, _ := client.PublicKeyInPEM(legalEntity)
+				println(opem)
+
+				if err != nil {
+					t.Errorf("Expected no error, Got %s", err.Error())
+				}
+
+				pub, err := client.PublicKeyInJWK(legalEntity)
+
+				if err != nil {
+					t.Errorf("Expected no error, Got %s", err.Error())
+				}
+
+				bool, err := client.VerifyWith(data, sig, pub)
+
+				if err != nil {
+					t.Errorf("Expected no error, Got %s", err.Error())
+				}
+
+				if !bool {
+					t.Error("Expected signature to be valid")
+				}
+			})
+		})
+	}
+	doTest(types.SignatureFormatJWS)
+	doTest(types.SignatureFormatPlainRSA)
 }
 
 func TestCrypto_ExternalIdFor(t *testing.T) {
@@ -854,7 +888,7 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 }
 
 func TestCrypto_Configure(t *testing.T) {
-	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
+	t.Run("error - configure returns an error when keySize is too small", func(t *testing.T) {
 		e := defaultBackend(t.Name())
 		e.Config.Keysize = 2047
 		err := e.Configure()
@@ -868,6 +902,29 @@ func TestCrypto_Configure(t *testing.T) {
 			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
 		}
 	})
+	t.Run("ok - signature format defaults to plain-rsa", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.SignatureFormat = ""
+		assert.NoError(t, e.Configure())
+		assert.Equal(t, types.SignatureFormatPlainRSA, e.Config.SignatureFormat)
+	})
+	t.Run("ok - signature format (plain-rsa)", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.SignatureFormat = types.SignatureFormatPlainRSA
+		assert.NoError(t, e.Configure())
+		assert.Equal(t, types.SignatureFormatPlainRSA, e.Config.SignatureFormat)
+	})
+	t.Run("ok - signature format (jws)", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.SignatureFormat = types.SignatureFormatJWS
+		assert.NoError(t, e.Configure())
+		assert.Equal(t, types.SignatureFormatJWS, e.Config.SignatureFormat)
+	})
+	t.Run("error - signature format unknown", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.SignatureFormat = "foobar"
+		assert.Error(t, e.Configure())
+	})
 }
 
 func TestNewCryptoBackend(t *testing.T) {
@@ -875,14 +932,10 @@ func TestNewCryptoBackend(t *testing.T) {
 
 	t.Run("Getting the backend returns the fs backend", func(t *testing.T) {
 		cl, err := client.newCryptoStorage()
-
-		if err != nil {
-			t.Errorf("Expected no error, got %s", err.Error())
+		if !assert.NoError(t, err) {
+			return
 		}
-
-		if reflect.TypeOf(cl).String() != "*storage.fileSystemBackend" {
-			t.Errorf("Expected crypto backend to be of type [*storage.fileSystemBackend], Got [%s]", reflect.TypeOf(cl).String())
-		}
+		assert.Equal(t, "*storage.fileSystemBackend", reflect.TypeOf(cl).String())
 	})
 
 	t.Run("Getting the backend returns err for unknown backend", func(t *testing.T) {

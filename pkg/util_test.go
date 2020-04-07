@@ -295,3 +295,31 @@ func TestValidateJWK(t *testing.T) {
 		assert.Error(t, ValidateJWK(key, invalidMap))
 	})
 }
+
+func TestJWKFromJWS(t *testing.T) {
+	var dtbs = []byte("Hello, World!")
+	t.Run("ok", func(t *testing.T) {
+		privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
+		publicKeyAsJWK, _ := jwk.New(&privateKey.PublicKey)
+		h := customHeaders{JWK: publicKeyAsJWK}
+		input, _ := jws.Sign(dtbs, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
+		actual, err := JWKFromJWS(string(input))
+		if !assert.NoError(t, err) {
+			return
+		}
+		pk, _ := actual.Materialize()
+		assert.Equal(t, &privateKey.PublicKey, pk)
+	})
+	t.Run("error - invalid JWS", func(t *testing.T) {
+		actual, err := JWKFromJWS("abc")
+		assert.EqualError(t, err, "unable to parse JWS: failed to parse jws message: invalid compact serialization format: invalid number of segments")
+		assert.Nil(t, actual)
+	})
+	t.Run("error - no JWK", func(t *testing.T) {
+		privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
+		input, _ := jws.Sign(dtbs, jwsAlgorithm, privateKey)
+		actual, err := JWKFromJWS(string(input))
+		assert.Nil(t, actual)
+		assert.EqualError(t, err, "JWS signature doesn't contain JWK")
+	})
+}

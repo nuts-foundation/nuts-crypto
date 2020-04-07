@@ -99,9 +99,10 @@ const ModuleName = "Crypto"
 const jwsAlgorithm = jwa.RS256
 
 type CryptoConfig struct {
-	Keysize int
-	Storage string
-	Fspath  string
+	Keysize         int
+	Storage         string
+	Fspath          string
+	SignatureFormat string
 }
 
 // default implementation for CryptoInstance
@@ -230,7 +231,13 @@ func (client *Crypto) Configure() error {
 			err = ErrInvalidKeySize
 			return
 		}
-
+		if client.Config.SignatureFormat == "" {
+			client.Config.SignatureFormat = types.ConfigSignatureFormatDefault
+		}
+		if client.Config.SignatureFormat != types.SignatureFormatPlainRSA && client.Config.SignatureFormat != types.SignatureFormatJWS {
+			err = fmt.Errorf("signature format should be either %s or %s", types.SignatureFormatPlainRSA, types.SignatureFormatJWS)
+			return
+		}
 		client.Storage, err = client.newCryptoStorage()
 		client.configDone = true
 	})
@@ -414,23 +421,19 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 // It is expected that the plain data is given. It uses the SHA256 hashing function
 // todo: SHA_256?
 func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
-	// random
-	rng := rand.Reader
-
 	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
+	if err != nil {
+		return nil, err
+	}
+	if client.Config.SignatureFormat == types.SignatureFormatJWS {
+		publicKeyAsJWK, _ := jwk.New(&rsaPrivateKey.PublicKey)
+		// Workaround until jws.jwk is fixed (https://github.com/lestrrat-go/jwx/pull/146)
+		h := customHeaders{JWK: publicKeyAsJWK}
+		return jws.Sign(data, jwsAlgorithm, rsaPrivateKey, jws.WithHeaders(&h))
+	}
+	// Default to plain RSA
 	hashedData := sha256.Sum256(data)
-
-	if err != nil {
-		return nil, err
-	}
-
-	signature, err := rsa.SignPKCS1v15(rng, rsaPrivateKey, crypto.SHA256, hashedData[:])
-
-	if err != nil {
-		return nil, err
-	}
-
-	return signature, err
+	return rsa.SignPKCS1v15(rand.Reader, rsaPrivateKey, crypto.SHA256, hashedData[:])
 }
 
 // KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
@@ -440,29 +443,38 @@ func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
 
 // VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
 func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, error) {
-	hashedData := sha256.Sum256(data)
-
 	mKey, err := key.Materialize()
 	if err != nil {
 		return false, err
 	}
-
-	if k, ok := mKey.(*rsa.PublicKey); ok {
-		if err := rsa.VerifyPKCS1v15(k, crypto.SHA256, hashedData[:], sig); err != nil {
+	var publicKey *rsa.PublicKey
+	if pk, ok := mKey.(*rsa.PublicKey); ok {
+		publicKey = pk
+	} else {
+		return false, ErrInvalidAlgorithm
+	}
+	// Verify as JWS if we can parse it as such
+	msg, _ := jws.Parse(bytes.NewReader(sig))
+	if msg != nil {
+		client.logger().Debug("Verifying signature as JWS")
+		verifiedPayload, err := jws.Verify(sig, jwsAlgorithm, publicKey)
+		if err != nil {
 			return false, err
 		}
-		return true, nil
+		if bytes.Compare(data, verifiedPayload) == 0 {
+			err = nil
+		} else {
+			err = errors.New("payload protected by JWS differs from expected payload")
+		}
+		return err == nil, err
 	}
-
-	// todo support EC sigs
-	//if k, ok := mKey.(*ecdsa.PublicKey); ok {
-	//	if err := ecdsa.Verify(k, crypto.SHA256, hashedData[:], sig); err != nil {
-	//		return false, err
-	//	}
-	//	return true, nil
-	//}
-
-	return false, ErrInvalidAlgorithm
+	client.logger().Debug("Verifying signature as RSA PKCS#1 v1.5")
+	// Not a valid JWS, assume it's plain RSA PKCS#1 v1.5
+	hashedData := sha256.Sum256(data)
+	if err := rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, hashedData[:], sig); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
@@ -626,4 +638,23 @@ func (client *Crypto) logger() *logrus.Entry {
 		client._logger = logrus.StandardLogger().WithField("module", ModuleName)
 	}
 	return client._logger
+}
+
+// Required for workaround until jws.jwk is fixed (https://github.com/lestrrat-go/jwx/pull/146)
+type customHeaders struct {
+	JWK  interface{}            `json:"jwk,omitempty"` // https://tools.ietf.org/html/rfc7515#section-4.1.3
+	Algo jwa.SignatureAlgorithm `json:"alg,omitempty"` // https://tools.ietf.org/html/rfc7515#section-4.1.1
+}
+
+func (c customHeaders) Get(key string) (interface{}, bool) {
+	return c.Algo, true
+}
+
+func (c *customHeaders) Set(key string, value interface{}) error {
+	c.Algo = value.(jwa.SignatureAlgorithm)
+	return nil
+}
+
+func (c customHeaders) Algorithm() jwa.SignatureAlgorithm {
+	return c.Algo
 }

@@ -28,6 +28,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jws"
 	errors2 "github.com/pkg/errors"
 	"math/big"
 	"time"
@@ -90,6 +91,24 @@ func PublicKeyToPem(pub *rsa.PublicKey) (string, error) {
 	return string(pubBytes), err
 }
 
+// JWKFromJWS attempts to read extract a JWK from the given JWS, which is a JWS serialized in compact form
+// Returns an error if the JWS can't be parsed, if it doesn't contain exactly 1 signature or if there's no JWK for the signature.
+// It doesn't perform any cryptographic verification.
+func JWKFromJWS(signature string) (jwk.Key, error) {
+	message, err := jws.ParseString(signature)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to parse JWS")
+	}
+	if message.Signatures() == nil || len(message.Signatures()) != 1 {
+		return nil, errors2.Wrap(err, "JWS should contain exactly 1 signature")
+	}
+	if jwkAsInterf, ok := message.Signatures()[0].ProtectedHeaders().Get(jws.JWKKey); !ok {
+		return nil, errors.New("JWS signature doesn't contain JWK")
+	} else {
+		return jwkAsInterf.(*jwk.Set).Keys[0], nil
+	}
+}
+
 // MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization.
 func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
 	set, err := MapsToJwkSet([]map[string]interface{}{jwkAsMap})
@@ -143,6 +162,7 @@ func deepCopyMap(m map[string]interface{}) map[string]interface{} {
 	}
 	return cp
 }
+
 // JwkToMap transforms a Jwk key to a map. Can be used for json serialization
 func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
 	root := map[string]interface{}{}

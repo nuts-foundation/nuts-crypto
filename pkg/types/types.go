@@ -37,6 +37,17 @@ const ConfigKeySize string = "keysize"
 // default setting for --keysize "2048"
 const ConfigKeySizeDefault int = 2048
 
+// ConfigSignatureFormat defines --signature config flag
+const ConfigSignatureFormat = "signature"
+
+// ConfigSignatureFormatDefault holds the default value for ConfigSignatureFormat
+const ConfigSignatureFormatDefault = SignatureFormatPlainRSA
+
+const (
+	SignatureFormatPlainRSA = "plain-rsa"
+	SignatureFormatJWS      = "jws"
+)
+
 // type identifying the legalEntity responsible for the Patient/medical data
 type LegalEntity struct {
 	URI string
