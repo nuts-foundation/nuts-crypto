@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
+	"github.com/nuts-foundation/nuts-crypto/pkg/algo"
 	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/sirupsen/logrus"
 	"os"
@@ -228,7 +229,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 		_, symkey, _ := generateSymmetricKey()
 		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
 		pk, _ := client.Storage.GetPublicKey(legalEntity)
-		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
+		keyType, _ := algo.GetKeyTypeFromKey(pk)
+		cipherText, _ := keyType.EncryptionAlgorithm().Encrypt(cipherTextKey, pk)
 
 		ct := types.DoubleEncryptedCipherText{
 			CipherTextKeys: [][]byte{
@@ -251,7 +253,8 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 		_, symkey, _ := generateSymmetricKey()
 		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
 		pk, _ := client.Storage.GetPublicKey(legalEntity)
-		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
+		keyType, _ := algo.GetKeyTypeFromKey(pk)
+		cipherText, _ := keyType.EncryptionAlgorithm().Encrypt(cipherTextKey, pk)
 
 		ct := types.DoubleEncryptedCipherText{
 			CipherTextKeys: [][]byte{

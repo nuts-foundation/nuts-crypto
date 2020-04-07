@@ -2,9 +2,8 @@ package algo
 
 import "testing"
 
-func TestRSAKeyFamily(t *testing.T) {
-	family := getRSAKeyFamily()
-	for _, kt := range family.supportedKT {
-		testKeyType(t, kt, family)
+func TestRSACipherSuite(t *testing.T) {
+	for _, kt := range getRSAKeyTypes() {
+		testKeyType(t, kt)
 	}
 }

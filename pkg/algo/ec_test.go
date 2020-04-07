@@ -5,8 +5,7 @@ import (
 )
 
 func TestECKeyFamily(t *testing.T) {
-	family := getECKeyFamily()
-	for _, kt := range family.supportedKT {
-		testKeyType(t, kt, family)
+	for _, kt := range getECKeyTypes() {
+		testKeyType(t, kt)
 	}
 }

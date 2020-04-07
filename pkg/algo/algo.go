@@ -10,31 +10,6 @@ import (
 	"strings"
 )
 
-// Recommended:
-// ECDSA_WITH_AES_256_GCM_SHA384
-// ECDSA_WITH_CHACHA20_POLY1305_SHA256
-// ECDSA_WITH_AES_128_GCM_SHA256
-// RSA_WITH_AES_256_GCM_SHA384
-// RSA_WITH_CHACHA20_POLY1305_SHA256
-// RSA_WITH_AES_128_GCM_SHA256
-
-// Additionally supported:
-// ECDSA_WITH_AES_256_CBC_SHA384
-// ECDSA_WITH_AES_256_CBC_SHA
-// ECDSA_WITH_AES_128_CBC_SHA256
-// ECDSA_WITH_AES_128_CBC_SHA
-// RSA_WITH_AES_256_CBC_SHA384
-// RSA_WITH_AES_256_CBC_SHA
-// RSA_WITH_AES_128_CBC_SHA256
-// RSA_WITH_AES_128_CBC_SHA
-// RSA_WITH_AES_256_GCM_SHA384
-// RSA_WITH_CHACHA20_POLY1305_SHA256
-// RSA_WITH_AES_128_GCM_SHA256
-// RSA_WITH_AES_256_CBC_SHA256
-// RSA_WITH_AES_256_CBC_SHA
-// RSA_WITH_AES_128_CBC_SHA256
-// RSA_WITH_AES_128_CBC_SHA
-
 // We prefer EC keys, so it should be first in the array
 var keyTypes = append(getECKeyTypes(), getRSAKeyTypes()...)
 
@@ -61,14 +36,6 @@ func GetKeyTypeFromIdentifier(identifier string) (KeyType, error) {
 		}
 	}
 	return nil, UnsupportedKeyTypeError(identifier)
-}
-
-func encodeASN1(asn1data []byte, header string) string {
-	bytes := pem.EncodeToMemory(&pem.Block{
-		Type:  header,
-		Bytes: asn1data,
-	})
-	return string(bytes)
 }
 
 func GetPublicKey(key interface{}) interface{} {
@@ -109,4 +76,12 @@ func doHash(h crypto.Hash, data []byte) []byte {
 	digest.Write(data)
 	d := digest.Sum(nil)
 	return d
+}
+
+func encodeASN1(asn1data []byte, header string) string {
+	bytes := pem.EncodeToMemory(&pem.Block{
+		Type:  header,
+		Bytes: asn1data,
+	})
+	return string(bytes)
 }

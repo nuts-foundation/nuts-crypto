@@ -22,7 +22,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha512"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -32,15 +31,6 @@ import (
 	"math/big"
 	"time"
 )
-
-func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
-	hash := sha512.New()
-	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
 
 func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
 	if len(nonce) == 0 {

@@ -23,12 +23,7 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/ecdsa"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/sha512"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -304,17 +299,15 @@ func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Ke
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}
-
-		// todo support EC
-		if rsaPk, ok := pk.(*rsa.PublicKey); ok {
-			encSymKey, err := client.encryptPlainTextWith(cipherBytes, rsaPk)
-			if err != nil {
-				return types.DoubleEncryptedCipherText{}, err
-			}
-			cipherTextKeys = append(cipherTextKeys, encSymKey)
-		} else {
-			return types.DoubleEncryptedCipherText{}, ErrInvalidAlgorithm
+		keyType, err := algo.GetKeyTypeFromKey(pk)
+		if err != nil {
+			return types.DoubleEncryptedCipherText{}, err
 		}
+		encSymKey, err := keyType.EncryptionAlgorithm().Encrypt(cipherBytes, pk)
+		if err != nil {
+			return types.DoubleEncryptedCipherText{}, err
+		}
+		cipherTextKeys = append(cipherTextKeys, encSymKey)
 	}
 
 	return types.DoubleEncryptedCipherText{
@@ -393,25 +386,13 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 
 // SignFor signs a piece of data for a legal entity. This requires the private key for the legal entity to be present.
 // It is expected that the plain data is given. It uses the recommended signature algorithm for the entity's private key.
-//
-// Backwards compatibility: if it concerns an RSA-2048 bits key fallback to PKCS1v15 SHA-256 signatures
-// while we're using plain signatures instead of JWS (https://github.com/nuts-foundation/nuts-crypto/issues/15).
 func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
 	privateKey, err := client.Storage.GetPrivateKey(legalEntity)
-	// If key = RSA-2048, fallback to PKCS1v15 SHA-256
 	keyType, err := algo.GetKeyTypeFromKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
-	if keyType.Identifier() == "RSA-2048" {
-		return hashAndSignRSAWithSHA256(privateKey, data)
-	}
-	// Otherwise, sign using JWS
-	alg, err := algo.RecommendedSigningAlgorithm(privateKey)
-	if err != nil {
-		return nil, err
-	}
-	return jws.Sign(data, jwa.SignatureAlgorithm(alg.JWAIdentifier()), privateKey)
+	return keyType.SigningAlgorithm().Sign(data, privateKey)
 }
 
 // KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
@@ -420,9 +401,6 @@ func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
 }
 
 // VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the recommended signature algorithm for the entity's key.
-//
-// Backwards compatibility: if it concerns an RSA-2048 bits key fallback to PKCS1v15 SHA-256 signatures
-// while we're using plain signatures instead of JWS (https://github.com/nuts-foundation/nuts-crypto/issues/15).
 func (client *Crypto) VerifyWith(data []byte, sig []byte, keyAsJwk jwk.Key) (bool, error) {
 	key, err := keyAsJwk.Materialize()
 	// If key = RSA-2048, fallback to plain PKCS1v15 SHA-256
@@ -430,23 +408,7 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, keyAsJwk jwk.Key) (boo
 	if err != nil {
 		return false, err
 	}
-	if keyType.Identifier() == "RSA-2048" {
-		// TODO
-		hashedData := sha256.Sum256(data)
-		if err := rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA256, hashedData[:], sig); err != nil {
-			return false, err
-		}
-
-		rsa.VerifyPKCS1v15()
-	} else {
-		// Otherwise interpret it as JWS
-		message, err := parseJWS(sig)
-		if err != nil {
-			return false, err
-		}
-		sig := message.Signatures()[0]
-		protectedData, err := jws.Verify(sig.Signature(), sig.ProtectedHeaders().Algorithm(), key)
-	}
+	return keyType.SigningAlgorithm().VerifySignature(data, sig, key)
 }
 
 // PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
@@ -483,11 +445,11 @@ func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity type
 			return "", err
 		}
 	}
-	alg, err := algo.RecommendedSigningAlgorithm(key)
+	keyType, err := algo.GetKeyTypeFromKey(key)
 	if err != nil {
 		return "", err
 	}
-	signedToken, err := token.Sign(jwa.SignatureAlgorithm(alg.JWAIdentifier()), key)
+	signedToken, err := token.Sign(jwa.SignatureAlgorithm(keyType.SigningAlgorithm().JWAIdentifier()), key)
 	if err != nil {
 		return "", err
 	}
@@ -517,11 +479,11 @@ func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr 
 	headers := jws.StandardHeaders{
 		JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{certificate}),
 	}
-	algorithm, err := algo.RecommendedSigningAlgorithm(entityPrivateKey)
+	keyType, err := algo.GetKeyTypeFromKey(entityPrivateKey)
 	if err != nil {
 		return nil, err
 	}
-	return jws.Sign(payload, jwa.SignatureAlgorithm(algorithm.JWAIdentifier()), entityPrivateKey, jws.WithHeaders(&headers))
+	return jws.Sign(payload, jwa.SignatureAlgorithm(keyType.SigningAlgorithm().JWAIdentifier()), entityPrivateKey, jws.WithHeaders(&headers))
 }
 
 type CertificateVerifier interface {
@@ -564,43 +526,29 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.
 // It returns an error if the given legalEntity does not have a private key.
 func (client *Crypto) decryptCipherTextFor(cipherText []byte, legalEntity types.LegalEntity) ([]byte, error) {
-
 	key, err := client.Storage.GetPrivateKey(legalEntity)
-
 	if err != nil {
 		return nil, err
 	}
-
-	plainText, err := decryptWithPrivateKey(cipherText, key)
-
+	keyType, err := algo.GetKeyTypeFromKey(key)
 	if err != nil {
 		return nil, err
 	}
-
-	return plainText, nil
+	return keyType.EncryptionAlgorithm().Decrypt(cipherText, key)
 }
 
 // Encrypt a piece of data for a legalEntity. Usually encryptPlainTextWith will be used with a public key of a different (unknown) legalEntity.
 // It returns an error if the given legalEntity does not have a private key.
 func (client *Crypto) encryptPlainTextFor(plaintext []byte, legalEntity types.LegalEntity) ([]byte, error) {
-
 	publicKey, err := client.Storage.GetPublicKey(legalEntity)
-
 	if err != nil {
 		return nil, err
 	}
-
-	return client.encryptPlainTextWith(plaintext, publicKey)
-}
-
-// Encrypt a piece of data with the given public key
-func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey) ([]byte, error) {
-	hash := sha512.New()
-	ciphertext, err := rsa.EncryptOAEP(hash, rand.Reader, key, plaintext, nil)
+	keyType, err := algo.GetKeyTypeFromKey(publicKey)
 	if err != nil {
 		return nil, err
 	}
-	return ciphertext, nil
+	return keyType.EncryptionAlgorithm().Encrypt(plaintext, publicKey)
 }
 
 func (client *Crypto) logger() *logrus.Entry {
@@ -626,13 +574,4 @@ func parseJWS(signature []byte) (*jws.Message, error) {
 		return nil, fmt.Errorf("JWS is signed with unsupported algorithm (%v)", sig.ProtectedHeaders().Algorithm())
 	}
 	return m, nil
-}
-
-func hashAndSignRSAWithSHA256(key interface{}, dataToBeSigned []byte) ([]byte, error) {
-	rsaKey, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("key should be *rsa.PrivateKey")
-	}
-	hash := sha256.Sum256(dataToBeSigned)
-	return rsaKey.Sign(rand.Reader, hash[:], crypto.SHA256)
 }

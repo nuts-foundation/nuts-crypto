@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -24,6 +25,10 @@ func getRSAKeyTypes() []KeyType {
 
 type rsaKey struct {
 	bits int
+}
+
+func (e rsaKey) EncryptionAlgorithm() EncryptionAlgorithm {
+	return rsaOAEPEncryptionAlgorithm{}
 }
 
 func (e rsaKey) SigningAlgorithm() SigningAlgorithm {
@@ -89,7 +94,7 @@ func (s rsaSigningAlgorithm) JWAIdentifier() string {
 }
 
 func (s rsaSigningAlgorithm) Sign(dataToBeSigned []byte, key interface{}) ([]byte, error) {
-	if !getRSAKeyTypes()[0].Matches(key) {
+	if !isSupportedRSAKey(key) {
 		return nil, UnsupportedKeyTypeError(key)
 	}
 	// Cast is safe since Matches() checked the type
@@ -98,7 +103,7 @@ func (s rsaSigningAlgorithm) Sign(dataToBeSigned []byte, key interface{}) ([]byt
 }
 
 func (s rsaSigningAlgorithm) VerifySignature(data []byte, signature []byte, key interface{}) (bool, error) {
-	if !getRSAKeyTypes()[0].Matches(key) {
+	if !isSupportedRSAKey(key) {
 		return false, UnsupportedKeyTypeError(key)
 	}
 	// Cast is safe since Matches() checked the type
@@ -114,3 +119,43 @@ func (s rsaSigningAlgorithm) VerifySignature(data []byte, signature []byte, key 
 	return err == nil, resultingErr
 }
 
+func isSupportedRSAKey(key interface{}) bool {
+	for _, kt := range getRSAKeyTypes() {
+		if kt.Matches(key) {
+			return true
+		}
+	}
+	return false
+}
+
+type rsaOAEPEncryptionAlgorithm struct {
+
+}
+
+func (r rsaOAEPEncryptionAlgorithm) Encrypt(data []byte, key interface{}) ([]byte, error) {
+	if !isSupportedRSAKey(key) {
+		return nil, UnsupportedKeyTypeError(key)
+	}
+	// Cast is safe since Matches() checked the type
+	pubKey := key.(*rsa.PublicKey)
+	hash := sha512.New()
+	cipherText, err := rsa.EncryptOAEP(hash, rand.Reader, pubKey, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	return cipherText, nil
+}
+
+func (r rsaOAEPEncryptionAlgorithm) Decrypt(data []byte, key interface{}) ([]byte, error) {
+	if !isSupportedRSAKey(key) {
+		return nil, UnsupportedKeyTypeError(key)
+	}
+	// Cast is safe since Matches() checked the type
+	privKey := key.(*rsa.PrivateKey)
+	hash := sha512.New()
+	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, privKey, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
+}

@@ -12,6 +12,8 @@ type KeyType interface {
 	MarshalPEM(key interface{}) (string, error)
 	// SigningAlgorithm returns the recommended signing algorithm for this key type
 	SigningAlgorithm() SigningAlgorithm
+	// EncryptionAlgorithm returns the recommended encryption algorithm for this key type
+	EncryptionAlgorithm() EncryptionAlgorithm
 	CreateHMAC(privKey interface{}) (hash.Hash, error)
 }
 
@@ -25,6 +27,11 @@ type SigningAlgorithm interface {
 	// VerifySignature verifies the given signature. The key should be a pointer to the public key.
 	// If the key type is not supported by the algorithm, an error is returned.
 	VerifySignature(data []byte, signature []byte, key interface{}) (bool, error)
+}
+
+type EncryptionAlgorithm interface {
+	Encrypt(data []byte, key interface{}) ([]byte, error)
+	Decrypt(data []byte, key interface{}) ([]byte, error)
 }
 
 func UnsupportedKeyTypeError(kt interface{}) error {

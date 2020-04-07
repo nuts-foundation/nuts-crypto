@@ -4,11 +4,15 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/asn1"
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwe"
+	"hash"
 	"math/big"
 )
 
@@ -58,6 +62,10 @@ func (s ecSigningAlgorithm) JWAIdentifier() string {
 
 type ecKey struct {
 	curve elliptic.Curve
+}
+
+func (e ecKey) EncryptionAlgorithm() EncryptionAlgorithm {
+	return ecEncryptionAlgorithm{}
 }
 
 func (e ecKey) SigningAlgorithm() SigningAlgorithm {
@@ -111,4 +119,16 @@ func (e ecKey) Generate() (privKey interface{}, pubKey interface{}, err error) {
 
 func (e ecKey) Identifier() string {
 	return fmt.Sprintf("%s-%s", "EC", e.curve.Params().Name)
+}
+
+type ecEncryptionAlgorithm struct {
+}
+
+func (e ecEncryptionAlgorithm) Encrypt(data []byte, key interface{}) ([]byte, error) {
+	jwe.NewMultiEncrypt()
+	return jwe.Encrypt(data, jwa.ECDH_ES_A256KW, key, jwa.A256GCM, jwa.NoCompress)
+}
+
+func (e ecEncryptionAlgorithm) Decrypt(data []byte, key interface{}) ([]byte, error) {
+	return jwe.Decrypt(data, jwa.ECDH_ES_A256KW, key)
 }

@@ -37,7 +37,7 @@ const ConfigFSPathDefault string = "./"
 const ConfigKeyType string = "keytype"
 
 // default setting for --keytype
-var ConfigKeyTypeDefault = algo.RecommendedKeyTypes()[0].Identifier()
+var ConfigKeyTypeDefault = algo.SupportedKeyTypes()[0].Identifier()
 
 // type identifying the legalEntity responsible for the Patient/medical data
 type LegalEntity struct {
