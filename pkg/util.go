@@ -148,12 +148,6 @@ func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
 	root := map[string]interface{}{}
 	// unreachable err
 	_ = key.PopulateMap(root)
-	if root[jwk.X509CertChainKey] != nil {
-		// Bug in JWK library: X.509 certificate chain isn't marshalled correctly
-		// Reported: https://github.com/lestrrat-go/jwx/issues/139
-		chain := root[jwk.X509CertChainKey].([]*x509.Certificate)
-		root[jwk.X509CertChainKey] = marshalX509CertChain(chain)
-	}
 	return root, nil
 }
 
