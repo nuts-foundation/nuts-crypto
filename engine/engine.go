@@ -21,7 +21,6 @@ package engine
 import (
 	"encoding/json"
 	"errors"
-	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/nuts-foundation/nuts-crypto/api"
@@ -44,7 +43,7 @@ func NewCryptoEngine() *engine.Engine {
 		Configure: cb.Configure,
 		FlagSet:   flagSet(),
 		Name:      "Crypto",
-		Routes: func(router runtime.EchoRouter) {
+		Routes: func(router engine.EchoRouter) {
 			api.RegisterHandlers(router, &api.ApiWrapper{C: cb})
 		},
 	}

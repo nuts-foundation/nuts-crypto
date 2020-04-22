@@ -14,52 +14,86 @@ import (
 
 // DecryptRequest defines model for DecryptRequest.
 type DecryptRequest struct {
-	CipherText    string     `json:"cipherText"`
-	CipherTextKey string     `json:"cipherTextKey"`
-	LegalEntity   Identifier `json:"legalEntity"`
-	Nonce         string     `json:"nonce"`
+
+	// Base64 encoded cipherText
+	CipherText string `json:"cipherText"`
+
+	// base64 encoded encrypted symmetric key
+	CipherTextKey string `json:"cipherTextKey"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+	LegalEntity Identifier `json:"legalEntity"`
+
+	// base64 encoded nonce
+	Nonce string `json:"nonce"`
 }
 
 // DecryptResponse defines model for DecryptResponse.
 type DecryptResponse struct {
+
+	// Base64 encoded plain text
 	PlainText string `json:"plainText"`
 }
 
 // EncryptRequest defines model for EncryptRequest.
 type EncryptRequest struct {
 	EncryptRequestSubjects []EncryptRequestSubject `json:"encryptRequestSubjects"`
-	PlainText              string                  `json:"plainText"`
+
+	// Base64 encoded binary data
+	PlainText string `json:"plainText"`
 }
 
 // EncryptRequestSubject defines model for EncryptRequestSubject.
 type EncryptRequestSubject struct {
-	Jwk         *JWK       `json:"jwk,omitempty"`
+
+	// as described by https://tools.ietf.org/html/rfc7517. Modelled as object so libraries can parse the tokens themselves.
+	Jwk *JWK `json:"jwk,omitempty"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
 	LegalEntity Identifier `json:"legalEntity"`
-	PublicKey   *PublicKey `json:"publicKey,omitempty"`
+
+	// PEM encoded public key
+	PublicKey *PublicKey `json:"publicKey,omitempty"`
 }
 
 // EncryptResponse defines model for EncryptResponse.
 type EncryptResponse struct {
+
+	// Base64 encoded encrypted text
 	CipherText             string                 `json:"cipherText"`
 	EncryptResponseEntries []EncryptResponseEntry `json:"encryptResponseEntries"`
-	Nonce                  string                 `json:"nonce"`
+
+	// Base64 encoded nonce
+	Nonce string `json:"nonce"`
 }
 
 // EncryptResponseEntry defines model for EncryptResponseEntry.
 type EncryptResponseEntry struct {
-	CipherTextKey string     `json:"cipherTextKey"`
-	LegalEntity   Identifier `json:"legalEntity"`
+
+	// Base64 encoded encrypted key
+	CipherTextKey string `json:"cipherTextKey"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+	LegalEntity Identifier `json:"legalEntity"`
 }
 
 // ExternalIdRequest defines model for ExternalIdRequest.
 type ExternalIdRequest struct {
-	Actor       Identifier `json:"actor"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+	Actor Identifier `json:"actor"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
 	LegalEntity Identifier `json:"legalEntity"`
-	Subject     Identifier `json:"subject"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+	Subject Identifier `json:"subject"`
 }
 
 // ExternalIdResponse defines model for ExternalIdResponse.
 type ExternalIdResponse struct {
+
+	// hex encoded identifier
 	ExternalId string `json:"externalId"`
 }
 
@@ -76,74 +110,94 @@ type PublicKey string
 
 // SignJwtRequest defines model for SignJwtRequest.
 type SignJwtRequest struct {
-	Claims      map[string]interface{} `json:"claims"`
-	LegalEntity Identifier             `json:"legalEntity"`
+	Claims map[string]interface{} `json:"claims"`
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
+	LegalEntity Identifier `json:"legalEntity"`
 }
 
 // SignRequest defines model for SignRequest.
 type SignRequest struct {
+
+	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
 	LegalEntity Identifier `json:"legalEntity"`
-	PlainText   string     `json:"plainText"`
+
+	// Base64 encoded data
+	PlainText string `json:"plainText"`
 }
 
 // SignResponse defines model for SignResponse.
 type SignResponse struct {
+
+	// hex encoded signature
 	Signature string `json:"signature"`
 }
 
 // VerifyRequest defines model for VerifyRequest.
 type VerifyRequest struct {
-	Jwk       *JWK       `json:"jwk,omitempty"`
-	PlainText string     `json:"plainText"`
+
+	// as described by https://tools.ietf.org/html/rfc7517. Modelled as object so libraries can parse the tokens themselves.
+	Jwk *JWK `json:"jwk,omitempty"`
+
+	// Base64 encoded binary data
+	PlainText string `json:"plainText"`
+
+	// PEM encoded public key
 	PublicKey *PublicKey `json:"publicKey,omitempty"`
-	Signature string     `json:"signature"`
+
+	// hex encoded signature
+	Signature string `json:"signature"`
 }
 
 // VerifyResponse defines model for VerifyResponse.
 type VerifyResponse struct {
+
+	// true or false
 	Outcome bool `json:"outcome"`
 }
 
-// decryptJSONBody defines parameters for Decrypt.
-type decryptJSONBody DecryptRequest
+// DecryptJSONBody defines parameters for Decrypt.
+type DecryptJSONBody DecryptRequest
 
-// encryptJSONBody defines parameters for Encrypt.
-type encryptJSONBody EncryptRequest
+// EncryptJSONBody defines parameters for Encrypt.
+type EncryptJSONBody EncryptRequest
 
-// externalIdJSONBody defines parameters for ExternalId.
-type externalIdJSONBody ExternalIdRequest
+// ExternalIdJSONBody defines parameters for ExternalId.
+type ExternalIdJSONBody ExternalIdRequest
 
 // GenerateKeyPairParams defines parameters for GenerateKeyPair.
 type GenerateKeyPairParams struct {
+
+	// URN identifying the legal entity
 	LegalEntity Identifier `json:"legalEntity"`
 }
 
-// signJSONBody defines parameters for Sign.
-type signJSONBody SignRequest
+// SignJSONBody defines parameters for Sign.
+type SignJSONBody SignRequest
 
-// signJwtJSONBody defines parameters for SignJwt.
-type signJwtJSONBody SignJwtRequest
+// SignJwtJSONBody defines parameters for SignJwt.
+type SignJwtJSONBody SignJwtRequest
 
-// verifyJSONBody defines parameters for Verify.
-type verifyJSONBody VerifyRequest
+// VerifyJSONBody defines parameters for Verify.
+type VerifyJSONBody VerifyRequest
 
 // DecryptRequestBody defines body for Decrypt for application/json ContentType.
-type DecryptJSONRequestBody decryptJSONBody
+type DecryptJSONRequestBody DecryptJSONBody
 
 // EncryptRequestBody defines body for Encrypt for application/json ContentType.
-type EncryptJSONRequestBody encryptJSONBody
+type EncryptJSONRequestBody EncryptJSONBody
 
 // ExternalIdRequestBody defines body for ExternalId for application/json ContentType.
-type ExternalIdJSONRequestBody externalIdJSONBody
+type ExternalIdJSONRequestBody ExternalIdJSONBody
 
 // SignRequestBody defines body for Sign for application/json ContentType.
-type SignJSONRequestBody signJSONBody
+type SignJSONRequestBody SignJSONBody
 
 // SignJwtRequestBody defines body for SignJwt for application/json ContentType.
-type SignJwtJSONRequestBody signJwtJSONBody
+type SignJwtJSONRequestBody SignJwtJSONBody
 
 // VerifyRequestBody defines body for Verify for application/json ContentType.
-type VerifyJSONRequestBody verifyJSONBody
+type VerifyJSONRequestBody VerifyJSONBody
 
 // Getter for additional properties for JWK. Returns the specified
 // element and whether it was found
@@ -200,21 +254,29 @@ func (a JWK) MarshalJSON() ([]byte, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// decrypt a cipherText for the given legalEntity// (POST /crypto/decrypt)
+	// decrypt a cipherText for the given legalEntity
+	// (POST /crypto/decrypt)
 	Decrypt(ctx echo.Context) error
-	// encrypt a piece of data for a list of public keys/legalEntity's. A single symmetric keys will be used for all entries// (POST /crypto/encrypt)
+	// encrypt a piece of data for a list of public keys/legalEntity's. A single symmetric keys will be used for all entries
+	// (POST /crypto/encrypt)
 	Encrypt(ctx echo.Context) error
-	// calculate an externalId for a (custodian, subject, actor) triple// (POST /crypto/external_id)
+	// calculate an externalId for a (custodian, subject, actor) triple
+	// (POST /crypto/external_id)
 	ExternalId(ctx echo.Context) error
-	// Send a request for checking if the given combination has valid consent// (POST /crypto/generate)
+	// Send a request for checking if the given combination has valid consent
+	// (POST /crypto/generate)
 	GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error
-	// get the public key for a given organization. It returns the key in PEM or JWK form. This depends on the accept header used (text/plain vs application/json)// (GET /crypto/public_key/{urn})
+	// get the public key for a given organization. It returns the key in PEM or JWK form. This depends on the accept header used (text/plain vs application/json)
+	// (GET /crypto/public_key/{urn})
 	PublicKey(ctx echo.Context, urn string) error
-	// sign a piece of data with the private key of the given legalEntity// (POST /crypto/sign)
+	// sign a piece of data with the private key of the given legalEntity
+	// (POST /crypto/sign)
 	Sign(ctx echo.Context) error
-	// sign a JWT payload with the private key of the given legalEntity// (POST /crypto/sign_jwt)
+	// sign a JWT payload with the private key of the given legalEntity
+	// (POST /crypto/sign_jwt)
 	SignJwt(ctx echo.Context) error
-	// verify a signature given a public key, signature and the data// (POST /crypto/verify)
+	// verify a signature given a public key, signature and the data
+	// (POST /crypto/verify)
 	Verify(ctx echo.Context) error
 }
 
@@ -257,11 +319,6 @@ func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GenerateKeyPairParams
 	// ------------- Required query parameter "legalEntity" -------------
-	if paramValue := ctx.QueryParam("legalEntity"); paramValue != "" {
-
-	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Query argument legalEntity is required, but not found"))
-	}
 
 	err = runtime.BindQueryParameter("form", true, true, "legalEntity", ctx.QueryParams(), &params.LegalEntity)
 	if err != nil {
@@ -316,8 +373,23 @@ func (w *ServerInterfaceWrapper) Verify(ctx echo.Context) error {
 	return err
 }
 
+// This is a simple interface which specifies echo.Route addition functions which
+// are present on both echo.Echo and echo.Group, since we want to allow using
+// either of them for path registration
+type EchoRouter interface {
+	CONNECT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	DELETE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	GET(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	HEAD(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	OPTIONS(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	PATCH(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+}
+
 // RegisterHandlers adds each server route to the EchoRouter.
-func RegisterHandlers(router runtime.EchoRouter, si ServerInterface) {
+func RegisterHandlers(router EchoRouter, si ServerInterface) {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
