@@ -73,7 +73,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 	c := pkg.CryptoInstance()
 	c.Config.Fspath = "../temp"
 	c.Configure()
-	c.GenerateKeyPairFor(types.LegalEntity{URI: "legalEntity"})
+	c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
 	cmd := e.Cmd
 
 	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
@@ -117,11 +117,10 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		cmd.SetArgs([]string{"publicKey", "legalEntityMissing"})
 		cmd.SetOut(buf)
 		err := cmd.Execute()
-
-		if assert.NoError(t, err) {
-			expected := "Error printing publicKey: could not open entry for legalEntity: legalEntityMissing with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: entry not found"
-			assert.Contains(t, buf.String(), expected)
+		if !assert.NoError(t, err) {
+			return
 		}
+		assert.Equal(t, "Error printing publicKey: could not open entry [legalEntityMissing|] with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: entry not found", buf.String())
 	})
 
 	t.Run("Running publicKey returns pem", func(t *testing.T) {

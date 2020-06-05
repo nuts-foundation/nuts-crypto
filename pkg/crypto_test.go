@@ -20,6 +20,7 @@ package pkg
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -31,7 +32,6 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
-	"github.com/nuts-foundation/nuts-crypto/log"
 	"github.com/nuts-foundation/nuts-crypto/test"
 	"os"
 	"reflect"
@@ -45,6 +45,9 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
+
+var extension = pkix.Extension{Id: []int{1, 2}, Critical: false, Value: []byte("test")}
+var key = types.KeyForEntity(types.LegalEntity{URI: "urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
 
 func TestCryptoBackend(t *testing.T) {
 	t.Run("CryptoInstance always returns same instance", func(t *testing.T) {
@@ -70,22 +73,22 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 	client := defaultBackend(t.Name())
 
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
-		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
+		_, err := client.GenerateKeyPair(key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 	})
 
-	t.Run("Missing legalEntity generates error", func(t *testing.T) {
-		err := client.GenerateKeyPairFor(types.LegalEntity{})
+	t.Run("Missing key identifier generates error", func(t *testing.T) {
+		_, err := client.GenerateKeyPair(nil)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
 		}
 
-		if !errors.Is(err, ErrMissingLegalEntityURI) {
-			t.Errorf("Expected error [%v], got [%v]", ErrMissingLegalEntityURI, err)
+		if !errors.Is(err, ErrInvalidKeyIdentifier) {
+			t.Errorf("Expected error [%v], got [%v]", ErrInvalidKeyIdentifier, err)
 		}
 	})
 
@@ -95,7 +98,7 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 			Config:  CryptoConfig{Keysize: 1},
 		}
 
-		err := client.GenerateKeyPairFor(types.LegalEntity{"urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
+		_, err := client.GenerateKeyPair(key)
 
 		if err == nil {
 			t.Errorf("Expected error got nothing")
@@ -110,18 +113,18 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "test"}
+		key := types.KeyForEntity(types.LegalEntity{URI: "test"})
 		plaintext := "for your eyes only"
 
-		client.GenerateKeyPairFor(legalEntity)
+		client.GenerateKeyPair(key)
 
-		cipherText, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
+		cipherText, err := client.encryptPlainTextFor([]byte(plaintext), key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		decryptedText, err := client.decryptCipherTextFor(cipherText, legalEntity)
+		decryptedText, err := client.decryptCipherTextFor(cipherText, key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -133,7 +136,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
-		_, err := client.decryptCipherTextFor([]byte(""), types.LegalEntity{URI: "other"})
+		_, err := client.decryptCipherTextFor([]byte(""), types.KeyForEntity(types.LegalEntity{URI: "other"}))
 
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
@@ -144,10 +147,10 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 	defer emptyTemp(t.Name())
 
 	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "testEncrypt"}
+		key := types.KeyForEntity(types.LegalEntity{URI: "testEncrypt"})
 		plaintext := "for your eyes only"
 
-		_, err := client.encryptPlainTextFor([]byte(plaintext), legalEntity)
+		_, err := client.encryptPlainTextFor([]byte(plaintext), key)
 
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
@@ -162,7 +165,7 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 
 		sKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		pKey, _ := jwk.New(sKey.Public())
-		_, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pKey})
+		_, err := client.EncryptKeyAndPlainText([]byte(plaintext), []jwk.Key{pKey})
 
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "invalid algorithm for public key")
@@ -173,17 +176,16 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	legalEntity := types.LegalEntity{URI: "testDecrypt"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
-		pubKey, _ := client.PublicKeyInJWK(legalEntity)
-		encRecord, err := client.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
+		pubKey, _ := client.GetPublicKeyAsJWK(key)
+		encRecord, err := client.EncryptKeyAndPlainText([]byte(plaintext), []jwk.Key{pubKey})
 
 		if assert.NoError(t, err) {
-			decryptedText, err := client.DecryptKeyAndCipherTextFor(encRecord, legalEntity)
+			decryptedText, err := client.DecryptKeyAndCipherText(encRecord, key)
 
 			if assert.NoError(t, err) {
 				assert.Equal(t, plaintext, string(decryptedText))
@@ -197,7 +199,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 				{},
 			},
 		}
-		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+		_, err := client.DecryptKeyAndCipherText(ct, key)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
@@ -217,7 +219,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 				cipherText,
 			},
 		}
-		_, err := client.DecryptKeyAndCipherTextFor(ct, types.LegalEntity{URI: "testU"})
+		_, err := client.DecryptKeyAndCipherText(ct, key.WithQualifier("missing"))
 
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
@@ -227,7 +229,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Broken cipher text returns error", func(t *testing.T) {
 		_, symkey, _ := generateSymmetricKey()
 		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
-		pk, _ := client.Storage.GetPublicKey(legalEntity)
+		pk, _ := client.Storage.GetPublicKey(key)
 		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
 
 		ct := types.DoubleEncryptedCipherText{
@@ -236,7 +238,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			},
 			CipherText: cipherText[1:],
 		}
-		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+		_, err := client.DecryptKeyAndCipherText(ct, key)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
@@ -250,7 +252,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	t.Run("Incorrect number of cipherTextKeys returns error", func(t *testing.T) {
 		_, symkey, _ := generateSymmetricKey()
 		cipherTextKey, _, _ := encryptWithSymmetricKey([]byte("test"), symkey)
-		pk, _ := client.Storage.GetPublicKey(legalEntity)
+		pk, _ := client.Storage.GetPublicKey(key)
 		cipherText, _ := client.encryptPlainTextWith(cipherTextKey, pk)
 
 		ct := types.DoubleEncryptedCipherText{
@@ -260,7 +262,7 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 			},
 			CipherText: cipherText,
 		}
-		_, err := client.DecryptKeyAndCipherTextFor(ct, legalEntity)
+		_, err := client.DecryptKeyAndCipherText(ct, key)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
@@ -273,21 +275,30 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	})
 }
 
+func TestCrypto_SignFor(t *testing.T) {
+	t.Run("error - private key does not exist", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		defer emptyTemp(t.Name())
+		sig, err := client.Sign([]byte{1, 2, 3}, key)
+		assert.Error(t, err)
+		assert.Nil(t, sig)
+	})
+}
+
 func TestCrypto_VerifyWith(t *testing.T) {
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		data := []byte("hello")
-		legalEntity := types.LegalEntity{URI: "test"}
 		client := defaultBackend(t.Name())
 		defer emptyTemp(t.Name())
-		client.GenerateKeyPairFor(legalEntity)
+		client.GenerateKeyPair(key)
 
-		sig, err := client.SignFor(data, legalEntity)
+		sig, err := client.Sign(data, key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
 		}
 
-		pub, err := client.PublicKeyInJWK(legalEntity)
+		pub, err := client.GetPublicKeyAsJWK(key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -303,20 +314,28 @@ func TestCrypto_VerifyWith(t *testing.T) {
 			t.Error("Expected signature to be valid")
 		}
 	})
+	t.Run("error - signature invalid", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		defer emptyTemp(t.Name())
+		client.GenerateKeyPair(key)
+		keyAsJWK, _ := client.GetPublicKeyAsJWK(key)
+		result, err := client.VerifyWith([]byte("hello"), []byte{1, 2, 3}, keyAsJWK)
+		assert.False(t, result)
+		assert.EqualError(t, err, "crypto/rsa: verification error")
+	})
 }
 
 func TestCrypto_ExternalIdFor(t *testing.T) {
 	defer emptyTemp(t.Name())
 	client := defaultBackend(t.Name())
-	legalEntity := types.LegalEntity{URI: "testE"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
-	t.Run("ExternalId creates same Id for given identifier and legalEntity", func(t *testing.T) {
+	t.Run("ExternalId creates same Id for given identifier and key", func(t *testing.T) {
 		subject := "test_patient"
 		actor := "test_actor"
 
-		bytes1, err := client.ExternalIdFor(subject, actor, legalEntity)
-		bytes2, err := client.ExternalIdFor(subject, actor, legalEntity)
+		bytes1, err := client.CalculateExternalId(subject, actor, key)
+		bytes2, err := client.CalculateExternalId(subject, actor, key)
 
 		if err != nil {
 			t.Errorf("Expected no error, Got %s", err.Error())
@@ -327,12 +346,11 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 		}
 	})
 
-	t.Run("ExternalId generates error for unknown legalEntity", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "test2"}
+	t.Run("ExternalId generates error for unknown key", func(t *testing.T) {
 		subject := "test_patient"
 		actor := "test_actor"
 
-		_, err := client.ExternalIdFor(subject, actor, legalEntity)
+		_, err := client.CalculateExternalId(subject, actor, key.WithQualifier("unknown"))
 
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
@@ -340,7 +358,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	})
 
 	t.Run("ExternalId generates error for missing subject", func(t *testing.T) {
-		_, err := client.ExternalIdFor("", "", legalEntity)
+		_, err := client.CalculateExternalId("", "", key)
 
 		if err == nil {
 			t.Errorf("Expected error, got nothing")
@@ -353,7 +371,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 	})
 
 	t.Run("ExternalId generates error for missing actor", func(t *testing.T) {
-		_, err := client.ExternalIdFor("subject", "", legalEntity)
+		_, err := client.CalculateExternalId("subject", "", key)
 
 		if err == nil {
 			t.Errorf("Expected error, got nothing")
@@ -367,21 +385,19 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 }
 
 func TestCrypto_PublicKeyInPem(t *testing.T) {
-	legalEntity := types.LegalEntity{URI: "testPK"}
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
-		pub, err := client.PublicKeyInPEM(legalEntity)
+		pub, err := client.GetPublicKeyAsPEM(key)
 
 		assert.Nil(t, err)
 		assert.NotEmpty(t, pub)
 	})
 
 	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
-		_, err := client.PublicKeyInPEM(legalEntity)
+		_, err := client.GetPublicKeyAsPEM(key.WithQualifier("testtest"))
 
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
@@ -398,13 +414,12 @@ func TestCrypto_PublicKeyInPem(t *testing.T) {
 }
 
 func TestCrypto_PublicKeyInJWK(t *testing.T) {
-	legalEntity := types.LegalEntity{URI: "testPK"}
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
-		pub, err := client.PublicKeyInJWK(legalEntity)
+		pub, err := client.GetPublicKeyAsJWK(key)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, pub)
@@ -412,8 +427,7 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 	})
 
 	t.Run("Public key for unknown entity returns error", func(t *testing.T) {
-		legalEntity := types.LegalEntity{URI: "testPKUnknown"}
-		_, err := client.PublicKeyInJWK(legalEntity)
+		_, err := client.GetPublicKeyAsJWK(key.WithQualifier("foo"))
 
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
@@ -424,16 +438,15 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 func TestCrypto_SignJwtFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	legalEntity := types.LegalEntity{URI: "testSignJwt"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
 	t.Run("creates valid JWT", func(t *testing.T) {
-		tokenString, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, legalEntity)
+		tokenString, err := client.SignJWT(map[string]interface{}{"iss": "nuts"}, key)
 
 		assert.Nil(t, err)
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			pubKey, _ := client.Storage.GetPublicKey(legalEntity)
+			pubKey, _ := client.Storage.GetPublicKey(key)
 			return pubKey, nil
 		})
 
@@ -442,7 +455,7 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 	})
 
 	t.Run("returns error for not found", func(t *testing.T) {
-		_, err := client.SignJwtFor(map[string]interface{}{"iss": "nuts"}, types.LegalEntity{URI: "notFound"})
+		_, err := client.SignJWT(map[string]interface{}{"iss": "nuts"}, key.WithQualifier("notfound"))
 
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
@@ -464,21 +477,20 @@ func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error
 func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	selfSignCertificate := func(entity types.LegalEntity, keyUsage x509.KeyUsage) *x509.Certificate {
-		client.GenerateKeyPairFor(entity)
-		privateKey, _ := client.GetOpaquePrivateKey(entity)
+	selfSignCertificate := func(key types.KeyIdentifier, keyUsage x509.KeyUsage) *x509.Certificate {
+		client.GenerateKeyPair(key)
+		privateKey, _ := client.GetPrivateKey(key)
 		csr, _ := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
-			Subject:   pkix.Name{CommonName: entity.URI},
+			Subject:   pkix.Name{CommonName: key.Owner()},
 			PublicKey: privateKey.Public(),
 		}, privateKey)
-		asn1Cert, _ := client.SignCertificate(entity, entity, csr, CertificateProfile{NumDaysValid: 10, IsCA: true, KeyUsage: keyUsage})
+		asn1Cert, _ := client.SignCertificate(key, key, csr, CertificateProfile{NumDaysValid: 10, IsCA: true, KeyUsage: keyUsage})
 		cert, _ := x509.ParseCertificate(asn1Cert)
 		return cert
 	}
 
-	entity := types.LegalEntity{URI: "testJWSSignEphemeral"}
 	verifier := poolCertVerifier{pool: x509.NewCertPool()}
-	caCertificate := selfSignCertificate(entity, 0)
+	caCertificate := selfSignCertificate(key, 0)
 	verifier.pool.AddCert(caCertificate)
 
 	var sourceStruct = struct {
@@ -491,8 +503,8 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	dataToBeSigned, _ := json.Marshal(sourceStruct)
 
 	t.Run("ok - roundtrip", func(t *testing.T) {
-		signature, err := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: entity.URI},
+		signature, err := client.SignJWSEphemeral(dataToBeSigned, key, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: key.Owner()},
 		}, time.Now())
 		if !assert.NoError(t, err) {
 			return
@@ -515,8 +527,8 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		assert.Equal(t, dataToBeSigned, parsedSignature.Payload())
 	})
 	t.Run("error - certificate not trusted", func(t *testing.T) {
-		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: entity.URI},
+		signature, _ := client.SignJWSEphemeral(dataToBeSigned, key, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: key.Owner()},
 		}, time.Now())
 		payload, err := client.VerifyJWS(signature, time.Now(), poolCertVerifier{pool: x509.NewCertPool()})
 		assert.EqualError(t, err, "X.509 certificate not trusted: x509: certificate signed by unknown authority")
@@ -524,31 +536,31 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	})
 	t.Run("error - certificate not valid at time of signing", func(t *testing.T) {
 		signingTime := time.Now().AddDate(-1, 0, 0)
-		signature, _ := client.JWSSignEphemeral(dataToBeSigned, entity, x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: entity.URI},
+		signature, _ := client.SignJWSEphemeral(dataToBeSigned, key, x509.CertificateRequest{
+			Subject: pkix.Name{CommonName: key.Owner()},
 		}, signingTime)
 		payload, err := client.VerifyJWS(signature, time.Now(), verifier)
 		assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - certificate not meant for signing", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
-		certificate := selfSignCertificate(entity, 0)
+		certificate := selfSignCertificate(key, 0)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 		h := jws.StandardHeaders{}
-		certificate := selfSignCertificate(entity, x509.KeyUsageDigitalSignature)
+		certificate := selfSignCertificate(key, x509.KeyUsageDigitalSignature)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
 		assert.Nil(t, payload)
@@ -604,14 +616,106 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	})
 }
 
+func TestCrypto_GetTLSCertificate(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	client.GenerateKeyPair(key)
+	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
+		Country:      []string{"NL"},
+		Organization: []string{"Zorg Inc."},
+	}, time.Now(), 1)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.NotNil(t, caCertificate)
+
+	t.Run("ok", func(t *testing.T) {
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, certificate)
+		assert.NotNil(t, privateKey)
+	})
+	t.Run("ok - cert exists", func(t *testing.T) {
+		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, expectedCert, certificate)
+		assert.Equal(t, expectedPrivateKey, privateKey)
+	})
+	t.Run("ok - cert exists, but expired, so issue new one", func(t *testing.T) {
+		publicKey, _ := client.GenerateKeyPair(key)
+		existingCert, _ := selfSignCACertificateEx(client, key, caCertificate.Subject, time.Now().Add(-48*time.Hour), 1)
+		client.Storage.SaveCertificate(key.WithQualifier("tls"), existingCert.Raw)
+		newCertificate, newPrivateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, newCertificate)
+		assert.NotNil(t, newPrivateKey)
+		// Assert new certificate and key pair differ from existing one
+		assert.NotEqual(t, existingCert, newCertificate)
+		assert.NotEqual(t, (newPrivateKey.(crypto.Signer)).Public(), publicKey)
+	})
+	t.Run("error - cert exists, private key is invalid", func(t *testing.T) {
+		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, expectedCert, certificate)
+		assert.Equal(t, expectedPrivateKey, privateKey)
+	})
+	t.Run("error - existing cert invalid", func(t *testing.T) {
+		client.Storage.SaveCertificate(key.WithQualifier("tls"), []byte{1, 2, 3})
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		assert.Error(t, err)
+		assert.Nil(t, certificate)
+		assert.Nil(t, privateKey)
+	})
+	t.Run("error - no CA certificate found", func(t *testing.T) {
+		certificate, privateKey, err := client.GetTLSCertificate(types.KeyForEntity(types.LegalEntity{URI: "non-existent"}))
+		assert.EqualError(t, err, "unable to retrieve CA certificate [non-existent|]")
+		assert.Nil(t, certificate)
+		assert.Nil(t, privateKey)
+	})
+	t.Run("error - CA certificate subject missing country", func(t *testing.T) {
+		_, _ = selfSignCACertificateEx(client, key, pkix.Name{
+			Organization: []string{"Zorg Inc."},
+		}, time.Now(), 1)
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'C' component")
+		assert.Nil(t, certificate)
+		assert.Nil(t, privateKey)
+	})
+	t.Run("error - CA certificate subject missing org", func(t *testing.T) {
+		_, _ = selfSignCACertificateEx(client, key, pkix.Name{
+			Country: []string{"NL"},
+		}, time.Now(), 1)
+		certificate, privateKey, err := client.GetTLSCertificate(key)
+		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'O' component")
+		assert.Nil(t, certificate)
+		assert.Nil(t, privateKey)
+	})
+}
+
 func TestCrypto_SignCertificate(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	ca := types.LegalEntity{URI: "Root CA"}
-	client.GenerateKeyPairFor(ca)
-	caPrivateKey, _ := client.GetOpaquePrivateKey(ca)
-	endEntity := types.LegalEntity{URI: "End Entity"}
-	intermediateCa := types.LegalEntity{URI: "Intermediate CA"}
+	ca := key
+	client.GenerateKeyPair(ca)
+	caPrivateKey, _ := client.GetPrivateKey(ca)
+	endEntityKey := types.KeyForEntity(types.LegalEntity{URI: "End Entity"})
+	intermediateCaKey := types.KeyForEntity(types.LegalEntity{URI: "Intermediate CA"})
 
 	roots := x509.NewCertPool()
 
@@ -620,30 +724,10 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		client = defaultBackend(t.Name())
 	}
 
-	var signRoot = func() *x509.Certificate {
-		extension := pkix.Extension{Id: []int{1, 2}, Critical: false, Value: []byte("test")}
-		csrTemplate := x509.CertificateRequest{
-			Subject:         pkix.Name{CommonName: ca.URI},
-			ExtraExtensions: []pkix.Extension{extension},
-		}
-		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
-		if err != nil {
-			log.Logger().Fatalf("unable to create CSR: %v", err)
-			return nil
-		}
-		certBytes, err := client.SignCertificate(ca, ca, csr, CertificateProfile{
-			IsCA:         true,
-			MaxPathLen:   1,
-			NumDaysValid: 1,
-		})
-		if err != nil {
-			log.Logger().Fatalf("unable to sign certificate: %v", err)
-			return nil
-		}
-		certificate, err := x509.ParseCertificate(certBytes)
-		if err != nil {
-			log.Logger().Fatalf("unable to parse certificate: %v", err)
-			return nil
+	t.Run("self-sign CSR", func(t *testing.T) {
+		certificate, err := selfSignCACertificate(client, ca)
+		if !assert.NoError(t, err) {
+			return
 		}
 		containsExtension := false
 		for _, ext := range certificate.Extensions {
@@ -652,15 +736,11 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			}
 		}
 		assert.True(t, containsExtension, "certificate doesn't contain custom extension")
-		return certificate
-	}
 
-	t.Run("self-sign CSR", func(t *testing.T) {
-		certificate := signRoot()
 		assert.True(t, certificate.IsCA)
 		assert.Equal(t, 1, certificate.MaxPathLen)
-		assert.Equal(t, ca.URI, certificate.Subject.CommonName)
-		assert.Equal(t, ca.URI, certificate.Issuer.CommonName)
+		assert.Equal(t, ca.Owner(), certificate.Subject.CommonName)
+		assert.Equal(t, ca.Owner(), certificate.Issuer.CommonName)
 		roots.AddCert(certificate)
 		verify, err := certificate.Verify(x509.VerifyOptions{
 			Roots:         roots,
@@ -672,16 +752,16 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("sign CSR for end-entity under root CA", func(t *testing.T) {
 		// Setup
-		root := signRoot()
+		root, _ := selfSignCACertificate(client, ca)
 		roots.AddCert(root)
-		client.GenerateKeyPairFor(endEntity)
-		endEntityPrivKey, _ := client.GetOpaquePrivateKey(endEntity)
+		client.GenerateKeyPair(endEntityKey)
+		endEntityPrivKey, _ := client.GetPrivateKey(endEntityKey)
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: endEntity.URI},
+			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
 		}
 		csr, _ := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, endEntityPrivKey)
 		// Sign
-		certBytes, err := client.SignCertificate(endEntity, ca, csr, CertificateProfile{
+		certBytes, err := client.SignCertificate(endEntityKey, ca, csr, CertificateProfile{
 			NumDaysValid: 1,
 		})
 		// Verify
@@ -694,8 +774,8 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		}
 		assert.False(t, certificate.IsCA)
 		assert.Equal(t, 0, certificate.MaxPathLen)
-		assert.Equal(t, endEntity.URI, certificate.Subject.CommonName)
-		assert.Equal(t, ca.URI, certificate.Issuer.CommonName)
+		assert.Equal(t, endEntityKey.Owner(), certificate.Subject.CommonName)
+		assert.Equal(t, ca.Owner(), certificate.Issuer.CommonName)
 		verify, err := certificate.Verify(x509.VerifyOptions{
 			Roots:         roots,
 			Intermediates: x509.NewCertPool(),
@@ -708,19 +788,19 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("sign CSR for intermediate CA", func(t *testing.T) {
 		// Setup
-		root := signRoot()
+		root, _ := selfSignCACertificate(client, ca)
 		roots.AddCert(root)
-		client.GenerateKeyPairFor(intermediateCa)
-		intermediateCaPrivKey, _ := client.GetOpaquePrivateKey(intermediateCa)
+		client.GenerateKeyPair(intermediateCaKey)
+		intermediateCaPrivKey, _ := client.GetPrivateKey(intermediateCaKey)
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: intermediateCa.URI},
+			Subject: pkix.Name{CommonName: intermediateCaKey.Owner()},
 		}
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, intermediateCaPrivKey)
 		if !assert.NoError(t, err) {
 			return
 		}
 		// Sign
-		certBytes, err := client.SignCertificate(intermediateCa, ca, csr, CertificateProfile{
+		certBytes, err := client.SignCertificate(intermediateCaKey, ca, csr, CertificateProfile{
 			IsCA:         true,
 			NumDaysValid: 1,
 		})
@@ -734,8 +814,8 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		}
 		assert.True(t, certificate.IsCA)
 		assert.False(t, certificate.MaxPathLenZero)
-		assert.Equal(t, intermediateCa.URI, certificate.Subject.CommonName)
-		assert.Equal(t, ca.URI, certificate.Issuer.CommonName)
+		assert.Equal(t, intermediateCaKey.Owner(), certificate.Subject.CommonName)
+		assert.Equal(t, ca.Owner(), certificate.Issuer.CommonName)
 		verify, err := certificate.Verify(x509.VerifyOptions{
 			Roots:         roots,
 			Intermediates: x509.NewCertPool(),
@@ -747,17 +827,17 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	})
 
 	t.Run("invalid CSR: format", func(t *testing.T) {
-		certificate, err := client.SignCertificate(endEntity, ca, []byte{1, 2, 3}, CertificateProfile{})
+		certificate, err := client.SignCertificate(endEntityKey, ca, []byte{1, 2, 3}, CertificateProfile{})
 		assert.Contains(t, err.Error(), ErrUnableToParseCSR.Error())
 		assert.Nil(t, certificate)
 	})
 
 	t.Run("invalid CSR: signature", func(t *testing.T) {
-		client.GenerateKeyPairFor(endEntity)
-		endEntityPrivKey, _ := client.GetOpaquePrivateKey(endEntity)
-		otherPrivKey, _ := client.GetOpaquePrivateKey(ca)
+		client.GenerateKeyPair(key)
+		endEntityPrivKey, _ := client.GetPrivateKey(endEntityKey)
+		otherPrivKey, _ := client.GetPrivateKey(ca)
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: endEntity.URI},
+			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
 		}
 		// Make this CSR invalid by providing a public key which doesn't match the private key
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, opaquePrivateKey{
@@ -768,7 +848,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			return
 		}
 		// Sign
-		certificate, err := client.SignCertificate(endEntity, ca, csr, CertificateProfile{NumDaysValid: 1})
+		certificate, err := client.SignCertificate(endEntityKey, ca, csr, CertificateProfile{NumDaysValid: 1})
 		assert.Contains(t, err.Error(), ErrCSRSignatureInvalid.Error())
 		assert.Nil(t, certificate)
 	})
@@ -777,14 +857,14 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		// Setup
 		emptyStore()
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: endEntity.URI},
+			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
 		}
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
 		if !assert.NoError(t, err) {
 			return
 		}
 		// Sign
-		certificate, err := client.SignCertificate(endEntity, types.LegalEntity{"foobar"}, csr, CertificateProfile{})
+		certificate, err := client.SignCertificate(endEntityKey, types.KeyForEntity(types.LegalEntity{"foobar"}), csr, CertificateProfile{})
 		// Verify
 		assert.Contains(t, err.Error(), ErrUnknownCA.Error())
 		assert.Nil(t, certificate)
@@ -793,16 +873,16 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	t.Run("unknown CA: certificate missing", func(t *testing.T) {
 		// Setup
 		emptyStore()
-		client.GenerateKeyPairFor(ca)
+		client.GenerateKeyPair(ca)
 		csrTemplate := x509.CertificateRequest{
-			Subject: pkix.Name{CommonName: endEntity.URI},
+			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
 		}
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
 		if !assert.NoError(t, err) {
 			return
 		}
 		// Sign
-		certificate, err := client.SignCertificate(endEntity, ca, csr, CertificateProfile{})
+		certificate, err := client.SignCertificate(endEntityKey, ca, csr, CertificateProfile{})
 		// Verify
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), ErrUnknownCA.Error())
@@ -814,15 +894,14 @@ func TestCrypto_SignCertificate(t *testing.T) {
 func TestCrypto_GetPrivateKey(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	entity := types.LegalEntity{URI: "En. Ti. Ti. Y."}
 	t.Run("private key not found", func(t *testing.T) {
-		pk, err := client.GetOpaquePrivateKey(entity)
+		pk, err := client.GetPrivateKey(key)
 		assert.Nil(t, pk)
 		assert.Error(t, err)
 	})
 	t.Run("get private key, assert non-exportable", func(t *testing.T) {
-		client.GenerateKeyPairFor(entity)
-		pk, err := client.GetOpaquePrivateKey(entity)
+		client.GenerateKeyPair(key)
+		pk, err := client.GetPrivateKey(key)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -841,19 +920,24 @@ func TestCrypto_GetPrivateKey(t *testing.T) {
 func TestCrypto_KeyExistsFor(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
-	legalEntity := types.LegalEntity{URI: "exists"}
-	client.GenerateKeyPairFor(legalEntity)
+	client.GenerateKeyPair(key)
 
 	t.Run("returns true for existing key", func(t *testing.T) {
-		assert.True(t, client.KeyExistsFor(legalEntity))
+		assert.True(t, client.PrivateKeyExists(key))
 	})
 
 	t.Run("returns false for non-existing key", func(t *testing.T) {
-		assert.False(t, client.KeyExistsFor(types.LegalEntity{URI: "does_not_exists"}))
+		assert.False(t, client.PrivateKeyExists(types.KeyForEntity(types.LegalEntity{URI: "does_not_exists"})))
 	})
 }
 
 func TestCrypto_Configure(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.Keysize = 4096
+		err := e.Configure()
+		assert.NoError(t, err)
+	})
 	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
 		e := defaultBackend(t.Name())
 		e.Config.Keysize = 2047
@@ -894,13 +978,13 @@ func TestNewCryptoBackend(t *testing.T) {
 	})
 }
 
-func defaultBackend(name string) Crypto {
+func defaultBackend(name string) *Crypto {
 	backend := Crypto{
 		Storage: createTempStorage(name),
 		Config:  CryptoConfig{Keysize: types.ConfigKeySizeDefault},
 	}
 
-	return backend
+	return &backend
 }
 
 func createTempStorage(name string) storage.Storage {
@@ -914,4 +998,45 @@ func emptyTemp(name string) {
 	if err != nil {
 		println(err.Error())
 	}
+}
+
+func selfSignCACertificate(client Client, key types.KeyIdentifier) (*x509.Certificate, error) {
+	return selfSignCACertificateEx(client, key, pkix.Name{CommonName: key.Owner()}, time.Now(), 1)
+}
+
+func selfSignCACertificateEx(client Client, key types.KeyIdentifier, name pkix.Name, notBefore time.Time, daysValid int) (*x509.Certificate, error) {
+	csrTemplate := x509.CertificateRequest{
+		Subject:         name,
+		ExtraExtensions: []pkix.Extension{extension},
+	}
+	privateKey, err := client.GetPrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, privateKey)
+	if err != nil {
+		return nil, err
+	}
+	certBytes, err := client.SignCertificate(key, key, csr, CertificateProfile{
+		IsCA:       true,
+		MaxPathLen: 1,
+		notBefore:  notBefore,
+		notAfter:   notBefore.AddDate(0, 0, daysValid),
+	})
+	if err != nil {
+		return nil, err
+	}
+	certificate, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return nil, err
+	}
+	return certificate, nil
+}
+
+func Test_symmetricKeyToBlockCipher(t *testing.T) {
+	t.Run("error - invalid cipher", func(t *testing.T) {
+		cipher, err := symmetricKeyToBlockCipher([]byte{1, 2, 3})
+		assert.Nil(t, cipher)
+		assert.Error(t, err)
+	})
 }

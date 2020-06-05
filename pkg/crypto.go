@@ -29,6 +29,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -54,8 +55,8 @@ const MinKeySize = 2048
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
 var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits", MinKeySize), false)
 
-// ErrMissingLegalEntityURI is returned when a required legal entity is missing
-var ErrMissingLegalEntityURI = core.NewError("missing legalEntity URI", false)
+// ErrInvalidKeyIdentifier is returned when the provided key identifier isn't valid
+var ErrInvalidKeyIdentifier = core.NewError("invalid key identifier", false)
 
 // ErrMissingActor indicates the actor is missing
 var ErrMissingActor = core.NewError("missing actor", false)
@@ -95,6 +96,9 @@ var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
 // jwsAlgorithm holds the supported (required) JWS signing algorithm
 const jwsAlgorithm = jwa.RS256
 
+// TLSCertificateValidityInDays holds the number of days issued TLS certificates are valid
+const TLSCertificateValidityInDays = 60
+
 type CryptoConfig struct {
 	Keysize int
 	Storage string
@@ -122,9 +126,9 @@ func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 	return k.signFn(rand, digest, opts)
 }
 
-// GetOpaquePrivateKey returns the current private key for a given legal entity. It can be used for signing, but cannot be exported.
-func (client *Crypto) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
-	priv, err := client.Storage.GetPrivateKey(entity)
+// GetPrivateKey returns the specified private key. It can be used for signing, but cannot be exported.
+func (client *Crypto) GetPrivateKey(key types.KeyIdentifier) (crypto.Signer, error) {
+	priv, err := client.Storage.GetPrivateKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -132,21 +136,21 @@ func (client *Crypto) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Sign
 }
 
 // SignCertificate issues a certificate by signing a PKCS10 certificate request. The private key of the specified CA should be available in the key store.
-func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEntity, pkcs10 []byte, profile CertificateProfile) ([]byte, error) {
+func (client *Crypto) SignCertificate(subjectKey types.KeyIdentifier, caKey types.KeyIdentifier, pkcs10 []byte, profile CertificateProfile) ([]byte, error) {
 	csr, err := x509.ParseCertificateRequest(pkcs10)
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrUnableToParseCSR.Error())
 	}
-	log.Logger().Infof("Issuing certificate for CSR, ca=%s, entity=%s, subject=%s, self-signed=%t", ca.URI, entity.URI, csr.Subject.String(), entity == ca)
+	log.Logger().Infof("Issuing certificate based on CSR, ca=%s, entity=%s, subject=%s, self-signed=%t", caKey, subjectKey, csr.Subject.String(), subjectKey == caKey)
 	err = csr.CheckSignature()
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrCSRSignatureInvalid.Error())
 	}
-	certificate, err := client.signCertificate(csr, ca, profile, entity == ca)
+	certificate, err := client.signCertificate(csr, caKey, profile, subjectKey == caKey)
 	if err != nil {
 		return nil, err
 	}
-	err = client.Storage.SaveCertificate(entity, certificate)
+	err = client.Storage.SaveCertificate(subjectKey, certificate)
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to save certificate to store")
 	}
@@ -154,8 +158,77 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 	return certificate, nil
 }
 
-func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.LegalEntity, profile CertificateProfile, selfSigned bool) ([]byte, error) {
-	key, err := client.Storage.GetPrivateKey(ca)
+func (client *Crypto) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
+	caCertificate, err := client.Storage.GetCertificate(caKey)
+	if err != nil || caCertificate == nil {
+		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s", caKey)
+	}
+	if len(caCertificate.Subject.Organization) == 0 {
+		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'O' component", caKey)
+	}
+	if len(caCertificate.Subject.Country) == 0 {
+		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
+	}
+	tlsKey := caKey.WithQualifier("tls")
+	var tlsCertificate *x509.Certificate
+	var tlsPrivateKey crypto.PrivateKey
+	mustIssue := false
+	if client.Storage.CertificateExists(tlsKey) {
+		tlsCertificate, err = client.Storage.GetCertificate(tlsKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		now := time.Now()
+		if now.After(tlsCertificate.NotAfter) || now.Before(tlsCertificate.NotBefore) {
+			log.Logger().Infof("Current TLS certificate (%s) isn't currently valid, will issue new one (not before=%s,not after=%s)", tlsKey, tlsCertificate.NotBefore, tlsCertificate.NotAfter)
+			mustIssue = true
+		}
+	} else {
+		log.Logger().Infof("No TLS certificate (%s) found will issue new one.", tlsKey)
+		mustIssue = true
+	}
+	if mustIssue {
+		var tlsPublicKey crypto.PublicKey
+		if tlsPublicKey, err = client.GenerateKeyPair(tlsKey); err != nil {
+			return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new TLS certificate (%s)", tlsKey)
+		}
+		csr := x509.CertificateRequest{
+			Subject: pkix.Name{
+				Country:      []string{caCertificate.Subject.Country[0]},
+				Organization: []string{caCertificate.Subject.Organization[0]},
+				// TODO: We really want just the entity's name here, but CA certificates have 'CA' postfixed to their common name,
+				//  which we don't want for our TLS certificates. Taking the 'O' component for common name should work in practice,
+				//  but is pretty ugly.
+				CommonName: caCertificate.Subject.Organization[0],
+			},
+			PublicKey: tlsPublicKey,
+		}
+		tlsCertificateAsBytes, err := client.signCertificate(&csr, caKey, CertificateProfile{
+			KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			NumDaysValid: TLSCertificateValidityInDays,
+		}, false)
+		if err != nil {
+			return nil, nil, errors2.Wrapf(err, "unable to issue TLS certificate %s", caKey)
+		} else {
+			tlsCertificate, err = x509.ParseCertificate(tlsCertificateAsBytes)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		if err = client.Storage.SaveCertificate(tlsKey, tlsCertificateAsBytes); err != nil {
+			return nil, nil, errors2.Wrap(err, "unable to store issued TLS certificate")
+		}
+	}
+	tlsPrivateKey, err = client.Storage.GetPrivateKey(tlsKey)
+	if err != nil {
+		return nil, nil, errors2.Wrap(err, "unable to retrieve private key corresponding with TLS certificate (recover your key material)")
+	}
+	return tlsCertificate, tlsPrivateKey, nil
+}
+
+func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.KeyIdentifier, profile CertificateProfile, selfSigned bool) ([]byte, error) {
+	key, err := client.Storage.GetPrivateKey(caKey)
 	if err != nil || key == nil {
 		return nil, errors2.Wrap(err, ErrUnknownCA.Error())
 	}
@@ -169,6 +242,7 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.Leg
 		Subject:         csr.Subject,
 		NotBefore:       time.Now(),
 		KeyUsage:        profile.KeyUsage,
+		ExtKeyUsage:     profile.ExtKeyUsage,
 		NotAfter:        time.Now().AddDate(0, 0, profile.NumDaysValid),
 		ExtraExtensions: csr.Extensions,
 		PublicKey:       csr.PublicKey,
@@ -188,7 +262,8 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.Leg
 	if selfSigned {
 		parentTemplate = template
 	} else {
-		parentCertificate, err := client.Storage.GetCertificate(ca)
+		parentCertificate, err := client.Storage.GetCertificate(caKey)
+		// TODO: Check if this certificate is a CA certificate
 		if err != nil {
 			return nil, errors2.Wrap(err, ErrUnknownCA.Error())
 		}
@@ -249,35 +324,33 @@ func (client *Crypto) newCryptoStorage() (storage.Storage, error) {
 	return nil, errors.New("only fs backend available for now")
 }
 
-// generate a new rsa keypair for the given legalEntity. The legalEntity uri is base64 encoded and used as filename
-// for the key.
-func (client *Crypto) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
-	var err error = nil
-
-	if len(legalEntity.URI) == 0 {
-		return ErrMissingLegalEntityURI
+// GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
+func (client *Crypto) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
+	if key == nil || key.Owner() == "" {
+		return nil, ErrInvalidKeyIdentifier
 	}
-
-	key, err := client.generateKeyPair()
-
-	if err != nil {
-		return err
+	if keyPair, err := client.generateKeyPair(); err != nil {
+		return nil, err
+	} else {
+		if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
+			return nil, err
+		} else {
+			return keyPair.Public(), nil
+		}
 	}
-
-	err = client.Storage.SavePrivateKey(legalEntity, key)
-
-	return err
 }
 
 // Main decryption function, first the symmetric key will be decrypted using the private key of the legal entity.
 // The resulting symmetric key will then be used to decrypt the given cipherText.
-func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
-
+func (client *Crypto) DecryptKeyAndCipherText(cipherText types.DoubleEncryptedCipherText, key types.KeyIdentifier) ([]byte, error) {
+	if key == nil {
+		return nil, ErrInvalidKeyIdentifier
+	}
 	if len(cipherText.CipherTextKeys) != 1 {
 		return nil, core.Errorf("unsupported count of CipherTextKeys: %d", false, len(cipherText.CipherTextKeys))
 	}
 
-	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], legalEntity)
+	symmKey, err := client.decryptCipherTextFor(cipherText.CipherTextKeys[0], key)
 
 	if err != nil {
 		return nil, err
@@ -305,7 +378,7 @@ func (client *Crypto) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncrypte
 }
 
 // EncryptKeyAndPlainTextFor encrypts a piece of data for the given public key
-func (client *Crypto) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
+func (client *Crypto) EncryptKeyAndPlainText(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
 	cipherBytes, cipher, err := generateSymmetricKey()
 
 	if err != nil {
@@ -381,10 +454,10 @@ func symmetricKeyToBlockCipher(ciph []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
-// ExternalIdFor creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
+// CalculateExternalId creates an unique identifier which is repeatable. It uses the legalEntity private key as key.
 // This is not for security but does generate the same unique identifier every time. It should only be used as unique identifier for consent records. Using the private key also ensure the BSN can not be deduced from the externalID.
 // todo: check by others if this makes sense
-func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) CalculateExternalId(subject string, actor string, key types.KeyIdentifier) ([]byte, error) {
 	if len(strings.TrimSpace(subject)) == 0 {
 		return nil, ErrMissingSubject
 	}
@@ -393,7 +466,7 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 		return nil, ErrMissingActor
 	}
 
-	pk, err := client.Storage.GetPrivateKey(entity)
+	pk, err := client.Storage.GetPrivateKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -406,14 +479,13 @@ func (client *Crypto) ExternalIdFor(subject string, actor string, entity types.L
 	return h.Sum(nil), nil
 }
 
-// SignFor signs a piece of data for a legal entity. This requires the private key for the legal entity to be present.
-// It is expected that the plain data is given. It uses the SHA256 hashing function
+// SignFor signs a piece of data using the given key. It is expected that the plain data is given, and it uses the SHA256 hashing function.
 // todo: SHA_256?
-func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) Sign(data []byte, key types.KeyIdentifier) ([]byte, error) {
 	// random
 	rng := rand.Reader
 
-	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
+	rsaPrivateKey, err := client.Storage.GetPrivateKey(key)
 	hashedData := sha256.Sum256(data)
 
 	if err != nil {
@@ -429,9 +501,9 @@ func (client *Crypto) SignFor(data []byte, legalEntity types.LegalEntity) ([]byt
 	return signature, err
 }
 
-// KeyExistsFor checks storage for an entry for the given legal entity and returns true if it exists
-func (client *Crypto) KeyExistsFor(legalEntity types.LegalEntity) bool {
-	return client.Storage.KeyExistsFor(legalEntity)
+// PrivateKeyExists checks storage for an entry for the given legal entity and returns true if it exists
+func (client *Crypto) PrivateKeyExists(key types.KeyIdentifier) bool {
+	return client.Storage.PrivateKeyExists(key)
 }
 
 // VerifyWith verfifies a signature of some data with a given PublicKeyInPEM. It uses the SHA256 hashing function.
@@ -462,8 +534,8 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, er
 }
 
 // PublicKeyInPEM loads the key from storage and returns it as PEM encoded. Only supports RSA style keys
-func (client *Crypto) PublicKeyInPEM(legalEntity types.LegalEntity) (string, error) {
-	pubKey, err := client.Storage.GetPublicKey(legalEntity)
+func (client *Crypto) GetPublicKeyAsPEM(key types.KeyIdentifier) (string, error) {
+	pubKey, err := client.Storage.GetPublicKey(key)
 
 	if err != nil {
 		return "", err
@@ -473,8 +545,8 @@ func (client *Crypto) PublicKeyInPEM(legalEntity types.LegalEntity) (string, err
 }
 
 // PublicKeyInJWK loads the key from storage and wraps it in a Key format. Supports RSA, ECDSA and Symmetric style keys
-func (client *Crypto) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error) {
-	pubKey, err := client.Storage.GetPublicKey(legalEntity)
+func (client *Crypto) GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error) {
+	pubKey, err := client.Storage.GetPublicKey(key)
 
 	if err != nil {
 		return nil, err
@@ -484,8 +556,8 @@ func (client *Crypto) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, er
 }
 
 // SignJwtFor creates a signed JWT given a legalEntity and map of claims
-func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error) {
-	rsaPrivateKey, err := client.Storage.GetPrivateKey(legalEntity)
+func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error) {
+	rsaPrivateKey, err := client.Storage.GetPrivateKey(key)
 
 	if err != nil {
 		return "", err
@@ -500,14 +572,14 @@ func (client *Crypto) SignJwtFor(claims map[string]interface{}, legalEntity type
 	return token.SignedString(rsaPrivateKey)
 }
 
-func (client Crypto) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
+func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	// Generate ephemeral key and certificate
 	entityPrivateKey, err := client.generateKeyPair()
 	if err != nil {
 		return nil, err
 	}
 	csr.PublicKey = &entityPrivateKey.PublicKey
-	asn1Cert, err := client.signCertificate(&csr, ca, CertificateProfile{
+	asn1Cert, err := client.signCertificate(&csr, caKey, CertificateProfile{
 		KeyUsage:  x509.KeyUsageDigitalSignature,
 		notBefore: signingTime,
 		notAfter:  signingTime.Add(time.Minute),
@@ -576,15 +648,15 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.
 // It returns an error if the given legalEntity does not have a private key.
-func (client *Crypto) decryptCipherTextFor(cipherText []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) decryptCipherTextFor(cipherText []byte, key types.KeyIdentifier) ([]byte, error) {
 
-	key, err := client.Storage.GetPrivateKey(legalEntity)
+	privateKey, err := client.Storage.GetPrivateKey(key)
 
 	if err != nil {
 		return nil, err
 	}
 
-	plainText, err := decryptWithPrivateKey(cipherText, key)
+	plainText, err := decryptWithPrivateKey(cipherText, privateKey)
 
 	if err != nil {
 		return nil, err
@@ -595,9 +667,9 @@ func (client *Crypto) decryptCipherTextFor(cipherText []byte, legalEntity types.
 
 // Encrypt a piece of data for a legalEntity. Usually encryptPlainTextWith will be used with a public key of a different (unknown) legalEntity.
 // It returns an error if the given legalEntity does not have a private key.
-func (client *Crypto) encryptPlainTextFor(plaintext []byte, legalEntity types.LegalEntity) ([]byte, error) {
+func (client *Crypto) encryptPlainTextFor(plaintext []byte, key types.KeyIdentifier) ([]byte, error) {
 
-	publicKey, err := client.Storage.GetPublicKey(legalEntity)
+	publicKey, err := client.Storage.GetPublicKey(key)
 
 	if err != nil {
 		return nil, err

@@ -44,8 +44,8 @@ type ApiWrapper struct {
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 // It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
-	le := types.LegalEntity{URI: string(params.LegalEntity)}
-	if err := w.C.GenerateKeyPairFor(le); err != nil {
+	key := types.KeyForEntity(types.LegalEntity{URI: string(params.LegalEntity)})
+	if _, err := w.C.GenerateKeyPair(key); err != nil {
 		return err
 	}
 
@@ -54,7 +54,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
 		var jwk jwk.Key
 		var err error
-		if jwk, err = w.C.PublicKeyInJWK(le); err != nil {
+		if jwk, err = w.C.GetPublicKeyAsJWK(key); err != nil {
 			return err
 		}
 
@@ -62,7 +62,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	}
 
 	// backwards compatible PEM format is the default
-	pub, err := w.C.PublicKeyInPEM(le)
+	pub, err := w.C.GetPublicKeyAsPEM(key)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	dect, err := w.C.EncryptKeyAndPlainTextWith(plainTextBytes, pubKeys)
+	dect, err := w.C.EncryptKeyAndPlainText(plainTextBytes, pubKeys)
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to encrypt plainText: %s", err.Error())
@@ -176,7 +176,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	plainTextBytes, err := w.C.DecryptKeyAndCipherTextFor(dect, types.LegalEntity{URI: string(decryptRequest.LegalEntity)})
+	plainTextBytes, err := w.C.DecryptKeyAndCipherText(dect, types.KeyForEntity(types.LegalEntity{URI: string(decryptRequest.LegalEntity)}))
 
 	if err != nil {
 		msg := fmt.Sprintf("error decrypting request: %v", err)
@@ -218,7 +218,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	shaBytes, err := w.C.ExternalIdFor(string(request.Subject), string(request.Actor), types.LegalEntity{URI: string(request.LegalEntity)})
+	shaBytes, err := w.C.CalculateExternalId(string(request.Subject), string(request.Actor), types.KeyForEntity(types.LegalEntity{URI: string(request.LegalEntity)}))
 	if err != nil {
 		msg := fmt.Sprintf("error getting externalId: %v", err)
 		log.Logger().Error(msg)
@@ -263,8 +263,8 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
-	sig, err := w.C.SignFor(plainTextBytes, le)
+	key := types.KeyForEntity(types.LegalEntity{URI: string(signRequest.LegalEntity)})
+	sig, err := w.C.Sign(plainTextBytes, key)
 
 	if err != nil {
 		log.Logger().Error(err.Error())
@@ -300,8 +300,8 @@ func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing claims")
 	}
 
-	le := types.LegalEntity{URI: string(signRequest.LegalEntity)}
-	sig, err := w.C.SignJwtFor(signRequest.Claims, le)
+	key := types.KeyForEntity(types.LegalEntity{URI: string(signRequest.LegalEntity)})
+	sig, err := w.C.SignJWT(signRequest.Claims, key)
 
 	if err != nil {
 		log.Logger().Error(err.Error())
@@ -384,12 +384,12 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
 
-	le := types.LegalEntity{URI: urn}
+	key := types.KeyForEntity(types.LegalEntity{URI: urn})
 	acceptHeader := ctx.Request().Header.Get("Accept")
 
 	// starts with so we can ignore any +
 	if ct, _, _ := mime.ParseMediaType(acceptHeader); ct == "application/json" {
-		jwk, err := w.C.PublicKeyInJWK(le)
+		jwk, err := w.C.GetPublicKeyAsJWK(key)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return ctx.NoContent(404)
@@ -402,7 +402,7 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 	}
 
 	// backwards compatible PEM format is the default
-	pub, err := w.C.PublicKeyInPEM(le)
+	pub, err := w.C.GetPublicKeyAsPEM(key)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return ctx.NoContent(404)

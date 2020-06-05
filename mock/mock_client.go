@@ -38,108 +38,109 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// DecryptKeyAndCipherTextFor mocks base method
-func (m *MockClient) DecryptKeyAndCipherTextFor(cipherText types.DoubleEncryptedCipherText, legalEntity types.LegalEntity) ([]byte, error) {
+// DecryptKeyAndCipherText mocks base method
+func (m *MockClient) DecryptKeyAndCipherText(cipherText types.DoubleEncryptedCipherText, key types.KeyIdentifier) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DecryptKeyAndCipherTextFor", cipherText, legalEntity)
+	ret := m.ctrl.Call(m, "DecryptKeyAndCipherText", cipherText, key)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DecryptKeyAndCipherTextFor indicates an expected call of DecryptKeyAndCipherTextFor
-func (mr *MockClientMockRecorder) DecryptKeyAndCipherTextFor(cipherText, legalEntity interface{}) *gomock.Call {
+// DecryptKeyAndCipherText indicates an expected call of DecryptKeyAndCipherText
+func (mr *MockClientMockRecorder) DecryptKeyAndCipherText(cipherText, key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptKeyAndCipherTextFor", reflect.TypeOf((*MockClient)(nil).DecryptKeyAndCipherTextFor), cipherText, legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptKeyAndCipherText", reflect.TypeOf((*MockClient)(nil).DecryptKeyAndCipherText), cipherText, key)
 }
 
-// EncryptKeyAndPlainTextWith mocks base method
-func (m *MockClient) EncryptKeyAndPlainTextWith(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
+// EncryptKeyAndPlainText mocks base method
+func (m *MockClient) EncryptKeyAndPlainText(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EncryptKeyAndPlainTextWith", plainText, keys)
+	ret := m.ctrl.Call(m, "EncryptKeyAndPlainText", plainText, keys)
 	ret0, _ := ret[0].(types.DoubleEncryptedCipherText)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// EncryptKeyAndPlainTextWith indicates an expected call of EncryptKeyAndPlainTextWith
-func (mr *MockClientMockRecorder) EncryptKeyAndPlainTextWith(plainText, keys interface{}) *gomock.Call {
+// EncryptKeyAndPlainText indicates an expected call of EncryptKeyAndPlainText
+func (mr *MockClientMockRecorder) EncryptKeyAndPlainText(plainText, keys interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptKeyAndPlainTextWith", reflect.TypeOf((*MockClient)(nil).EncryptKeyAndPlainTextWith), plainText, keys)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptKeyAndPlainText", reflect.TypeOf((*MockClient)(nil).EncryptKeyAndPlainText), plainText, keys)
 }
 
-// ExternalIdFor mocks base method
-func (m *MockClient) ExternalIdFor(subject, actor string, entity types.LegalEntity) ([]byte, error) {
+// CalculateExternalId mocks base method
+func (m *MockClient) CalculateExternalId(subject, actor string, key types.KeyIdentifier) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExternalIdFor", subject, actor, entity)
+	ret := m.ctrl.Call(m, "CalculateExternalId", subject, actor, key)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ExternalIdFor indicates an expected call of ExternalIdFor
-func (mr *MockClientMockRecorder) ExternalIdFor(subject, actor, entity interface{}) *gomock.Call {
+// CalculateExternalId indicates an expected call of CalculateExternalId
+func (mr *MockClientMockRecorder) CalculateExternalId(subject, actor, key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExternalIdFor", reflect.TypeOf((*MockClient)(nil).ExternalIdFor), subject, actor, entity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateExternalId", reflect.TypeOf((*MockClient)(nil).CalculateExternalId), subject, actor, key)
 }
 
-// GenerateKeyPairFor mocks base method
-func (m *MockClient) GenerateKeyPairFor(legalEntity types.LegalEntity) error {
+// GenerateKeyPair mocks base method
+func (m *MockClient) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateKeyPairFor", legalEntity)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "GenerateKeyPair", key)
+	ret0, _ := ret[0].(crypto.PublicKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// GenerateKeyPairFor indicates an expected call of GenerateKeyPairFor
-func (mr *MockClientMockRecorder) GenerateKeyPairFor(legalEntity interface{}) *gomock.Call {
+// GenerateKeyPair indicates an expected call of GenerateKeyPair
+func (mr *MockClientMockRecorder) GenerateKeyPair(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateKeyPairFor", reflect.TypeOf((*MockClient)(nil).GenerateKeyPairFor), legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateKeyPair", reflect.TypeOf((*MockClient)(nil).GenerateKeyPair), key)
 }
 
-// SignFor mocks base method
-func (m *MockClient) SignFor(data []byte, legalEntity types.LegalEntity) ([]byte, error) {
+// Sign mocks base method
+func (m *MockClient) Sign(data []byte, key types.KeyIdentifier) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SignFor", data, legalEntity)
+	ret := m.ctrl.Call(m, "Sign", data, key)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SignFor indicates an expected call of SignFor
-func (mr *MockClientMockRecorder) SignFor(data, legalEntity interface{}) *gomock.Call {
+// Sign indicates an expected call of Sign
+func (mr *MockClientMockRecorder) Sign(data, key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignFor", reflect.TypeOf((*MockClient)(nil).SignFor), data, legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockClient)(nil).Sign), data, key)
 }
 
 // SignCertificate mocks base method
-func (m *MockClient) SignCertificate(entity, ca types.LegalEntity, pkcs10 []byte, profile pkg.CertificateProfile) ([]byte, error) {
+func (m *MockClient) SignCertificate(subjectKey, caKey types.KeyIdentifier, pkcs10 []byte, profile pkg.CertificateProfile) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SignCertificate", entity, ca, pkcs10, profile)
+	ret := m.ctrl.Call(m, "SignCertificate", subjectKey, caKey, pkcs10, profile)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SignCertificate indicates an expected call of SignCertificate
-func (mr *MockClientMockRecorder) SignCertificate(entity, ca, pkcs10, profile interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) SignCertificate(subjectKey, caKey, pkcs10, profile interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignCertificate", reflect.TypeOf((*MockClient)(nil).SignCertificate), entity, ca, pkcs10, profile)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignCertificate", reflect.TypeOf((*MockClient)(nil).SignCertificate), subjectKey, caKey, pkcs10, profile)
 }
 
-// GetOpaquePrivateKey mocks base method
-func (m *MockClient) GetOpaquePrivateKey(entity types.LegalEntity) (crypto.Signer, error) {
+// GetPrivateKey mocks base method
+func (m *MockClient) GetPrivateKey(key types.KeyIdentifier) (crypto.Signer, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOpaquePrivateKey", entity)
+	ret := m.ctrl.Call(m, "GetPrivateKey", key)
 	ret0, _ := ret[0].(crypto.Signer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOpaquePrivateKey indicates an expected call of GetOpaquePrivateKey
-func (mr *MockClientMockRecorder) GetOpaquePrivateKey(entity interface{}) *gomock.Call {
+// GetPrivateKey indicates an expected call of GetPrivateKey
+func (mr *MockClientMockRecorder) GetPrivateKey(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpaquePrivateKey", reflect.TypeOf((*MockClient)(nil).GetOpaquePrivateKey), entity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrivateKey", reflect.TypeOf((*MockClient)(nil).GetPrivateKey), key)
 }
 
 // VerifyWith mocks base method
@@ -157,64 +158,80 @@ func (mr *MockClientMockRecorder) VerifyWith(data, sig, jwk interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyWith", reflect.TypeOf((*MockClient)(nil).VerifyWith), data, sig, jwk)
 }
 
-// PublicKeyInPEM mocks base method
-func (m *MockClient) PublicKeyInPEM(legalEntity types.LegalEntity) (string, error) {
+// GetTLSCertificate mocks base method
+func (m *MockClient) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublicKeyInPEM", legalEntity)
+	ret := m.ctrl.Call(m, "GetTLSCertificate", caKey)
+	ret0, _ := ret[0].(*x509.Certificate)
+	ret1, _ := ret[1].(crypto.PrivateKey)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetTLSCertificate indicates an expected call of GetTLSCertificate
+func (mr *MockClientMockRecorder) GetTLSCertificate(caKey interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTLSCertificate", reflect.TypeOf((*MockClient)(nil).GetTLSCertificate), caKey)
+}
+
+// GetPublicKeyAsPEM mocks base method
+func (m *MockClient) GetPublicKeyAsPEM(key types.KeyIdentifier) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPublicKeyAsPEM", key)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PublicKeyInPEM indicates an expected call of PublicKeyInPEM
-func (mr *MockClientMockRecorder) PublicKeyInPEM(legalEntity interface{}) *gomock.Call {
+// GetPublicKeyAsPEM indicates an expected call of GetPublicKeyAsPEM
+func (mr *MockClientMockRecorder) GetPublicKeyAsPEM(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKeyInPEM", reflect.TypeOf((*MockClient)(nil).PublicKeyInPEM), legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPublicKeyAsPEM", reflect.TypeOf((*MockClient)(nil).GetPublicKeyAsPEM), key)
 }
 
-// PublicKeyInJWK mocks base method
-func (m *MockClient) PublicKeyInJWK(legalEntity types.LegalEntity) (jwk.Key, error) {
+// GetPublicKeyAsJWK mocks base method
+func (m *MockClient) GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublicKeyInJWK", legalEntity)
+	ret := m.ctrl.Call(m, "GetPublicKeyAsJWK", key)
 	ret0, _ := ret[0].(jwk.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PublicKeyInJWK indicates an expected call of PublicKeyInJWK
-func (mr *MockClientMockRecorder) PublicKeyInJWK(legalEntity interface{}) *gomock.Call {
+// GetPublicKeyAsJWK indicates an expected call of GetPublicKeyAsJWK
+func (mr *MockClientMockRecorder) GetPublicKeyAsJWK(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKeyInJWK", reflect.TypeOf((*MockClient)(nil).PublicKeyInJWK), legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPublicKeyAsJWK", reflect.TypeOf((*MockClient)(nil).GetPublicKeyAsJWK), key)
 }
 
-// SignJwtFor mocks base method
-func (m *MockClient) SignJwtFor(claims map[string]interface{}, legalEntity types.LegalEntity) (string, error) {
+// SignJWT mocks base method
+func (m *MockClient) SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SignJwtFor", claims, legalEntity)
+	ret := m.ctrl.Call(m, "SignJWT", claims, key)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SignJwtFor indicates an expected call of SignJwtFor
-func (mr *MockClientMockRecorder) SignJwtFor(claims, legalEntity interface{}) *gomock.Call {
+// SignJWT indicates an expected call of SignJWT
+func (mr *MockClientMockRecorder) SignJWT(claims, key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJwtFor", reflect.TypeOf((*MockClient)(nil).SignJwtFor), claims, legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWT", reflect.TypeOf((*MockClient)(nil).SignJWT), claims, key)
 }
 
-// JWSSignEphemeral mocks base method
-func (m *MockClient) JWSSignEphemeral(payload []byte, ca types.LegalEntity, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
+// SignJWSEphemeral mocks base method
+func (m *MockClient) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "JWSSignEphemeral", payload, ca, csr, signingTime)
+	ret := m.ctrl.Call(m, "SignJWSEphemeral", payload, caKey, csr, signingTime)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// JWSSignEphemeral indicates an expected call of JWSSignEphemeral
-func (mr *MockClientMockRecorder) JWSSignEphemeral(payload, ca, csr, signingTime interface{}) *gomock.Call {
+// SignJWSEphemeral indicates an expected call of SignJWSEphemeral
+func (mr *MockClientMockRecorder) SignJWSEphemeral(payload, caKey, csr, signingTime interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JWSSignEphemeral", reflect.TypeOf((*MockClient)(nil).JWSSignEphemeral), payload, ca, csr, signingTime)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWSEphemeral", reflect.TypeOf((*MockClient)(nil).SignJWSEphemeral), payload, caKey, csr, signingTime)
 }
 
 // VerifyJWS mocks base method
@@ -232,16 +249,16 @@ func (mr *MockClientMockRecorder) VerifyJWS(signature, signingTime, certVerifier
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyJWS", reflect.TypeOf((*MockClient)(nil).VerifyJWS), signature, signingTime, certVerifier)
 }
 
-// KeyExistsFor mocks base method
-func (m *MockClient) KeyExistsFor(legalEntity types.LegalEntity) bool {
+// PrivateKeyExists mocks base method
+func (m *MockClient) PrivateKeyExists(key types.KeyIdentifier) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "KeyExistsFor", legalEntity)
+	ret := m.ctrl.Call(m, "PrivateKeyExists", key)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// KeyExistsFor indicates an expected call of KeyExistsFor
-func (mr *MockClientMockRecorder) KeyExistsFor(legalEntity interface{}) *gomock.Call {
+// PrivateKeyExists indicates an expected call of PrivateKeyExists
+func (mr *MockClientMockRecorder) PrivateKeyExists(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KeyExistsFor", reflect.TypeOf((*MockClient)(nil).KeyExistsFor), legalEntity)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrivateKeyExists", reflect.TypeOf((*MockClient)(nil).PrivateKeyExists), key)
 }

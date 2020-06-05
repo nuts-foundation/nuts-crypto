@@ -31,8 +31,9 @@ sA7xv2k51lnp+CmY20vz5FMXWlktmgQN3J9uKIMlBQ4=
 -----END CERTIFICATE-----
 `
 
+var key = types.KeyForEntity(types.LegalEntity{URI: "Some Entity"})
+
 func Test_fs_SaveThenLoadCertificate(t *testing.T) {
-	entity := types.LegalEntity{URI: "Some Entity"}
 	storage := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 
@@ -41,11 +42,11 @@ func Test_fs_SaveThenLoadCertificate(t *testing.T) {
 		if !assert.Len(t, rest, 0, "unable to decode cert") {
 			return
 		}
-		err := storage.SaveCertificate(entity, block.Bytes)
+		err := storage.SaveCertificate(key, block.Bytes)
 		assert.NoError(t, err)
 	})
 	t.Run("load certificate", func(t *testing.T) {
-		certificate, err := storage.GetCertificate(entity)
+		certificate, err := storage.GetCertificate(key)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -54,55 +55,53 @@ func Test_fs_SaveThenLoadCertificate(t *testing.T) {
 }
 
 func Test_fs_GetCertificate(t *testing.T) {
-	entity := types.LegalEntity{URI: "Some Entity"}
 	storage := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 
 	t.Run("entry does not exist", func(t *testing.T) {
-		certificate, err := storage.GetCertificate(types.LegalEntity{URI: "abc"})
+		certificate, err := storage.GetCertificate(types.KeyForEntity(types.LegalEntity{URI: "abc"}))
 		assert.Nil(t, certificate)
 		assert.Error(t, err)
 	})
 	t.Run("incorrect certificate", func(t *testing.T) {
-		storage.SaveCertificate(entity, []byte{1, 2, 3})
-		certificate, err := storage.GetCertificate(entity)
+		storage.SaveCertificate(key, []byte{1, 2, 3})
+		certificate, err := storage.GetCertificate(key)
 		assert.Nil(t, certificate)
 		assert.Error(t, err)
 	})
 	t.Run("trailing bytes", func(t *testing.T) {
 		block, _ := pem.Decode([]byte(cert))
-		err := storage.SaveCertificate(entity, block.Bytes)
+		err := storage.SaveCertificate(key, block.Bytes)
 		if !assert.NoError(t, err) {
 			return
 		}
-		path := storage.getEntryPath(entity, certificateFilePostfix)
+		path := storage.getEntryPath(key, certificateEntry)
 		file, _ := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		_, err = file.WriteString("some trailing bytes")
 		if !assert.NoError(t, err) {
 			return
 		}
-		certificate, err := storage.GetCertificate(entity)
+		certificate, err := storage.GetCertificate(key)
 		assert.Nil(t, certificate)
 		assert.Error(t, err)
 	})
 }
 
 func Test_fs_GetPublicKey(t *testing.T) {
-	entity := types.LegalEntity{URI: "Some Entity"}
 	storage := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 	t.Run("non-existing entry", func(t *testing.T) {
-		key, err := storage.GetPublicKey(entity)
-		assert.EqualError(t, err, "could not open entry for legalEntity: Some Entity with filename temp/Test_fs_GetPublicKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		key, err := storage.GetPublicKey(key)
+		assert.EqualError(t, err, "could not open entry [Some Entity|] with filename temp/Test_fs_GetPublicKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
 		assert.Nil(t, key)
 	})
 	t.Run("ok", func(t *testing.T) {
 		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
-		err := storage.SavePrivateKey(entity, pk)
+		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
 			return
 		}
-		key, err := storage.GetPublicKey(entity)
+		key, err := storage.GetPublicKey(key)
 		assert.NoError(t, err)
 		if !assert.NotNil(t, key) {
 			return
@@ -112,33 +111,32 @@ func Test_fs_GetPublicKey(t *testing.T) {
 }
 
 func Test_fs_GetPrivateKey(t *testing.T) {
-	entity := types.LegalEntity{URI: "Some Entity"}
 	storage := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 
 	t.Run("non-existing entry", func(t *testing.T) {
-		key, err := storage.GetPrivateKey(entity)
-		assert.EqualError(t, err, "could not open entry for legalEntity: Some Entity with filename temp/Test_fs_GetPrivateKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		key, err := storage.GetPrivateKey(key)
+		assert.EqualError(t, err, "could not open entry [Some Entity|] with filename temp/Test_fs_GetPrivateKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
 		assert.Nil(t, key)
 	})
 	t.Run("private key invalid", func(t *testing.T) {
-		path := storage.getEntryPath(entity, privateKeyFilePostfix)
+		path := storage.getEntryPath(key, privateKeyEntry)
 		file, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 		_, err := file.WriteString("hello world")
 		if !assert.NoError(t, err) {
 			return
 		}
-		key, err := storage.GetPrivateKey(entity)
+		key, err := storage.GetPrivateKey(key)
 		assert.Nil(t, key)
 		assert.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
 		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
-		err := storage.SavePrivateKey(entity, pk)
+		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
 			return
 		}
-		key, err := storage.GetPrivateKey(entity)
+		key, err := storage.GetPrivateKey(key)
 		assert.NoError(t, err)
 		if !assert.NotNil(t, key) {
 			return
@@ -147,19 +145,41 @@ func Test_fs_GetPrivateKey(t *testing.T) {
 	})
 }
 
-
 func Test_fs_KeyExistsFor(t *testing.T) {
-	entity := types.LegalEntity{URI: "Some Entity"}
 	storage := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 
 	t.Run("non-existing entry", func(t *testing.T) {
-		assert.False(t, storage.KeyExistsFor(entity))
+		assert.False(t, storage.PrivateKeyExists(key))
 	})
 	t.Run("existing entry", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 2048)
-		storage.SavePrivateKey(entity, key)
-		assert.True(t, storage.KeyExistsFor(entity))
+		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		storage.SavePrivateKey(key, privateKey)
+		assert.True(t, storage.PrivateKeyExists(key))
+	})
+}
+
+func Test_fs_CertificateExistsFor(t *testing.T) {
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("ok - non-existing entry", func(t *testing.T) {
+		assert.False(t, storage.CertificateExists(key))
+	})
+	t.Run("ok - non-existing entry with qualifier", func(t *testing.T) {
+		assert.False(t, storage.CertificateExists(key.WithQualifier("foo")))
+	})
+	t.Run("ok - non-existing entry with qualifier (2)", func(t *testing.T) {
+		storage.SaveCertificate(key, []byte{1, 2, 3})
+		assert.False(t, storage.CertificateExists(key.WithQualifier("foo")))
+	})
+	t.Run("ok - existing entry", func(t *testing.T) {
+		storage.SaveCertificate(key, []byte{1, 2, 3})
+		assert.True(t, storage.CertificateExists(key))
+	})
+	t.Run("ok - existing entry with qualifier", func(t *testing.T) {
+		storage.SaveCertificate(key.WithQualifier("foo"), []byte{1, 2, 3})
+		assert.True(t, storage.CertificateExists(key))
 	})
 }
 

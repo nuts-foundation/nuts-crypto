@@ -30,12 +30,13 @@ import (
 
 // Storage interface containing functions for storing and retrieving keys
 type Storage interface {
-	GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error)
-	GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error)
-	KeyExistsFor(legalEntity types.LegalEntity) bool
-	SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error
-	SaveCertificate(entity types.LegalEntity, certificate []byte) error
-	GetCertificate(entity types.LegalEntity) (*x509.Certificate, error)
+	GetPrivateKey(key types.KeyIdentifier) (*rsa.PrivateKey, error)
+	GetPublicKey(key types.KeyIdentifier) (*rsa.PublicKey, error)
+	PrivateKeyExists(key types.KeyIdentifier) bool
+	SavePrivateKey(keyIdentifier types.KeyIdentifier, key *rsa.PrivateKey) error
+	SaveCertificate(key types.KeyIdentifier, certificate []byte) error
+	GetCertificate(key types.KeyIdentifier) (*x509.Certificate, error)
+	CertificateExists(key types.KeyIdentifier) bool
 }
 
 // shared function to convert bytes to a RSA private key
