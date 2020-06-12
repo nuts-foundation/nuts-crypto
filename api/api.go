@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nuts-foundation/nuts-crypto/log"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -34,7 +35,6 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 type ApiWrapper struct {
@@ -82,19 +82,19 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(encryptRequest.EncryptRequestSubjects) == 0 {
 		msg := "missing encryptRequestSubjects in encryptRequest"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(encryptRequest.PlainText) == 0 {
 		msg := "missing plainText in encryptRequest"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
@@ -103,7 +103,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 	for _, e := range encryptRequest.EncryptRequestSubjects {
 		if e.PublicKey == nil && e.Jwk == nil {
 			msg := "missing key in encryptRequestSubjects"
-			logrus.Error(msg)
+			log.Logger().Error(msg)
 			return echo.NewHTTPError(http.StatusBadRequest, msg)
 		}
 
@@ -132,7 +132,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Illegal base64 encoded string: %s", err.Error())
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
@@ -140,7 +140,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to encrypt plainText: %s", err.Error())
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
@@ -159,20 +159,20 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(decryptRequest.LegalEntity) == 0 {
 		msg := "missing legalEntityURI in request"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	dect, err := decryptRequestToDect(*decryptRequest)
 	if err != nil {
 		msg := fmt.Sprintf("error decrypting request: %v", err)
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
@@ -180,7 +180,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("error decrypting request: %v", err)
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
@@ -203,25 +203,25 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 
 	if err != nil {
 		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	if len(request.LegalEntity) == 0 {
 		msg := "missing legalEntityURI in request"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 	if len(request.Subject) == 0 {
 		msg := "missing subjectURI in request"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	shaBytes, err := w.C.ExternalIdFor(string(request.Subject), string(request.Actor), types.LegalEntity{URI: string(request.LegalEntity)})
 	if err != nil {
 		msg := fmt.Sprintf("error getting externalId: %v", err)
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusInternalServerError, msg)
 	}
 
@@ -244,7 +244,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	err = json.Unmarshal(buf, signRequest)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -259,7 +259,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(signRequest.PlainText)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -267,7 +267,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	sig, err := w.C.SignFor(plainTextBytes, le)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -288,7 +288,7 @@ func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
 	err = json.Unmarshal(buf, signRequest)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -304,7 +304,7 @@ func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
 	sig, err := w.C.SignJwtFor(signRequest.Claims, le)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -321,7 +321,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	err = json.Unmarshal(buf, verifyRequest)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return err
 	}
 
@@ -340,14 +340,14 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	plainTextBytes, err := base64.StdEncoding.DecodeString(verifyRequest.PlainText)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return err
 	}
 
 	sigBytes, err := hex.DecodeString(verifyRequest.Signature)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return err
 	}
 
@@ -366,7 +366,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	valid, err := w.C.VerifyWith(plainTextBytes, sigBytes, j)
 
 	if err != nil {
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return err
 	}
 
@@ -394,7 +394,7 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 			if errors.Is(err, storage.ErrNotFound) {
 				return ctx.NoContent(404)
 			}
-			logrus.Error(err.Error())
+			log.Logger().Error(err.Error())
 			return err
 		}
 
@@ -407,7 +407,7 @@ func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
 		if errors.Is(err, storage.ErrNotFound) {
 			return ctx.NoContent(404)
 		}
-		logrus.Error(err.Error())
+		log.Logger().Error(err.Error())
 		return err
 	}
 
@@ -418,14 +418,14 @@ func readBody(ctx echo.Context) ([]byte, error) {
 	req := ctx.Request()
 	if req.Body == nil {
 		msg := "missing body in request"
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return nil, echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	buf, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		msg := fmt.Sprintf("error reading request: %v", err)
-		logrus.Error(msg)
+		log.Logger().Error(msg)
 		return nil, echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
