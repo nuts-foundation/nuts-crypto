@@ -34,7 +34,6 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
 	errors2 "github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"io"
 	"math/big"
 	"strings"
@@ -43,6 +42,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/log"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -92,9 +92,6 @@ var ErrInvalidCertChain = errors.New("X.509 certificate chain is invalid")
 // noinspection GoErrorStringFormat
 var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
 
-// ModuleName == Registry
-const ModuleName = "Crypto"
-
 // jwsAlgorithm holds the supported (required) JWS signing algorithm
 const jwsAlgorithm = jwa.RS256
 
@@ -110,7 +107,6 @@ type Crypto struct {
 	Config     CryptoConfig
 	configOnce sync.Once
 	configDone bool
-	_logger    *logrus.Entry
 }
 
 type opaquePrivateKey struct {
@@ -141,7 +137,7 @@ func (client *Crypto) SignCertificate(entity types.LegalEntity, ca types.LegalEn
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrUnableToParseCSR.Error())
 	}
-	client.logger().Infof("Issuing certificate for CSR, ca=%s, entity=%s, subject=%s, self-signed=%t", ca.URI, entity.URI, csr.Subject.String(), entity == ca)
+	log.Logger().Infof("Issuing certificate for CSR, ca=%s, entity=%s, subject=%s, self-signed=%t", ca.URI, entity.URI, csr.Subject.String(), entity == ca)
 	err = csr.CheckSignature()
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrCSRSignatureInvalid.Error())
@@ -202,7 +198,7 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, ca types.Leg
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to create certificate")
 	}
-	client.logger().Infof("Issued certificate, subject=%s, serialNumber=%d", template.Subject.String(), template.SerialNumber)
+	log.Logger().Infof("Issued certificate, subject=%s, serialNumber=%d", template.Subject.String(), template.SerialNumber)
 	return certificate, nil
 }
 
@@ -619,11 +615,4 @@ func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey)
 		return nil, err
 	}
 	return ciphertext, nil
-}
-
-func (client *Crypto) logger() *logrus.Entry {
-	if client._logger == nil {
-		client._logger = logrus.StandardLogger().WithField("module", ModuleName)
-	}
-	return client._logger
 }

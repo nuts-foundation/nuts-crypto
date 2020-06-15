@@ -31,8 +31,8 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
+	"github.com/nuts-foundation/nuts-crypto/log"
 	"github.com/nuts-foundation/nuts-crypto/test"
-	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
 	"testing"
@@ -628,7 +628,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 		}
 		csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, caPrivateKey)
 		if err != nil {
-			logrus.Fatalf("unable to create CSR: %v", err)
+			log.Logger().Fatalf("unable to create CSR: %v", err)
 			return nil
 		}
 		certBytes, err := client.SignCertificate(ca, ca, csr, CertificateProfile{
@@ -637,12 +637,12 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			NumDaysValid: 1,
 		})
 		if err != nil {
-			logrus.Fatalf("unable to sign certificate: %v", err)
+			log.Logger().Fatalf("unable to sign certificate: %v", err)
 			return nil
 		}
 		certificate, err := x509.ParseCertificate(certBytes)
 		if err != nil {
-			logrus.Fatalf("unable to parse certificate: %v", err)
+			log.Logger().Fatalf("unable to parse certificate: %v", err)
 			return nil
 		}
 		containsExtension := false
