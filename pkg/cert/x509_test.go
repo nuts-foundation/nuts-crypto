@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -33,7 +32,7 @@ func TestGetActiveCertificates(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		key, _ := pkg.CertificateToJWK(cert)
+		key, _ := CertificateToJWK(cert)
 		certs := GetActiveCertificates([]interface{}{jwkToMap(key)}, time.Now())
 		assert.Len(t, certs, 1)
 	})
@@ -73,7 +72,7 @@ func TestGetActiveCertificates(t *testing.T) {
 }
 
 func jwkToMap(key jwk.Key) map[string]interface{} {
-	m, _ := pkg.JwkToMap(key)
+	m, _ := JwkToMap(key)
 	keyAsJSON, _ := json.MarshalIndent(m, "", "  ")
 	j := map[string]interface{}{}
 	json.Unmarshal(keyAsJSON, &j)

@@ -24,6 +24,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	mock2 "github.com/nuts-foundation/nuts-crypto/test/mock"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -33,7 +35,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
-	mock2 "github.com/nuts-foundation/nuts-crypto/mock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -1124,7 +1125,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		})
 
 		t.Run("using jwk", func(t *testing.T) {
-			pk, _ := pkg.JwkToMap(jwk)
+			pk, _ := cert.JwkToMap(jwk)
 			jsonRequest := VerifyRequest{
 				Signature: hexSignature,
 				Jwk:       &JWK{AdditionalProperties: pk},
@@ -1178,7 +1179,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		})
 
 		t.Run("using jwk", func(t *testing.T) {
-			pk, _ := pkg.JwkToMap(jwk)
+			pk, _ := cert.JwkToMap(jwk)
 			pk["kty"] = "unknown"
 			jsonRequest := VerifyRequest{
 				Signature: hexSignature,

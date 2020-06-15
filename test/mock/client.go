@@ -10,6 +10,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	jwk "github.com/lestrrat-go/jwx/jwk"
 	pkg "github.com/nuts-foundation/nuts-crypto/pkg"
+	cert "github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
 	reflect "reflect"
 	time "time"
@@ -235,7 +236,7 @@ func (mr *MockClientMockRecorder) SignJWSEphemeral(payload, caKey, csr, signingT
 }
 
 // VerifyJWS mocks base method
-func (m *MockClient) VerifyJWS(signature []byte, signingTime time.Time, certVerifier pkg.CertificateVerifier) ([]byte, error) {
+func (m *MockClient) VerifyJWS(signature []byte, signingTime time.Time, certVerifier cert.Verifier) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyJWS", signature, signingTime, certVerifier)
 	ret0, _ := ret[0].([]byte)
@@ -261,4 +262,18 @@ func (m *MockClient) PrivateKeyExists(key types.KeyIdentifier) bool {
 func (mr *MockClientMockRecorder) PrivateKeyExists(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrivateKeyExists", reflect.TypeOf((*MockClient)(nil).PrivateKeyExists), key)
+}
+
+// TrustStore mocks base method
+func (m *MockClient) TrustStore() cert.TrustStore {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TrustStore")
+	ret0, _ := ret[0].(cert.TrustStore)
+	return ret0
+}
+
+// TrustStore indicates an expected call of TrustStore
+func (mr *MockClientMockRecorder) TrustStore() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TrustStore", reflect.TypeOf((*MockClient)(nil).TrustStore))
 }

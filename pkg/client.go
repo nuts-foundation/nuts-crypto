@@ -22,6 +22,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"time"
 )
@@ -70,9 +71,11 @@ type Client interface {
 	// to the certificate verifier and whether the certificate was valid at the time of signing ("signingTime").
 	// If the verification succeeds the payload that the JWS protects is returned.
 	// If any of the verifications fail an error is returned (and no payload).
-	VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error)
+	VerifyJWS(signature []byte, signingTime time.Time, certVerifier cert.Verifier) ([]byte, error)
 	// PrivateKeyExists returns if the specified private key eixsts.
 	PrivateKeyExists(key types.KeyIdentifier) bool
+	// TrustStore returns the trust store backing the crypto module.
+	TrustStore() cert.TrustStore
 }
 
 // CertificateProfile is used to specify input parameters for certificate issuance.

@@ -30,8 +30,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/lestrrat-go/jwx/jwe/aescbc"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"github.com/nuts-foundation/nuts-crypto/test"
 	"os"
 	"reflect"
@@ -407,7 +409,7 @@ func TestCrypto_PublicKeyInPem(t *testing.T) {
 	t.Run("parse public key", func(t *testing.T) {
 		pub := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9wJQN59PYsvIsTrFuTqS\nLoUBgwdRfpJxOa5L8nOALxNk41MlAg7xnPbvnYrOHFucfWBTDOMTKBMSmD4WDkaF\ndVrXAML61z85Le8qsXfX6f7TbKMDm2u1O3cye+KdJe8zclK9sTFzSD0PP0wfw7wf\nlACe+PfwQgeOLPUWHaR6aDfaA64QEdfIzk/IL3S595ixaEn0huxMHgXFX35Vok+o\nQdbnclSTo6HUinkqsHUu/hGHApkE3UfT6GD6SaLiB9G4rAhlrDQ71ai872t4FfoK\n7skhe8sP2DstzAQRMf9FcetrNeTxNL7Zt4F/qKm80cchRZiFYPMCYyjQphyBCoJf\n0wIDAQAB\n-----END PUBLIC KEY-----"
 
-		_, err := PemToPublicKey([]byte(pub))
+		_, err := cert.PemToPublicKey([]byte(pub))
 
 		assert.Nil(t, err)
 	})
@@ -548,7 +550,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(key, 0)
 		verifier.pool.AddCert(certificate)
-		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
+		h.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
@@ -559,7 +561,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(key, x509.KeyUsageDigitalSignature)
 		verifier.pool.AddCert(certificate)
-		h.Set(jws.X509CertChainKey, marshalX509CertChain([]*x509.Certificate{certificate}))
+		h.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
@@ -587,13 +589,13 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	t.Run("error - key strength insufficient", func(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 1024)
 		certBytes := test.GenerateCertificateEx(time.Now(), 2, key)
-		cert, _ := x509.ParseCertificate(certBytes)
+		certificate, _ := x509.ParseCertificate(certBytes)
 		headers := jws.StandardHeaders{
-			JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{cert}),
+			JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
 		}
 		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&headers))
 		pool := x509.NewCertPool()
-		pool.AddCert(cert)
+		pool.AddCert(certificate)
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.EqualError(t, err, ErrInvalidKeySize.Error())
 		assert.Nil(t, payload)
@@ -932,6 +934,20 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 }
 
 func TestCrypto_Configure(t *testing.T) {
+	t.Run("ok - configOnce", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		assert.False(t, e.configDone)
+		err := e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
+		err = e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
+	})
 	t.Run("ok", func(t *testing.T) {
 		e := defaultBackend(t.Name())
 		e.Config.Keysize = 4096
@@ -940,41 +956,110 @@ func TestCrypto_Configure(t *testing.T) {
 	})
 	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
 		e := defaultBackend(t.Name())
-		e.Config.Keysize = 2047
+		assert.False(t, e.configDone)
 		err := e.Configure()
-
-		if err == nil {
-			t.Errorf("Expected error, got nothing")
+		if !assert.NoError(t, err) {
 			return
 		}
-
-		if !errors.Is(err, ErrInvalidKeySize) {
-			t.Errorf("Expected error [invalid keySize, needs to be at least 2048 bits], got %s", err.Error())
+		assert.True(t, e.configDone)
+		err = e.Configure()
+		if !assert.NoError(t, err) {
+			return
 		}
+		assert.True(t, e.configDone)
+	})
+	t.Run("ok", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		err := e.doConfigure()
+		assert.NoError(t, err)
+	})
+	t.Run("ok - default = fs backend", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		err := client.doConfigure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		storageType := reflect.TypeOf(client.Storage).String()
+		assert.Equal(t, "*storage.fileSystemBackend", storageType)
+	})
+	t.Run("error - unknown backend", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		client.Config.Storage = "unknown"
+		err := client.doConfigure()
+		assert.EqualErrorf(t, err, "only fs backend available for now", "expected error")
+	})
+	t.Run("error - fs path invalid", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		client.Config.Fspath = "crypto.go"
+		err := client.doConfigure()
+		assert.EqualError(t, err, "error checking for existing truststore: stat crypto.go/truststore.pem: not a directory")
+	})
+	t.Run("error - keySize is too small", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.Keysize = 2047
+		err := e.doConfigure()
+		assert.EqualError(t, err, ErrInvalidKeySize.Error())
 	})
 }
 
-func TestNewCryptoBackend(t *testing.T) {
+func TestCryptoConfig_TrustStore(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		client.doConfigure()
+		assert.NotNil(t, client.TrustStore())
+	})
+}
+
+func TestCrypto_TrustStore(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		client.doConfigure()
+		assert.NotNil(t, client.TrustStore())
+	})
+}
+
+func Test_serialNumberUniqueness(t *testing.T) {
+	r := make(map[string]bool, 0)
+	for i := 0; i < 100000; i++ {
+		serial, err := serialNumber()
+		if !assert.NoError(t, err) {
+			return
+		}
+		if r[serial.String()] {
+			assert.Failf(t, "duplicate found", "serial: %d", serial)
+			return
+		}
+		r[serial.String()] = true
+	}
+}
+
+func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
+	t.Run("nonce empty", func(t *testing.T) {
+		_, err := decryptWithSymmetricKey(make([]byte, 0), aescbc.AesCbcHmac{}, make([]byte, 0))
+		assert.EqualErrorf(t, err, ErrIllegalNonce.Error(), "error")
+	})
+}
+
+func TestCrypto_encryptPlainTextWith(t *testing.T) {
 	client := defaultBackend(t.Name())
 
-	t.Run("Getting the backend returns the fs backend", func(t *testing.T) {
-		cl, err := client.newCryptoStorage()
+	t.Run("incorrect public key returns error", func(t *testing.T) {
+		plainText := "Secret"
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		pub := key.PublicKey
+		pub.E = 0
 
-		if err != nil {
-			t.Errorf("Expected no error, got %s", err.Error())
+		_, err = client.encryptPlainTextWith([]byte(plainText), &pub)
+
+		if err == nil {
+			t.Errorf("Expected error, Got nothing")
+			return
 		}
 
-		if reflect.TypeOf(cl).String() != "*storage.fileSystemBackend" {
-			t.Errorf("Expected crypto backend to be of type [*storage.fileSystemBackend], Got [%s]", reflect.TypeOf(cl).String())
+		expected := "crypto/rsa: public exponent too small"
+		if err.Error() != expected {
+			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
-	})
-
-	t.Run("Getting the backend returns err for unknown backend", func(t *testing.T) {
-		client.Config.Storage = "unknown"
-
-		_, err := client.newCryptoStorage()
-
-		assert.EqualErrorf(t, err, "only fs backend available for now", "expected error")
 	})
 }
 
@@ -1034,9 +1119,9 @@ func selfSignCACertificateEx(client Client, key types.KeyIdentifier, name pkix.N
 }
 
 func Test_symmetricKeyToBlockCipher(t *testing.T) {
-	t.Run("error - invalid cipher", func(t *testing.T) {
-		cipher, err := symmetricKeyToBlockCipher([]byte{1, 2, 3})
-		assert.Nil(t, cipher)
-		assert.Error(t, err)
+	t.Run("error - invalid key size", func(t *testing.T) {
+		c, err := symmetricKeyToBlockCipher([]byte{1, 2, 3})
+		assert.Nil(t, c)
+		assert.EqualError(t, err, "crypto/aes: invalid key size 3")
 	})
 }

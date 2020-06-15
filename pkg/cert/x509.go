@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
-	crypto "github.com/nuts-foundation/nuts-crypto/pkg"
 	"sort"
 	"time"
 )
@@ -42,7 +41,7 @@ func GetActiveCertificates(jwks []interface{}, instant time.Time) []*x509.Certif
 }
 
 func jwkMapToCertChain(keyAsMap interface{}) ([]*x509.Certificate, error) {
-	key, err := crypto.MapToJwk(keyAsMap.(map[string]interface{}))
+	key, err := MapToJwk(keyAsMap.(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}

@@ -34,9 +34,11 @@ import (
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	errors2 "github.com/pkg/errors"
 	"io"
 	"math/big"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -66,12 +68,6 @@ var ErrMissingSubject = core.NewError("missing subject", false)
 
 // ErrIllegalNonce indicates an incorrect nonce
 var ErrIllegalNonce = core.NewError("illegal nonce given", false)
-
-// ErrWrongPublicKey indicates a wrong public key format
-var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing public key, key is of the wrong type", false)
-
-// ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
-var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
 
 // ErrInvalidAlgorithm indicates an invalid public key was used
 var ErrInvalidAlgorithm = core.NewError("invalid algorithm for public key", false)
@@ -105,10 +101,19 @@ type CryptoConfig struct {
 	Fspath  string
 }
 
+func (cc CryptoConfig) getFSPath() string {
+	if cc.Fspath == "" {
+		return types.ConfigFSPathDefault
+	} else {
+		return cc.Fspath
+	}
+}
+
 // default implementation for CryptoInstance
 type Crypto struct {
 	Storage    storage.Storage
 	Config     CryptoConfig
+	trustStore cert.TrustStore
 	configOnce sync.Once
 	configDone bool
 }
@@ -238,7 +243,7 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.
 		return nil, errors2.Wrap(err, "unable to generate serial number")
 	}
 	template := &x509.Certificate{
-		SerialNumber:    big.NewInt(serialNumber),
+		SerialNumber:    serialNumber,
 		Subject:         csr.Subject,
 		NotBefore:       time.Now(),
 		KeyUsage:        profile.KeyUsage,
@@ -295,33 +300,29 @@ func CryptoInstance() *Crypto {
 // Configure loads the given configurations in the engine. Any wrong combination will return an error
 func (client *Crypto) Configure() error {
 	var err error
-
 	client.configOnce.Do(func() {
-		if client.Config.Keysize < MinKeySize {
-			err = ErrInvalidKeySize
-			return
+		if err = client.doConfigure(); err == nil {
+			client.configDone = true
 		}
-
-		client.Storage, err = client.newCryptoStorage()
-		client.configDone = true
 	})
-
 	return err
 }
 
-// Helper function to create a new CryptoInstance. It checks the config (via Viper) for a --cryptobackend setting
-// if none are given or this is set to 'fs', the filesystem backend is used.
-func (client *Crypto) newCryptoStorage() (storage.Storage, error) {
-	if client.Config.Storage == types.ConfigStorageFs || client.Config.Storage == "" {
-		fspath := client.Config.Fspath
-		if fspath == "" {
-			fspath = types.ConfigFSPathDefault
-		}
-
-		return storage.NewFileSystemBackend(fspath)
+func (client *Crypto) doConfigure() error {
+	if client.Config.Keysize < MinKeySize {
+		return ErrInvalidKeySize
 	}
-
-	return nil, errors.New("only fs backend available for now")
+	if client.Config.Storage != types.ConfigStorageFs && client.Config.Storage != "" {
+		return errors.New("only fs backend available for now")
+	}
+	var err error
+	if client.Storage, err = storage.NewFileSystemBackend(client.Config.getFSPath()); err != nil {
+		return err
+	}
+	if client.trustStore, err = cert.NewTrustStore(path.Join(client.Config.getFSPath(), "truststore.pem")); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
@@ -541,7 +542,7 @@ func (client *Crypto) GetPublicKeyAsPEM(key types.KeyIdentifier) (string, error)
 		return "", err
 	}
 
-	return PublicKeyToPem(pubKey)
+	return cert.PublicKeyToPem(pubKey)
 }
 
 // PublicKeyInJWK loads the key from storage and wraps it in a Key format. Supports RSA, ECDSA and Symmetric style keys
@@ -593,17 +594,12 @@ func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier,
 	}
 	// Now sign
 	headers := jws.StandardHeaders{
-		JWSx509CertChain: marshalX509CertChain([]*x509.Certificate{certificate}),
+		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
 	}
 	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(&headers))
 }
 
-type CertificateVerifier interface {
-	// Verify verifies the given certificate. The validity of the certificate is checked against the given moment in time.
-	Verify(*x509.Certificate, time.Time) error
-}
-
-func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier CertificateVerifier) ([]byte, error) {
+func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier cert.Verifier) ([]byte, error) {
 	m, err := jws.Parse(bytes.NewReader(signature))
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to parse signature")
@@ -621,7 +617,7 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	}
 
 	// Parse X509 certificate chain
-	certChain, err := GetX509ChainFromHeaders(sig.ProtectedHeaders())
+	certChain, err := cert.GetX509ChainFromHeaders(sig.ProtectedHeaders())
 	if err != nil {
 		return nil, errors2.Wrap(err, ErrInvalidCertChain.Error())
 	}
@@ -644,6 +640,10 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	}
 	// TODO: CRL checking
 	return jws.Verify(signature, sig.ProtectedHeaders().Algorithm(), signingCert.PublicKey)
+}
+
+func (client Crypto) TrustStore() cert.TrustStore {
+	return client.trustStore
 }
 
 // Decrypt a piece of data for the given legalEntity. It loads the private key from the storage and decrypts the cipherText.
@@ -687,4 +687,31 @@ func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey)
 		return nil, err
 	}
 	return ciphertext, nil
+}
+
+func serialNumber() (*big.Int, error) {
+	// Taken from crypto/tls/generate_cert.go
+	snLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	return rand.Int(rand.Reader, snLimit)
+}
+
+func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
+	hash := sha512.New()
+	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
+}
+
+func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
+	if len(nonce) == 0 {
+		return nil, ErrIllegalNonce
+	}
+
+	plaintext, err := key.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }

@@ -16,43 +16,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package pkg
+package cert
 
 import (
-	"crypto/cipher"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha512"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"github.com/lestrrat-go/jwx/jwk"
+	core "github.com/nuts-foundation/nuts-go-core"
 	errors2 "github.com/pkg/errors"
-	"math/big"
-	"time"
 )
 
-func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {
-	hash := sha512.New()
-	plaintext, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherText, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
+// ErrWrongPublicKey indicates a wrong public key format
+var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing public key, key is of the wrong type", false)
 
-func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) ([]byte, error) {
-	if len(nonce) == 0 {
-		return nil, ErrIllegalNonce
-	}
-
-	plaintext, err := key.Open(nil, nonce, cipherText, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
+// ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
+var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
 
 // PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
 func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
@@ -216,21 +197,12 @@ func unmarshalX509CertChain(chain []string) ([]*x509.Certificate, error) {
 	return certs, nil
 }
 
-func marshalX509CertChain(chain []*x509.Certificate) []string {
+func MarshalX509CertChain(chain []*x509.Certificate) []string {
 	encodedCerts := make([]string, len(chain))
 	for idx, cert := range chain {
 		encodedCerts[idx] = base64.StdEncoding.EncodeToString(cert.Raw)
 	}
 	return encodedCerts
-}
-
-func serialNumber() (int64, error) {
-	// TODO: Make this implementation safer. This one just hopes for enough entropy.
-	n, err := rand.Int(rand.Reader, big.NewInt(time.Now().UnixNano()*2))
-	if err != nil {
-		return 0, err
-	}
-	return time.Now().UnixNano() ^ (*n).Int64(), nil
 }
 
 type jwkHeaderReader interface {

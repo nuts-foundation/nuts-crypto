@@ -29,16 +29,16 @@ const ConfigStorage string = "storage"
 // default setting for --storage "fs"
 const ConfigStorageFs string = "fs"
 
-// --fspath config flag
+// --fspath config flagclient.getStoragePath()
 const ConfigFSPath string = "fspath"
 
-// default setting for --fspath "./"
+// ConfigFSPathDefault holds the default setting for --fspath
 const ConfigFSPathDefault string = "./"
 
 // --keysize config flag
 const ConfigKeySize string = "keysize"
 
-// default setting for --keysize "2048"
+// ConfigKeySizeDefault holds the default setting for --keysize
 const ConfigKeySizeDefault int = 2048
 
 // type identifying the legalEntity responsible for the Patient/medical data
