@@ -29,15 +29,19 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
-const privateKeyFilePostfix = "private.pem"
-const certificateFilePostfix = "certificate.pem"
+type entryType string
+const (
+	certificateEntry entryType = "certificate.pem"
+	privateKeyEntry entryType = "private.pem"
+)
 
 type FileOpenError struct {
-	filePath    string
-	legalEntity string
-	err         error
+	filePath string
+	key      types.KeyIdentifier
+	err      error
 }
 
 // ErrNotFound indicates that the specified crypto storage entry couldn't be found.
@@ -45,7 +49,7 @@ var ErrNotFound = errors.New("entry not found")
 
 // Error returns the string representation
 func (f *FileOpenError) Error() string {
-	return fmt.Sprintf("could not open entry for legalEntity: %v with filename %s: %v", f.legalEntity, f.filePath, f.err)
+	return fmt.Sprintf("could not open entry %s with filename %s: %v", f.key, f.filePath, f.err)
 }
 
 // UnWrap is needed for FileOpenError to be UnWrapped
@@ -73,13 +77,18 @@ func NewFileSystemBackend(fspath string) (*fileSystemBackend, error) {
 	return fsc, nil
 }
 
-func (fsc *fileSystemBackend) KeyExistsFor(entity types.LegalEntity) bool {
-	_, err := os.Stat(fsc.getEntryPath(entity, privateKeyFilePostfix))
+func (fsc *fileSystemBackend) CertificateExists(key types.KeyIdentifier) bool {
+	_, err := os.Stat(fsc.getEntryPath(key, certificateEntry))
 	return err == nil
 }
 
-func (fsc *fileSystemBackend) SaveCertificate(entity types.LegalEntity, certificate []byte) error {
-	filenamePath := fsc.getEntryPath(entity, certificateFilePostfix)
+func (fsc *fileSystemBackend) PrivateKeyExists(key types.KeyIdentifier) bool {
+	_, err := os.Stat(fsc.getEntryPath(key, privateKeyEntry))
+	return err == nil
+}
+
+func (fsc *fileSystemBackend) SaveCertificate(key types.KeyIdentifier, certificate []byte) error {
+	filenamePath := fsc.getEntryPath(key, certificateEntry)
 	outFile, err := os.Create(filenamePath)
 	if err != nil {
 		return err
@@ -92,8 +101,8 @@ func (fsc *fileSystemBackend) SaveCertificate(entity types.LegalEntity, certific
 	return pem.Encode(outFile, privateKey)
 }
 
-func (fsc *fileSystemBackend) GetCertificate(entity types.LegalEntity) (*x509.Certificate, error) {
-	rawData, err := fsc.readEntry(entity, certificateFilePostfix)
+func (fsc *fileSystemBackend) GetCertificate(key types.KeyIdentifier) (*x509.Certificate, error) {
+	rawData, err := fsc.readEntry(key, certificateEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -105,36 +114,30 @@ func (fsc *fileSystemBackend) GetCertificate(entity types.LegalEntity) (*x509.Ce
 }
 
 // Load the privatekey for the given legalEntity from disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
-func (fsc *fileSystemBackend) GetPrivateKey(legalEntity types.LegalEntity) (*rsa.PrivateKey, error) {
-	data, err := fsc.readEntry(legalEntity, privateKeyFilePostfix)
+func (fsc *fileSystemBackend) GetPrivateKey(key types.KeyIdentifier) (*rsa.PrivateKey, error) {
+	data, err := fsc.readEntry(key, privateKeyEntry)
 	if err != nil {
 		return nil, err
 	}
-
-	var key *rsa.PrivateKey
-	key, err = bytesToPrivateKey(data)
-
+	privateKey, err := bytesToPrivateKey(data)
 	if err != nil {
 		return nil, err
 	}
-
-	return key, nil
+	return privateKey, nil
 }
 
 // Load the public key from disk, it load the private key and extract the public key from it.
-func (fsc *fileSystemBackend) GetPublicKey(legalEntity types.LegalEntity) (*rsa.PublicKey, error) {
-	key, err := fsc.GetPrivateKey(legalEntity)
-
+func (fsc *fileSystemBackend) GetPublicKey(key types.KeyIdentifier) (*rsa.PublicKey, error) {
+	privateKey, err := fsc.GetPrivateKey(key)
 	if err != nil {
 		return nil, err
 	}
-
-	return &key.PublicKey, nil
+	return &privateKey.PublicKey, nil
 }
 
 // Save the private key for the given legalEntity to disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
-func (fsc *fileSystemBackend) SavePrivateKey(legalEntity types.LegalEntity, key *rsa.PrivateKey) error {
-	filenamePath := fsc.getEntryPath(legalEntity, privateKeyFilePostfix)
+func (fsc *fileSystemBackend) SavePrivateKey(keyIdentifier types.KeyIdentifier, key *rsa.PrivateKey) error {
+	filenamePath := fsc.getEntryPath(keyIdentifier, privateKeyEntry)
 	outFile, err := os.Create(filenamePath)
 
 	if err != nil {
@@ -153,20 +156,20 @@ func (fsc *fileSystemBackend) SavePrivateKey(legalEntity types.LegalEntity, key 
 	return err
 }
 
-func (fsc fileSystemBackend) readEntry(entity types.LegalEntity, postfix string) ([]byte, error) {
-	filePath := fsc.getEntryPath(entity, postfix)
+func (fsc fileSystemBackend) readEntry(key types.KeyIdentifier, entryType entryType) ([]byte, error) {
+	filePath := fsc.getEntryPath(key, entryType)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, &FileOpenError{legalEntity: entity.URI, filePath: filePath, err: ErrNotFound}
+			return nil, &FileOpenError{key: key, filePath: filePath, err: ErrNotFound}
 		}
-		return nil, &FileOpenError{legalEntity: entity.URI, filePath: filePath, err: err}
+		return nil, &FileOpenError{key: key, filePath: filePath, err: err}
 	}
 	return data, nil
 }
 
-func (fsc fileSystemBackend) getEntryPath(entity types.LegalEntity, postfix string) string {
-	return fmt.Sprintf("%s/%s", fsc.fspath, legalEntityToFileName(entity, postfix))
+func (fsc fileSystemBackend) getEntryPath(key types.KeyIdentifier, entryType entryType) string {
+	return filepath.Join(fsc.fspath, getEntryFileName(key, entryType))
 }
 
 func (fsc *fileSystemBackend) createDirs() error {
@@ -183,12 +186,14 @@ func (fsc *fileSystemBackend) createDirs() error {
 	return err
 }
 
-// helper for transforming a legalEntity to something that can be stored on disk
-func legalEntityToFileName(legalEntity types.LegalEntity, filePostfix string) string {
+func getEntryFileName(key types.KeyIdentifier, entryType entryType) string {
 	buffer := new(bytes.Buffer)
 	encoder := base64.NewEncoder(base64.StdEncoding, buffer)
-	encoder.Write([]byte(legalEntity.URI))
+	encoder.Write([]byte(key.Owner()))
 	encoder.Close()
-
-	return fmt.Sprintf("%s_%s", buffer.String(), filePostfix)
+	var qualifier = ""
+	if key.Qualifier() != "" {
+		qualifier = "_" + key.Qualifier()
+	}
+	return fmt.Sprintf("%s%s_%s", buffer.String(), qualifier, entryType)
 }

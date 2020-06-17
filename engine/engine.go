@@ -95,7 +95,7 @@ func cmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cc := pkg.NewCryptoClient()
-			if err := cc.GenerateKeyPairFor(types.LegalEntity{URI: args[0]}); err != nil {
+			if _, err := cc.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: args[0]})); err != nil {
 				cmd.Printf("Error generating keyPair: %v\n", err)
 			} else {
 				cmd.Println("KeyPair generated")
@@ -120,7 +120,7 @@ func cmd() *cobra.Command {
 			le := types.LegalEntity{URI: args[0]}
 
 			// printout in JWK
-			jwk, err := cc.PublicKeyInJWK(le)
+			jwk, err := cc.GetPublicKeyAsJWK(types.KeyForEntity(le))
 			if err != nil {
 				cmd.Printf("Error printing publicKey: %v", err)
 				return
@@ -135,7 +135,7 @@ func cmd() *cobra.Command {
 			cmd.Println("")
 
 			// printout in PEM
-			inPem, err := cc.PublicKeyInPEM(le)
+			inPem, err := cc.GetPublicKeyAsPEM(types.KeyForEntity(le))
 			if err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return

@@ -41,6 +41,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var key = types.KeyForEntity(types.LegalEntity{URI: "test"})
+
+
 type pubKeyMatcher struct {
 }
 
@@ -99,8 +102,8 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		if err := se.GenerateKeyPair(echo, GenerateKeyPairParams{}); err != nil {
-			if !errors.Is(err, pkg.ErrMissingLegalEntityURI) {
-				t.Errorf("Expected error [%s], got [%s]", pkg.ErrMissingLegalEntityURI, err)
+			if !errors.Is(err, pkg.ErrInvalidKeyIdentifier) {
+				t.Errorf("Expected error [%s], got [%s]", pkg.ErrInvalidKeyIdentifier, err)
 			}
 		} else {
 			t.Error("Expected error")
@@ -121,11 +124,10 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().Request().Return(&http.Request{})
 
 		// key generation is ok
-		le := types.LegalEntity{URI: "test"}
-		cl.EXPECT().GenerateKeyPairFor(le).Return(nil).AnyTimes()
+	cl.EXPECT().GenerateKeyPair(key).Return(nil, nil).AnyTimes()
 
 		// getting pub key goes boom!
-		cl.EXPECT().PublicKeyInPEM(le).Return("", errors.New("boom"))
+		cl.EXPECT().GetPublicKeyAsPEM(key).Return("", errors.New("boom"))
 
 		err := se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 
@@ -136,10 +138,9 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 func TestApiWrapper_Encrypt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
-	legalEntity := types.LegalEntity{URI: "test"}
-	plaintext := "for your eyes only"
-	client.C.GenerateKeyPairFor(legalEntity)
-	pemKey, _ := client.C.PublicKeyInPEM(legalEntity)
+plaintext := "for your eyes only"
+	client.C.GenerateKeyPair(key)
+	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -172,7 +173,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
-					LegalEntity: Identifier(legalEntity.URI),
+					LegalEntity: Identifier(key.Owner()),
 					PublicKey:   &pk,
 				},
 			},
@@ -251,7 +252,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 		jsonRequest := EncryptRequest{
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
-					LegalEntity: Identifier(legalEntity.URI),
+					LegalEntity: Identifier(key.Owner()),
 					PublicKey:   &pk,
 				},
 			},
@@ -403,11 +404,10 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	plaintext := "for your eyes only"
-	client.C.GenerateKeyPairFor(legalEntity)
-	pubKey, _ := client.C.PublicKeyInJWK(legalEntity)
-	encRecord, _ := client.C.EncryptKeyAndPlainTextWith([]byte(plaintext), []jwk.Key{pubKey})
+plaintext := "for your eyes only"
+	client.C.GenerateKeyPair(key)
+	pubKey, _ := client.C.GetPublicKeyAsJWK(key)
+	encRecord, _ := client.C.EncryptKeyAndPlainText([]byte(plaintext), []jwk.Key{pubKey})
 
 	t.Run("Decrypt API call returns 200 with decrypted message", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -415,7 +415,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity:   Identifier(legalEntity.URI),
+			LegalEntity:   Identifier(key.Owner()),
 			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText),
 			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
@@ -438,7 +438,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity:   Identifier(legalEntity.URI),
+			LegalEntity:   Identifier(key.Owner()),
 			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText[1:]),
 			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
@@ -537,7 +537,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity:   Identifier(legalEntity.URI),
+			LegalEntity:   Identifier(key.Owner()),
 			CipherText:    base64.StdEncoding.EncodeToString(encRecord.CipherText),
 			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 		}
@@ -562,7 +562,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity:   Identifier(legalEntity.URI),
+			LegalEntity:   Identifier(key.Owner()),
 			CipherTextKey: base64.StdEncoding.EncodeToString(encRecord.CipherTextKeys[0]),
 			Nonce:         base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
@@ -587,7 +587,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := DecryptRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 			CipherText:  base64.StdEncoding.EncodeToString(encRecord.CipherText),
 			Nonce:       base64.StdEncoding.EncodeToString(encRecord.Nonce),
 		}
@@ -611,10 +611,9 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	subject := Identifier("test")
+subject := Identifier("test")
 	actor := Identifier("test")
-	client.C.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPair(key)
 
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -622,7 +621,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := ExternalIdRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 			Subject:     subject,
 			Actor:       actor,
 		}
@@ -742,7 +741,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := ExternalIdRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -795,8 +794,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	client.C.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPair(key)
 
 	t.Run("Missing plainText returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -804,7 +802,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := SignRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -860,7 +858,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := SignRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 			PlainText:   "text",
 		}
 
@@ -906,8 +904,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	client.C.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPair(key)
 
 	t.Run("Missing claims returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -915,7 +912,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := SignJwtRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 		}
 
 		json, _ := json.Marshal(jsonRequest)
@@ -959,7 +956,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 		echo := mock.NewMockContext(ctrl)
 
 		jsonRequest := SignJwtRequest{
-			LegalEntity: Identifier(legalEntity.URI),
+			LegalEntity: Identifier(key.Owner()),
 			Claims:      map[string]interface{}{"iss": "nuts"},
 		}
 
@@ -996,14 +993,13 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	client.C.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPair(key)
 
-	pemPubKey, _ := client.C.PublicKeyInPEM(legalEntity)
-	jwk, _ := client.C.PublicKeyInJWK(legalEntity)
+	pemPubKey, _ := client.C.GetPublicKeyAsPEM(key)
+	jwk, _ := client.C.GetPublicKeyAsJWK(key)
 	plainText := "text"
 	base64PlainText := base64.StdEncoding.EncodeToString([]byte(plainText))
-	signature, _ := client.C.SignFor([]byte(plainText), legalEntity)
+	signature, _ := client.C.Sign([]byte(plainText), key)
 	hexSignature := hex.EncodeToString(signature)
 
 	t.Run("Missing publicKey/JWK returns 400", func(t *testing.T) {
@@ -1100,8 +1096,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		client := apiWrapper()
 		defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
-		client.C.GenerateKeyPairFor(legalEntity)
+		client.C.GenerateKeyPair(key)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -1154,8 +1149,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		client := apiWrapper()
 		defer emptyTemp()
 
-		legalEntity := types.LegalEntity{URI: "test"}
-		client.C.GenerateKeyPairFor(legalEntity)
+		client.C.GenerateKeyPair(key)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -1212,8 +1206,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-	legalEntity := types.LegalEntity{URI: "test"}
-	client.C.GenerateKeyPairFor(legalEntity)
+	client.C.GenerateKeyPair(key)
 
 	t.Run("PublicKey API call returns 200", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -1295,7 +1288,7 @@ func emptyTemp() {
 
 type errorCloser struct{}
 
-func (errorCloser) Read(p []byte) (n int, err error) {
+func (errorCloser) Read([]byte) (n int, err error) {
 	return 0, errors.New("error")
 }
 

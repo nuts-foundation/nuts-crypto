@@ -19,6 +19,10 @@
 // types and interfaces used by all other packages
 package types
 
+import (
+	"fmt"
+)
+
 // --storage config flag
 const ConfigStorage string = "storage"
 
@@ -40,6 +44,55 @@ const ConfigKeySizeDefault int = 2048
 // type identifying the legalEntity responsible for the Patient/medical data
 type LegalEntity struct {
 	URI string
+}
+
+// KeyIdentifier is the reference to a key pair
+type KeyIdentifier interface {
+	// String returns a human readable representation for this KeyIdentifier
+	String() string
+	// Owner returns the identifier of the entity owning this key pair (e.g. LegalEntity, person, organization, etc). The
+	// owner must uniquely identify this entity (in other words, multiple entities must not share the same identifier).
+	Owner() string
+	// Qualifier returns the identifier which points to a key pair for this owner. It must be unique for this owner (but
+	// other owners can have key pairs with the same qualifier).
+	Qualifier() string
+	// WithQualifier returns a new KeyIdentifier with the specified qualifier.
+	WithQualifier(qualifier string) KeyIdentifier
+}
+
+type entityKeyIdentifier struct {
+	entity    LegalEntity
+	qualifier string
+}
+
+// WithQualifier: see KeyIdentifier interface
+func (e entityKeyIdentifier) WithQualifier(qualifier string) KeyIdentifier {
+	return &entityKeyIdentifier{
+		entity:    e.entity,
+		qualifier: qualifier,
+	}
+}
+
+// String: see KeyIdentifier interface
+func (e entityKeyIdentifier) String() string {
+	return fmt.Sprintf("[%s|%s]", e.entity.URI, e.qualifier)
+}
+
+// Owner: see KeyIdentifier interface
+func (e entityKeyIdentifier) Owner() string {
+	return e.entity.URI
+}
+
+// Qualifier: see KeyIdentifier interface
+func (e entityKeyIdentifier) Qualifier() string {
+	return e.qualifier
+}
+
+// KeyForEntity returns a KeyIdentifier for the given LegalEntity. The KeyIdentifier will not have a qualifier.
+func KeyForEntity(entity LegalEntity) KeyIdentifier {
+	return entityKeyIdentifier{
+		entity: entity,
+	}
 }
 
 // Struct defining the encrypted data in CipherText, an encrypted symmetric key in CipherTextKeys (1 for each given public key) and the nonce needed for the AES_GCM decryption.
