@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/log"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -112,13 +113,13 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 			err error
 		)
 		if e.Jwk != nil {
-			if j, err = pkg.MapToJwk(e.Jwk.AdditionalProperties); err != nil {
+			if j, err = cert.MapToJwk(e.Jwk.AdditionalProperties); err != nil {
 				return echo.NewHTTPError(http.StatusBadRequest, "invalid key in encryptRequestSubjects")
 			}
 		}
 
 		if j == nil && e.PublicKey != nil {
-			if j, err = pkg.PemToJwk([]byte(*e.PublicKey)); err != nil {
+			if j, err = cert.PemToJwk([]byte(*e.PublicKey)); err != nil {
 				return echo.NewHTTPError(http.StatusBadRequest, "invalid key in encryptRequestSubjects")
 			}
 		}
@@ -353,12 +354,12 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 
 	var j jwk.Key
 	if verifyRequest.Jwk != nil {
-		if j, err = pkg.MapToJwk(verifyRequest.Jwk.AdditionalProperties); err != nil {
+		if j, err = cert.MapToJwk(verifyRequest.Jwk.AdditionalProperties); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid JWK in verifyRequest")
 		}
 	}
 	if j == nil && verifyRequest.PublicKey != nil {
-		if j, err = pkg.PemToJwk([]byte(*verifyRequest.PublicKey)); err != nil {
+		if j, err = cert.PemToJwk([]byte(*verifyRequest.PublicKey)); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid publicKey in verifyRequest")
 		}
 	}

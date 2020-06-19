@@ -17,5 +17,8 @@
 #sphinx
 _build
 *.pem
+!test/certificate-and-key.pem
+!test/truststore.pem
+!test/truststore-invalid.pem
 
 nuts-crypto
