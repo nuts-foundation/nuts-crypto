@@ -32,16 +32,16 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
-	errors2 "github.com/pkg/errors"
 	"io"
-	"math/big"
 	"path"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jws"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	errors2 "github.com/pkg/errors"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -238,7 +238,7 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.
 		return nil, errors2.Wrap(err, ErrUnknownCA.Error())
 	}
 
-	serialNumber, err := serialNumber()
+	serialNumber, err := cert.SerialNumber()
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to generate serial number")
 	}
@@ -687,12 +687,6 @@ func (client *Crypto) encryptPlainTextWith(plaintext []byte, key *rsa.PublicKey)
 		return nil, err
 	}
 	return ciphertext, nil
-}
-
-func serialNumber() (*big.Int, error) {
-	// Taken from crypto/tls/generate_cert.go
-	snLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	return rand.Int(rand.Reader, snLimit)
 }
 
 func decryptWithPrivateKey(cipherText []byte, priv *rsa.PrivateKey) ([]byte, error) {

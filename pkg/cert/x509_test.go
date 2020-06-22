@@ -7,12 +7,28 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
+
+func Test_serialNumberUniqueness(t *testing.T) {
+	r := make(map[string]bool, 0)
+	for i := 0; i < 100000; i++ {
+		serial, err := SerialNumber()
+		if !assert.NoError(t, err) {
+			return
+		}
+		if r[serial.String()] {
+			assert.Failf(t, "duplicate found", "serial: %d", serial)
+			return
+		}
+		r[serial.String()] = true
+	}
+}
 
 func TestGetActiveCertificates(t *testing.T) {
 	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)

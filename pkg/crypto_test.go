@@ -30,15 +30,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/lestrrat-go/jwx/jwe/aescbc"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
 	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"github.com/nuts-foundation/nuts-crypto/test"
-	"os"
-	"reflect"
-	"testing"
-	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -161,6 +162,7 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 }
 
 func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
+	defer emptyTemp(t.Name())
 	client := defaultBackend(t.Name())
 	t.Run("returns error for unsupported algorithm", func(t *testing.T) {
 		plaintext := "for your eyes only"
@@ -278,9 +280,9 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 }
 
 func TestCrypto_SignFor(t *testing.T) {
+	defer emptyTemp(t.Name())
 	t.Run("error - private key does not exist", func(t *testing.T) {
 		client := defaultBackend(t.Name())
-		defer emptyTemp(t.Name())
 		sig, err := client.Sign([]byte{1, 2, 3}, key)
 		assert.Error(t, err)
 		assert.Nil(t, sig)
@@ -288,6 +290,7 @@ func TestCrypto_SignFor(t *testing.T) {
 }
 
 func TestCrypto_VerifyWith(t *testing.T) {
+	defer emptyTemp(t.Name())
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		data := []byte("hello")
 		client := defaultBackend(t.Name())
@@ -934,6 +937,7 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 }
 
 func TestCrypto_Configure(t *testing.T) {
+	defer emptyTemp(t.Name())
 	t.Run("ok - configOnce", func(t *testing.T) {
 		e := defaultBackend(t.Name())
 		assert.False(t, e.configDone)
@@ -1003,6 +1007,7 @@ func TestCrypto_Configure(t *testing.T) {
 }
 
 func TestCryptoConfig_TrustStore(t *testing.T) {
+	defer emptyTemp(t.Name())
 	t.Run("ok", func(t *testing.T) {
 		client := defaultBackend(t.Name())
 		client.doConfigure()
@@ -1011,26 +1016,12 @@ func TestCryptoConfig_TrustStore(t *testing.T) {
 }
 
 func TestCrypto_TrustStore(t *testing.T) {
+	defer emptyTemp(t.Name())
 	t.Run("ok", func(t *testing.T) {
 		client := defaultBackend(t.Name())
 		client.doConfigure()
 		assert.NotNil(t, client.TrustStore())
 	})
-}
-
-func Test_serialNumberUniqueness(t *testing.T) {
-	r := make(map[string]bool, 0)
-	for i := 0; i < 100000; i++ {
-		serial, err := serialNumber()
-		if !assert.NoError(t, err) {
-			return
-		}
-		if r[serial.String()] {
-			assert.Failf(t, "duplicate found", "serial: %d", serial)
-			return
-		}
-		r[serial.String()] = true
-	}
 }
 
 func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
@@ -1042,6 +1033,7 @@ func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
 
 func TestCrypto_encryptPlainTextWith(t *testing.T) {
 	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
 
 	t.Run("incorrect public key returns error", func(t *testing.T) {
 		plainText := "Secret"
@@ -1080,6 +1072,18 @@ func createTempStorage(name string) storage.Storage {
 func emptyTemp(name string) {
 	err := os.RemoveAll(fmt.Sprintf("temp/%s", name))
 
+	if err != nil {
+		println(err.Error())
+	}
+	err = os.Remove(fmt.Sprintf("temp/%s", name))
+	if err != nil {
+		println(err.Error())
+	}
+	err = os.Remove("temp")
+	if err != nil {
+		println(err.Error())
+	}
+	err = os.Remove("truststore.pem")
 	if err != nil {
 		println(err.Error())
 	}
