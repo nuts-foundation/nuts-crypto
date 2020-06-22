@@ -1,12 +1,21 @@
 package cert
 
 import (
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
+	"math/big"
 	"sort"
 	"time"
 )
+
+// SerialNumber generates a random serialNumber
+// Taken from crypto/tls/generate_cert.go
+func SerialNumber() (*big.Int, error) {
+	snLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	return rand.Int(rand.Reader, snLimit)
+}
 
 // GetCertificate converts the given JWK to a X.509 certificate chain, returning the topmost certificate. If the JWK
 // does not contain any certificates, nil is returned.
@@ -32,7 +41,7 @@ func GetActiveCertificates(jwks []interface{}, instant time.Time) []*x509.Certif
 		}
 		activeCertificates = append(activeCertificates, certificate)
 	}
-	sort.Slice(activeCertificates, func( i, j int) bool {
+	sort.Slice(activeCertificates, func(i, j int) bool {
 		first := activeCertificates[i]
 		second := activeCertificates[j]
 		return first.NotAfter.UnixNano()-instant.UnixNano() > second.NotAfter.UnixNano()-instant.UnixNano()
@@ -95,7 +104,7 @@ func MarshalNutsDomain(domain string) ([]byte, error) {
 
 // UnmarshalNutsDomain tries to unmarshal the ASN.1 encoded Nuts Domain extension in a X.509 certificate.
 // It returns the value as a string, or an error if one occurs.
-func UnmarshalNutsDomain(data []byte)(string, error) {
+func UnmarshalNutsDomain(data []byte) (string, error) {
 	value := asn1.RawValue{}
 	if _, err := asn1.Unmarshal(data, &value); err != nil {
 		return "", err

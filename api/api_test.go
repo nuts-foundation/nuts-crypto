@@ -24,13 +24,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
-	mock2 "github.com/nuts-foundation/nuts-crypto/test/mock"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	mock2 "github.com/nuts-foundation/nuts-crypto/test/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -43,7 +44,6 @@ import (
 )
 
 var key = types.KeyForEntity(types.LegalEntity{URI: "test"})
-
 
 type pubKeyMatcher struct {
 }
@@ -125,7 +125,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().Request().Return(&http.Request{})
 
 		// key generation is ok
-	cl.EXPECT().GenerateKeyPair(key).Return(nil, nil).AnyTimes()
+		cl.EXPECT().GenerateKeyPair(key).Return(nil, nil).AnyTimes()
 
 		// getting pub key goes boom!
 		cl.EXPECT().GetPublicKeyAsPEM(key).Return("", errors.New("boom"))
@@ -139,7 +139,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 func TestApiWrapper_Encrypt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
-plaintext := "for your eyes only"
+	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key)
 	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
 
@@ -405,7 +405,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-plaintext := "for your eyes only"
+	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key)
 	pubKey, _ := client.C.GetPublicKeyAsJWK(key)
 	encRecord, _ := client.C.EncryptKeyAndPlainText([]byte(plaintext), []jwk.Key{pubKey})
@@ -612,7 +612,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 	client := apiWrapper()
 	defer emptyTemp()
 
-subject := Identifier("test")
+	subject := Identifier("test")
 	actor := Identifier("test")
 	client.C.GenerateKeyPair(key)
 
@@ -1282,6 +1282,10 @@ func createTempStorage() storage.Storage {
 func emptyTemp() {
 	err := os.RemoveAll("../../temp/")
 
+	if err != nil {
+		println(err.Error())
+	}
+	err = os.Remove("temp")
 	if err != nil {
 		println(err.Error())
 	}

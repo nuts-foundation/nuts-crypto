@@ -5,12 +5,12 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"github.com/stretchr/testify/assert"
-	"math/big"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewTrustStore(t *testing.T) {
@@ -212,8 +212,9 @@ func generateKeyPair() *rsa.PrivateKey {
 }
 
 func generateCertificate(commonName string, notBefore time.Time, validityInDays int, privKey *rsa.PrivateKey) *x509.Certificate {
+	sn, _ := SerialNumber()
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		SerialNumber: sn,
 		Subject: pkix.Name{
 			CommonName: commonName,
 		},

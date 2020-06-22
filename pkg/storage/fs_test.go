@@ -5,10 +5,11 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
 
 const cert = `
@@ -190,6 +191,10 @@ func createTempStorage(name string) *fileSystemBackend {
 
 func emptyTemp(name string) {
 	err := os.RemoveAll(fmt.Sprintf("temp/%s", name))
+	if err != nil {
+		println(err.Error())
+	}
+	err = os.Remove("temp")
 	if err != nil {
 		println(err.Error())
 	}
