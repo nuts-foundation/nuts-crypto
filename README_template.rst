@@ -14,8 +14,9 @@ Go crypto lib for Nuts service space
 .. image:: https://codecov.io/gh/nuts-foundation/nuts-crypto/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/nuts-foundation/nuts-crypto
 
-.. image:: https://api.codacy.com/project/badge/Grade/d17595243fd7424fbe743da68c8dcbfc
-    :target: https://www.codacy.com/app/woutslakhorst/nuts-crypto
+.. image:: https://api.codeclimate.com/v1/badges/72b0fb803a2716c10128/maintainability
+   :target: https://codeclimate.com/github/nuts-foundation/nuts-crypto/maintainability
+   :alt: Maintainability
 
 .. include:: docs/pages/development/crypto.rst
     :start-after: .. marker-for-readme
