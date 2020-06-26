@@ -78,15 +78,15 @@ The resulting html will be available from ``docs/_build/html/index.html``
 Configuration
 =============
 
-The following configuration parameters are available for the event service.
+The following configuration parameters are available:
 
-===================================     ====================    ================================================================================
-Key                                     Default                 Description
-===================================     ====================    ================================================================================
-crypto.storage                          fs                      storage to use, 'fs' for file system
-crypto.fspath                           .                       when file system is used as storage, this configures the path where keys are stored
-crypto.keysize                          2048                    number of bits to use when creating new RSA keys
-===================================     ====================    ================================================================================
+=======  =======  ===============================================================================================
+Key      Default  Description
+=======  =======  ===============================================================================================
+fspath   ./       when file system is used as storage, this configures the path where keys are stored (default .)
+keysize  2048     number of bits to use when creating new RSA keys
+storage  fs       storage to use, 'fs' for file system (default)
+=======  =======  ===============================================================================================
 
 As with all other properties for nuts-go, they can be set through yaml:
 

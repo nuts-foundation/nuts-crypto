@@ -24,5 +24,25 @@ Go crypto lib for Nuts service space
 Configuration
 =============
 
-.. include:: docs/pages/configuration/crypto.rst
-    :start-after: .. marker-for-readme
+The following configuration parameters are available:
+
+.. include:: README_options.rst
+
+As with all other properties for nuts-go, they can be set through yaml:
+
+.. sourcecode:: yaml
+
+    crypto:
+       keysize: 4096
+
+as commandline property
+
+.. sourcecode:: shell
+
+    ./nuts --crypto.keysize 4096
+
+Or by using environment variables
+
+.. sourcecode:: shell
+
+    NUTS_CRYPTO_KEYSIZE=4096 ./nuts
