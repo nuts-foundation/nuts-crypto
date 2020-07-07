@@ -96,16 +96,30 @@ const jwsAlgorithm = jwa.RS256
 const TLSCertificateValidityInDays = 60
 
 type CryptoConfig struct {
-	Keysize int
-	Storage string
-	Fspath  string
+	Mode          string
+	Address       string
+	ClientTimeout int
+	Keysize       int
+	Storage       string
+	Fspath        string
 }
 
 func (cc CryptoConfig) getFSPath() string {
 	if cc.Fspath == "" {
-		return types.ConfigFSPathDefault
+		return DefaultCryptoConfig().Fspath
 	} else {
 		return cc.Fspath
+	}
+}
+
+func DefaultCryptoConfig() CryptoConfig {
+	return CryptoConfig{
+		Mode:          "",
+		Address:       "localhost:1323",
+		ClientTimeout: 10,
+		Keysize:       2048,
+		Storage:       "fs",
+		Fspath:        "./",
 	}
 }
 
@@ -161,6 +175,37 @@ func (client *Crypto) SignCertificate(subjectKey types.KeyIdentifier, caKey type
 	}
 
 	return certificate, nil
+}
+
+func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
+	identity := core.NutsConfig().Identity()
+	log.Logger().Infof("Generating CSR for Vendor CA certificate (for current vendor: %s, name: %s)", identity, name)
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.New("invalid name")
+	}
+
+	key := types.KeyForEntity(types.LegalEntity{URI: identity})
+	if !client.Storage.PrivateKeyExists(key) {
+		log.Logger().Infof("No private key for %s generating.", identity)
+		_, err := client.GenerateKeyPair(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	privateKey, err := client.GetPrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+	csr, err := cert.VendorCertificateRequest(identity, name, "CA", "healthcare") // TODO: Domain is now hardcoded
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to create CSR template")
+	}
+	csr.PublicKey = privateKey.Public()
+	pkcs10, err := x509.CreateCertificateRequest(rand.Reader, csr, privateKey)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to create CSR")
+	}
+	return pkcs10, nil
 }
 
 func (client *Crypto) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
@@ -289,9 +334,7 @@ var oneBackend sync.Once
 func CryptoInstance() *Crypto {
 	oneBackend.Do(func() {
 		instance = &Crypto{
-			Config: CryptoConfig{
-				Keysize: types.ConfigKeySizeDefault,
-			},
+			Config: DefaultCryptoConfig(),
 		}
 	})
 	return instance
@@ -312,7 +355,7 @@ func (client *Crypto) doConfigure() error {
 	if client.Config.Keysize < MinKeySize {
 		return ErrInvalidKeySize
 	}
-	if client.Config.Storage != types.ConfigStorageFs && client.Config.Storage != "" {
+	if client.Config.Storage != "fs" && client.Config.Storage != "" {
 		return errors.New("only fs backend available for now")
 	}
 	var err error

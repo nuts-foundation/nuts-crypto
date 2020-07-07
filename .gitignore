@@ -11,14 +11,13 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+truststore.pem
+!test/truststore.pem
+
 #Intellij
 .idea
 
 #sphinx
 _build
-*.pem
-!test/certificate-and-key.pem
-!test/truststore.pem
-!test/truststore-invalid.pem
 
 nuts-crypto

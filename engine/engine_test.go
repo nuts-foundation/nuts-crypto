@@ -23,6 +23,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	core "github.com/nuts-foundation/nuts-go-core"
 	"github.com/nuts-foundation/nuts-go-core/mock"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -53,6 +54,7 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 		defer ctrl.Finish()
 		echo := mock.NewMockEchoRouter(ctrl)
 
+		echo.EXPECT().POST("/crypto/csr/vendorca", gomock.Any())
 		echo.EXPECT().POST("/crypto/sign", gomock.Any())
 		echo.EXPECT().POST("/crypto/verify", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
@@ -69,17 +71,16 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 func TestNewCryptoEngine_Cmd(t *testing.T) {
 	defer emptyTemp()
 
+	os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
+	defer os.Unsetenv("NUTS_IDENTITY")
+	core.NutsConfig().Load(&cobra.Command{})
+
 	e := NewCryptoEngine()
 	c := pkg.CryptoInstance()
 	c.Config.Fspath = "../temp"
 	c.Configure()
 	c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
 	cmd := e.Cmd
-
-	t.Run("Cmd returns a command with a single subCommand", func(t *testing.T) {
-		assert.Equal(t, "crypto", cmd.Name())
-		assert.Len(t, cmd.Commands(), 3)
-	})
 
 	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {
 		cmd.SetArgs([]string{"generateKeyPair"})
@@ -145,6 +146,18 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			assert.Contains(t, buf.String(), "Public key in JWK:")
 			assert.Contains(t, buf.String(), "kty")
 		}
+	})
+
+	t.Run("Running generateVendorCACSR returns CSR", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd.SetArgs([]string{"generate-vendor-csr", "foo"})
+		cmd.SetOut(buf)
+		err := cmd.Execute()
+
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Contains(t, buf.String(), "BEGIN CERTIFICATE REQUEST")
 	})
 }
 

@@ -4,12 +4,18 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // DecryptRequest defines model for DecryptRequest.
@@ -156,6 +162,13 @@ type VerifyResponse struct {
 	Outcome bool `json:"outcome"`
 }
 
+// GenerateVendorCACSRParams defines parameters for GenerateVendorCACSR.
+type GenerateVendorCACSRParams struct {
+
+	// Name of the vendor
+	Name string `json:"name"`
+}
+
 // DecryptJSONBody defines parameters for Decrypt.
 type DecryptJSONBody DecryptRequest
 
@@ -252,8 +265,1257 @@ func (a JWK) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// RequestEditorFn  is the function signature for the RequestEditor callback function
+type RequestEditorFn func(ctx context.Context, req *http.Request) error
+
+// Doer performs HTTP requests.
+//
+// The standard http.Client implements this interface.
+type HttpRequestDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Client which conforms to the OpenAPI3 specification for this service.
+type Client struct {
+	// The endpoint of the server conforming to this interface, with scheme,
+	// https://api.deepmap.com for example.
+	Server string
+
+	// Doer for performing requests, typically a *http.Client with any
+	// customized settings, such as certificate chains.
+	Client HttpRequestDoer
+
+	// A callback for modifying requests which are generated before sending over
+	// the network.
+	RequestEditor RequestEditorFn
+}
+
+// ClientOption allows setting custom parameters during construction
+type ClientOption func(*Client) error
+
+// Creates a new Client, with reasonable defaults
+func NewClient(server string, opts ...ClientOption) (*Client, error) {
+	// create a client with sane default values
+	client := Client{
+		Server: server,
+	}
+	// mutate client and add all optional params
+	for _, o := range opts {
+		if err := o(&client); err != nil {
+			return nil, err
+		}
+	}
+	// ensure the server URL always has a trailing slash
+	if !strings.HasSuffix(client.Server, "/") {
+		client.Server += "/"
+	}
+	// create httpClient, if not already present
+	if client.Client == nil {
+		client.Client = http.DefaultClient
+	}
+	return &client, nil
+}
+
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HttpRequestDoer) ClientOption {
+	return func(c *Client) error {
+		c.Client = doer
+		return nil
+	}
+}
+
+// WithRequestEditorFn allows setting up a callback function, which will be
+// called right before sending the request. This can be used to mutate the request.
+func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
+	return func(c *Client) error {
+		c.RequestEditor = fn
+		return nil
+	}
+}
+
+// The interface specification for the client above.
+type ClientInterface interface {
+	// GenerateVendorCACSR request
+	GenerateVendorCACSR(ctx context.Context, params *GenerateVendorCACSRParams) (*http.Response, error)
+
+	// Decrypt request  with any body
+	DecryptWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	Decrypt(ctx context.Context, body DecryptJSONRequestBody) (*http.Response, error)
+
+	// Encrypt request  with any body
+	EncryptWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	Encrypt(ctx context.Context, body EncryptJSONRequestBody) (*http.Response, error)
+
+	// ExternalId request  with any body
+	ExternalIdWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	ExternalId(ctx context.Context, body ExternalIdJSONRequestBody) (*http.Response, error)
+
+	// GenerateKeyPair request
+	GenerateKeyPair(ctx context.Context, params *GenerateKeyPairParams) (*http.Response, error)
+
+	// PublicKey request
+	PublicKey(ctx context.Context, urn string) (*http.Response, error)
+
+	// Sign request  with any body
+	SignWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	Sign(ctx context.Context, body SignJSONRequestBody) (*http.Response, error)
+
+	// SignJwt request  with any body
+	SignJwtWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	SignJwt(ctx context.Context, body SignJwtJSONRequestBody) (*http.Response, error)
+
+	// Verify request  with any body
+	VerifyWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
+	Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.Response, error)
+}
+
+func (c *Client) GenerateVendorCACSR(ctx context.Context, params *GenerateVendorCACSRParams) (*http.Response, error) {
+	req, err := NewGenerateVendorCACSRRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DecryptWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewDecryptRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Decrypt(ctx context.Context, body DecryptJSONRequestBody) (*http.Response, error) {
+	req, err := NewDecryptRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) EncryptWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewEncryptRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Encrypt(ctx context.Context, body EncryptJSONRequestBody) (*http.Response, error) {
+	req, err := NewEncryptRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExternalIdWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewExternalIdRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ExternalId(ctx context.Context, body ExternalIdJSONRequestBody) (*http.Response, error) {
+	req, err := NewExternalIdRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GenerateKeyPair(ctx context.Context, params *GenerateKeyPairParams) (*http.Response, error) {
+	req, err := NewGenerateKeyPairRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PublicKey(ctx context.Context, urn string) (*http.Response, error) {
+	req, err := NewPublicKeyRequest(c.Server, urn)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SignWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewSignRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Sign(ctx context.Context, body SignJSONRequestBody) (*http.Response, error) {
+	req, err := NewSignRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SignJwtWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewSignJwtRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SignJwt(ctx context.Context, body SignJwtJSONRequestBody) (*http.Response, error) {
+	req, err := NewSignJwtRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) VerifyWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewVerifyRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.Response, error) {
+	req, err := NewVerifyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
+}
+
+// NewGenerateVendorCACSRRequest generates requests for GenerateVendorCACSR
+func NewGenerateVendorCACSRRequest(server string, params *GenerateVendorCACSRParams) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/csr/vendorca")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryUrl.Query()
+
+	if queryFrag, err := runtime.StyleParam("form", true, "name", params.Name); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryUrl.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("POST", queryUrl.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDecryptRequest calls the generic Decrypt builder with application/json body
+func NewDecryptRequest(server string, body DecryptJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDecryptRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewDecryptRequestWithBody generates requests for Decrypt with any type of body
+func NewDecryptRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/decrypt")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewEncryptRequest calls the generic Encrypt builder with application/json body
+func NewEncryptRequest(server string, body EncryptJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewEncryptRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewEncryptRequestWithBody generates requests for Encrypt with any type of body
+func NewEncryptRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/encrypt")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewExternalIdRequest calls the generic ExternalId builder with application/json body
+func NewExternalIdRequest(server string, body ExternalIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewExternalIdRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewExternalIdRequestWithBody generates requests for ExternalId with any type of body
+func NewExternalIdRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/external_id")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewGenerateKeyPairRequest generates requests for GenerateKeyPair
+func NewGenerateKeyPairRequest(server string, params *GenerateKeyPairParams) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/generate")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryUrl.Query()
+
+	if queryFrag, err := runtime.StyleParam("form", true, "legalEntity", params.LegalEntity); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryUrl.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("POST", queryUrl.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPublicKeyRequest generates requests for PublicKey
+func NewPublicKeyRequest(server string, urn string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParam("simple", false, "urn", urn)
+	if err != nil {
+		return nil, err
+	}
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/public_key/%s", pathParam0)
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryUrl.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSignRequest calls the generic Sign builder with application/json body
+func NewSignRequest(server string, body SignJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSignRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSignRequestWithBody generates requests for Sign with any type of body
+func NewSignRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/sign")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewSignJwtRequest calls the generic SignJwt builder with application/json body
+func NewSignJwtRequest(server string, body SignJwtJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSignJwtRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSignJwtRequestWithBody generates requests for SignJwt with any type of body
+func NewSignJwtRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/sign_jwt")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// NewVerifyRequest calls the generic Verify builder with application/json body
+func NewVerifyRequest(server string, body VerifyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewVerifyRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewVerifyRequestWithBody generates requests for Verify with any type of body
+func NewVerifyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/verify")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
+}
+
+// ClientWithResponses builds on ClientInterface to offer response payloads
+type ClientWithResponses struct {
+	ClientInterface
+}
+
+// NewClientWithResponses creates a new ClientWithResponses, which wraps
+// Client with return type handling
+func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
+	client, err := NewClient(server, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &ClientWithResponses{client}, nil
+}
+
+// WithBaseURL overrides the baseURL.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		newBaseURL, err := url.Parse(baseURL)
+		if err != nil {
+			return err
+		}
+		c.Server = newBaseURL.String()
+		return nil
+	}
+}
+
+type generateVendorCACSRResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r generateVendorCACSRResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r generateVendorCACSRResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type decryptResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DecryptResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r decryptResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r decryptResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type encryptResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *EncryptResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r encryptResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r encryptResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type externalIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ExternalIdResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r externalIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r externalIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type generateKeyPairResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r generateKeyPairResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r generateKeyPairResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type publicKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r publicKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r publicKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type signResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SignResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r signResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r signResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type signJwtResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r signJwtResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r signJwtResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type verifyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *VerifyResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r verifyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r verifyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// GenerateVendorCACSRWithResponse request returning *GenerateVendorCACSRResponse
+func (c *ClientWithResponses) GenerateVendorCACSRWithResponse(ctx context.Context, params *GenerateVendorCACSRParams) (*generateVendorCACSRResponse, error) {
+	rsp, err := c.GenerateVendorCACSR(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateVendorCACSRResponse(rsp)
+}
+
+// DecryptWithBodyWithResponse request with arbitrary body returning *DecryptResponse
+func (c *ClientWithResponses) DecryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*decryptResponse, error) {
+	rsp, err := c.DecryptWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDecryptResponse(rsp)
+}
+
+func (c *ClientWithResponses) DecryptWithResponse(ctx context.Context, body DecryptJSONRequestBody) (*decryptResponse, error) {
+	rsp, err := c.Decrypt(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDecryptResponse(rsp)
+}
+
+// EncryptWithBodyWithResponse request with arbitrary body returning *EncryptResponse
+func (c *ClientWithResponses) EncryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*encryptResponse, error) {
+	rsp, err := c.EncryptWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEncryptResponse(rsp)
+}
+
+func (c *ClientWithResponses) EncryptWithResponse(ctx context.Context, body EncryptJSONRequestBody) (*encryptResponse, error) {
+	rsp, err := c.Encrypt(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEncryptResponse(rsp)
+}
+
+// ExternalIdWithBodyWithResponse request with arbitrary body returning *ExternalIdResponse
+func (c *ClientWithResponses) ExternalIdWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*externalIdResponse, error) {
+	rsp, err := c.ExternalIdWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExternalIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) ExternalIdWithResponse(ctx context.Context, body ExternalIdJSONRequestBody) (*externalIdResponse, error) {
+	rsp, err := c.ExternalId(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExternalIdResponse(rsp)
+}
+
+// GenerateKeyPairWithResponse request returning *GenerateKeyPairResponse
+func (c *ClientWithResponses) GenerateKeyPairWithResponse(ctx context.Context, params *GenerateKeyPairParams) (*generateKeyPairResponse, error) {
+	rsp, err := c.GenerateKeyPair(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateKeyPairResponse(rsp)
+}
+
+// PublicKeyWithResponse request returning *PublicKeyResponse
+func (c *ClientWithResponses) PublicKeyWithResponse(ctx context.Context, urn string) (*publicKeyResponse, error) {
+	rsp, err := c.PublicKey(ctx, urn)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePublicKeyResponse(rsp)
+}
+
+// SignWithBodyWithResponse request with arbitrary body returning *SignResponse
+func (c *ClientWithResponses) SignWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*signResponse, error) {
+	rsp, err := c.SignWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignResponse(rsp)
+}
+
+func (c *ClientWithResponses) SignWithResponse(ctx context.Context, body SignJSONRequestBody) (*signResponse, error) {
+	rsp, err := c.Sign(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignResponse(rsp)
+}
+
+// SignJwtWithBodyWithResponse request with arbitrary body returning *SignJwtResponse
+func (c *ClientWithResponses) SignJwtWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*signJwtResponse, error) {
+	rsp, err := c.SignJwtWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignJwtResponse(rsp)
+}
+
+func (c *ClientWithResponses) SignJwtWithResponse(ctx context.Context, body SignJwtJSONRequestBody) (*signJwtResponse, error) {
+	rsp, err := c.SignJwt(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignJwtResponse(rsp)
+}
+
+// VerifyWithBodyWithResponse request with arbitrary body returning *VerifyResponse
+func (c *ClientWithResponses) VerifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*verifyResponse, error) {
+	rsp, err := c.VerifyWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVerifyResponse(rsp)
+}
+
+func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body VerifyJSONRequestBody) (*verifyResponse, error) {
+	rsp, err := c.Verify(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVerifyResponse(rsp)
+}
+
+// ParseGenerateVendorCACSRResponse parses an HTTP response from a GenerateVendorCACSRWithResponse call
+func ParseGenerateVendorCACSRResponse(rsp *http.Response) (*generateVendorCACSRResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &generateVendorCACSRResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
+}
+
+// ParseDecryptResponse parses an HTTP response from a DecryptWithResponse call
+func ParseDecryptResponse(rsp *http.Response) (*decryptResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &decryptResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DecryptResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEncryptResponse parses an HTTP response from a EncryptWithResponse call
+func ParseEncryptResponse(rsp *http.Response) (*encryptResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &encryptResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EncryptResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExternalIdResponse parses an HTTP response from a ExternalIdWithResponse call
+func ParseExternalIdResponse(rsp *http.Response) (*externalIdResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &externalIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExternalIdResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGenerateKeyPairResponse parses an HTTP response from a GenerateKeyPairWithResponse call
+func ParseGenerateKeyPairResponse(rsp *http.Response) (*generateKeyPairResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &generateKeyPairResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
+}
+
+// ParsePublicKeyResponse parses an HTTP response from a PublicKeyWithResponse call
+func ParsePublicKeyResponse(rsp *http.Response) (*publicKeyResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &publicKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
+}
+
+// ParseSignResponse parses an HTTP response from a SignWithResponse call
+func ParseSignResponse(rsp *http.Response) (*signResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &signResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SignResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSignJwtResponse parses an HTTP response from a SignJwtWithResponse call
+func ParseSignJwtResponse(rsp *http.Response) (*signJwtResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &signJwtResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
+}
+
+// ParseVerifyResponse parses an HTTP response from a VerifyWithResponse call
+func ParseVerifyResponse(rsp *http.Response) (*verifyResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &verifyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VerifyResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Generate a CSR for requesting a vendor CA certificate.
+	// (POST /crypto/csr/vendorca)
+	GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error
 	// decrypt a cipherText for the given legalEntity
 	// (POST /crypto/decrypt)
 	Decrypt(ctx echo.Context) error
@@ -283,6 +1545,24 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GenerateVendorCACSR converts echo context to params.
+func (w *ServerInterfaceWrapper) GenerateVendorCACSR(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GenerateVendorCACSRParams
+	// ------------- Required query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, true, "name", ctx.QueryParams(), &params.Name)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter name: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.GenerateVendorCACSR(ctx, params)
+	return err
 }
 
 // Decrypt converts echo context to params.
@@ -395,6 +1675,7 @@ func RegisterHandlers(router EchoRouter, si ServerInterface) {
 		Handler: si,
 	}
 
+	router.POST("/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
 	router.POST("/crypto/decrypt", wrapper.Decrypt)
 	router.POST("/crypto/encrypt", wrapper.Encrypt)
 	router.POST("/crypto/external_id", wrapper.ExternalId)

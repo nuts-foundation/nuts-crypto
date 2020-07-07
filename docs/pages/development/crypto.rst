@@ -30,7 +30,7 @@ The server API is generated from the open-api spec:
 
 .. code-block:: shell
 
-    oapi-codegen -generate server,types -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
+    oapi-codegen -generate server,client,types -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
 
 Generating mocks
 ****************

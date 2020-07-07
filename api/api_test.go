@@ -24,6 +24,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -69,6 +71,41 @@ func (p jwkMatcher) Matches(x interface{}) bool {
 
 func (p jwkMatcher) String() string {
 	return "JWK Matcher"
+}
+
+func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
+		defer os.Unsetenv("NUTS_IDENTITY")
+		core.NutsConfig().Load(&cobra.Command{})
+
+		se := apiWrapper()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Blob(http.StatusOK, "application/x-pem-file", gomock.Any())
+
+		se.GenerateVendorCACSR(echo, GenerateVendorCACSRParams{Name: "foo"})
+	})
+	t.Run("error - vendor name is empty", func(t *testing.T) {
+		se := apiWrapper()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		err := se.GenerateVendorCACSR(echo, GenerateVendorCACSRParams{Name: "  "})
+		assert.EqualError(t, err, "code=400, message=name is invalid")
+	})
+	t.Run("error - vendor ID not set", func(t *testing.T) {
+		se := apiWrapper()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		err := se.GenerateVendorCACSR(echo, GenerateVendorCACSRParams{Name: "foo"})
+		assert.EqualError(t, err, "code=500, message=invalid key identifier")
+	})
 }
 
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
@@ -1268,7 +1305,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 func apiWrapper() *ApiWrapper {
 	backend := pkg.Crypto{
 		Storage: createTempStorage(),
-		Config:  pkg.CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  pkg.DefaultCryptoConfig(),
 	}
 
 	return &ApiWrapper{C: &backend}

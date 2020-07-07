@@ -19,12 +19,18 @@
 package engine
 
 import (
+	"crypto"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/nuts-foundation/nuts-crypto/api"
+	"github.com/nuts-foundation/nuts-crypto/client"
+	"github.com/nuts-foundation/nuts-crypto/log"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	engine "github.com/nuts-foundation/nuts-go-core"
 	"github.com/sirupsen/logrus"
@@ -49,13 +55,17 @@ func NewCryptoEngine() *engine.Engine {
 	}
 }
 
-// FlagSet returns the configuration possibilities for crypto: --backend, --fspath, --keysize
+// FlagSet returns the configuration flags for crypto
 func flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("crypto", pflag.ContinueOnError)
 
-	flags.String(types.ConfigStorage, types.ConfigStorageFs, "storage to use, 'fs' for file system (default)")
-	flags.String(types.ConfigFSPath, types.ConfigFSPathDefault, "when file system is used as storage, this configures the path where keys are stored (default .)")
-	flags.Int(types.ConfigKeySize, types.ConfigKeySizeDefault, "number of bits to use when creating new RSA keys")
+	defs := pkg.DefaultCryptoConfig()
+	flags.String(types.ConfigMode, defs.Mode, fmt.Sprintf("Server or client, when client it uses the HttpClient, default: %s", defs.Mode))
+	flags.String(types.ConfigAddress, defs.Address, fmt.Sprintf("Interface and port for http server to bind to, default: %s", defs.Address))
+	flags.Int(types.ConfigClientTimeout, defs.ClientTimeout, fmt.Sprintf("Time-out for the client in seconds (e.g. when using the CLI), default: %d", defs.ClientTimeout))
+	flags.String(types.ConfigStorage, defs.Storage, fmt.Sprintf("Storage to use, 'fs' for file system, default: %s", defs.Storage))
+	flags.String(types.ConfigFSPath, defs.Fspath, fmt.Sprintf("When file system is used as storage, this configures the path where key material and the truststore are persisted, default: %v", defs.Fspath))
+	flags.Int(types.ConfigKeySize, defs.Keysize, fmt.Sprintf("Number of bits to use when creating new RSA keys, default: %d", defs.Keysize))
 
 	return flags
 }
@@ -94,7 +104,7 @@ func cmd() *cobra.Command {
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cc := pkg.NewCryptoClient()
+			cc := client.NewCryptoClient()
 			if _, err := cc.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: args[0]})); err != nil {
 				cmd.Printf("Error generating keyPair: %v\n", err)
 			} else {
@@ -116,7 +126,7 @@ func cmd() *cobra.Command {
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cc := pkg.NewCryptoClient()
+			cc := client.NewCryptoClient()
 			le := types.LegalEntity{URI: args[0]}
 
 			// printout in JWK
@@ -135,13 +145,38 @@ func cmd() *cobra.Command {
 			cmd.Println("")
 
 			// printout in PEM
-			inPem, err := cc.GetPublicKeyAsPEM(types.KeyForEntity(le))
-			if err != nil {
+			if publicKey, err := jwk.Materialize(); err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return
+			} else {
+				publicKeyAsPEM, err := cert.PublicKeyToPem(publicKey.(crypto.PublicKey))
+				if err != nil {
+					cmd.Printf("Error printing publicKey: %v\n", err)
+					return
+				}
+				cmd.Println("Public key in PEM:")
+				cmd.Println(publicKeyAsPEM)
 			}
-			cmd.Println("Public key in PEM:")
-			cmd.Println(inPem)
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "generate-vendor-csr [name]",
+		Short: "Generates a CSR for the current vendor with the given name.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cc := client.NewCryptoClient()
+			csr, err := cc.GenerateVendorCACSR(args[0])
+			if err != nil {
+				log.Logger().Errorf("Error while generating CSR: %v", err)
+				return err
+			}
+			csrAsPEM := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE REQUEST",
+				Bytes: csr,
+			})
+			cmd.Println(string(csrAsPEM))
+			return nil
 		},
 	})
 

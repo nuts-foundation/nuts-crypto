@@ -84,6 +84,21 @@ func (mr *MockClientMockRecorder) CalculateExternalId(subject, actor, key interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateExternalId", reflect.TypeOf((*MockClient)(nil).CalculateExternalId), subject, actor, key)
 }
 
+// GenerateVendorCACSR mocks base method
+func (m *MockClient) GenerateVendorCACSR(name string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateVendorCACSR", name)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateVendorCACSR indicates an expected call of GenerateVendorCACSR
+func (mr *MockClientMockRecorder) GenerateVendorCACSR(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateVendorCACSR", reflect.TypeOf((*MockClient)(nil).GenerateVendorCACSR), name)
+}
+
 // GenerateKeyPair mocks base method
 func (m *MockClient) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
 	m.ctrl.T.Helper()
