@@ -43,7 +43,7 @@ The server API is generated from the open-api spec:
 
 .. code-block:: shell
 
-    oapi-codegen -generate server,types -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
+    oapi-codegen -generate server,client,types -package api docs/_static/nuts-service-crypto.yaml > api/generated.go
 
 Generating mocks
 ****************
@@ -80,13 +80,16 @@ Configuration
 
 The following configuration parameters are available:
 
-=======  =======  ===============================================================================================
-Key      Default  Description
-=======  =======  ===============================================================================================
-fspath   ./       when file system is used as storage, this configures the path where keys are stored (default .)
-keysize  2048     number of bits to use when creating new RSA keys
-storage  fs       storage to use, 'fs' for file system (default)
-=======  =======  ===============================================================================================
+=============  ==============  ==============================================================================================================================
+Key            Default         Description
+=============  ==============  ==============================================================================================================================
+address        localhost:1323  Interface and port for http server to bind to, default: localhost:1323
+clientTimeout  10              Time-out for the client in seconds (e.g. when using the CLI), default: 10
+fspath         ./              When file system is used as storage, this configures the path where key material and the truststore are persisted, default: ./
+keysize        2048            Number of bits to use when creating new RSA keys, default: 2048
+mode                           Server or client, when client it uses the HttpClient, default:
+storage        fs              Storage to use, 'fs' for file system, default: fs
+=============  ==============  ==============================================================================================================================
 
 As with all other properties for nuts-go, they can be set through yaml:
 

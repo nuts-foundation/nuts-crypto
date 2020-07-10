@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"github.com/nuts-foundation/nuts-crypto/log"
@@ -30,6 +31,7 @@ import (
 	"mime"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -69,6 +71,22 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	}
 
 	return ctx.String(http.StatusOK, pub)
+}
+
+func (w *ApiWrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error {
+	if strings.TrimSpace(params.Name) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "name is invalid")
+	}
+	csr, err := w.C.GenerateVendorCACSR(params.Name)
+	if err != nil {
+		log.Logger().Errorf("Unable to generate vendor CA certificate CSR: %v", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	csrAsPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csr,
+	})
+	return ctx.Blob(http.StatusOK, "application/x-pem-file", csrAsPEM)
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt

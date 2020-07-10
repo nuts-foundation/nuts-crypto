@@ -30,8 +30,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/spf13/cobra"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,14 +62,6 @@ func TestCryptoBackend(t *testing.T) {
 
 		if client != client2 {
 			t.Error("Expected instances to be the same")
-		}
-	})
-
-	t.Run("CryptoInstance with default keysize", func(t *testing.T) {
-		client := CryptoInstance()
-
-		if client.Config.Keysize != types.ConfigKeySizeDefault {
-			t.Errorf("Expected keySize to be %d, got %d", types.ConfigKeySizeDefault, client.Config.Keysize)
 		}
 	})
 }
@@ -621,6 +616,66 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	})
 }
 
+func TestCrypto_GenerateVendorCACSR(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("ok", func(t *testing.T) {
+		csrAsBytes, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, csrAsBytes)
+		// Verify result is a valid PKCS10 CSR
+		csr, err := x509.ParseCertificateRequest(csrAsBytes)
+		if !assert.NoError(t, err) {
+			return
+		}
+		// Verify signature
+		err = csr.CheckSignature()
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		t.Run("verify subject", func(t *testing.T) {
+			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", csr.Subject.String())
+		})
+		t.Run("verify VendorID SAN", func(t *testing.T) {
+			extension, err := CertificateRequest(*csr).getUniqueExtension("2.5.29.17")
+			assert.NoError(t, err)
+			assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, extension.Value)
+		})
+		t.Run("verify Domain extension", func(t *testing.T) {
+			extension, err := CertificateRequest(*csr).getUniqueExtension("1.3.6.1.4.1.54851.3")
+			assert.NoError(t, err)
+			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
+		})
+	})
+	t.Run("ok - key exists", func(t *testing.T) {
+		client.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{core.NutsConfig().Identity()}))
+		csr, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, csr)
+		// Verify result is a valid PKCS10 CSR
+		parsedCSR, err := x509.ParseCertificateRequest(csr)
+		if !assert.NoError(t, err) {
+			return
+		}
+		// Verify signature
+		err = parsedCSR.CheckSignature()
+		if !assert.NoError(t, err) {
+			return
+		}
+	})
+	t.Run("error - invalid name", func(t *testing.T) {
+		csr, err := client.GenerateVendorCACSR("   ")
+		assert.Nil(t, csr)
+		assert.EqualError(t, err, "invalid name")
+	})
+}
+
 func TestCrypto_GetTLSCertificate(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
@@ -1056,9 +1111,13 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 }
 
 func defaultBackend(name string) *Crypto {
+	os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:123")
+	if err := core.NutsConfig().Load(&cobra.Command{}); err != nil {
+		panic(err)
+	}
 	backend := Crypto{
 		Storage: createTempStorage(name),
-		Config:  CryptoConfig{Keysize: types.ConfigKeySizeDefault},
+		Config:  DefaultCryptoConfig(),
 	}
 
 	return &backend
@@ -1128,4 +1187,22 @@ func Test_symmetricKeyToBlockCipher(t *testing.T) {
 		assert.Nil(t, c)
 		assert.EqualError(t, err, "crypto/aes: invalid key size 3")
 	})
+}
+
+type CertificateRequest x509.CertificateRequest
+
+func (csr CertificateRequest) getUniqueExtension(oid string) (*pkix.Extension, error) {
+	var result pkix.Extension
+	for _, ext := range csr.Extensions {
+		if ext.Id.String() == oid {
+			if result.Id.String() != "" {
+				return nil, fmt.Errorf("multiple extensions in certificate with OID: %s", oid)
+			}
+			result = ext
+		}
+	}
+	if result.Id.String() == "" {
+		return nil, fmt.Errorf("no extensions in certificate with OID: %s", oid)
+	}
+	return &result, nil
 }

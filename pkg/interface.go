@@ -35,6 +35,9 @@ type Client interface {
 	EncryptKeyAndPlainText(plainText []byte, keys []jwk.Key) (types.DoubleEncryptedCipherText, error)
 	// CalculateExternalId calculates an externalId for a (custodian, subject, actor) triple using the given key (private key must be present).
 	CalculateExternalId(subject string, actor string, key types.KeyIdentifier) ([]byte, error)
+	// GenerateVendorCACSR generates a Certificate Signing Request (CSR) for a Vendor CA Certificate for the current vendor.
+	// If successful it returns the CSR as DER-encoded PKCS10.
+	GenerateVendorCACSR(name string) ([]byte, error)
 	// GenerateKeyPair generates a key pair. If the key already exists, it is overwritten and associated certificates are removed.
 	GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error)
 	// SignFor signs a piece of data using the given key (private key must be present).
@@ -90,14 +93,4 @@ type CertificateProfile struct {
 	// notBefore overrides (if also notAfter has been set) the NumDaysValid property.
 	notBefore time.Time
 	notAfter  time.Time
-}
-
-// NewCryptoClient returns a CryptoClient which either resolves call directly to the engine or uses a REST client.
-func NewCryptoClient() Client {
-	// todo: use configuration to choose client
-	instance := CryptoInstance()
-	if err := instance.Configure(); err != nil {
-		panic(err)
-	}
-	return instance
 }
