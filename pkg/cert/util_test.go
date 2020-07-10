@@ -25,13 +25,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jws"
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCrypto_PublicKeyToPem(t *testing.T) {
@@ -257,5 +260,39 @@ func TestValidateJWK(t *testing.T) {
 			"kty": "foobar",
 		}
 		assert.Error(t, ValidateJWK(key, invalidMap))
+	})
+}
+
+func TestPemToX509(t *testing.T) {
+	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	asn1 := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+	pemEncoded := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: asn1,
+	})
+
+	t.Run("decodes PEM to x509.Certificate", func(t *testing.T) {
+		cert, err := PemToX509(pemEncoded)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "Unit Test", cert.Subject.CommonName)
+		}
+	})
+
+	t.Run("incorrect data gives error", func(t *testing.T) {
+		_, err := PemToX509([]byte{})
+		if assert.Error(t, err) {
+			assert.Equal(t, "failed to decode PEM block containing certificate", err.Error())
+		}
+	})
+
+	t.Run("too much data gives error", func(t *testing.T) {
+		var pemCopy []byte
+		copy(pemEncoded, pemCopy)
+		pemCopy = append(pemCopy, 0x65)
+
+		_, err := PemToX509(pemCopy)
+		if assert.Error(t, err) {
+			assert.Equal(t, "found 1 rest bytes after decoding PEM", err.Error())
+		}
 	})
 }

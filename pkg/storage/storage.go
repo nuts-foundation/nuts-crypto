@@ -25,6 +25,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"time"
+
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
@@ -37,6 +39,8 @@ type Storage interface {
 	SaveCertificate(key types.KeyIdentifier, certificate []byte) error
 	GetCertificate(key types.KeyIdentifier) (*x509.Certificate, error)
 	CertificateExists(key types.KeyIdentifier) bool
+	// GetExpiringCertificates lists all certificates will expire between given times
+	GetExpiringCertificates(from time.Time, till time.Time) ([]*x509.Certificate, error)
 }
 
 // shared function to convert bytes to a RSA private key
