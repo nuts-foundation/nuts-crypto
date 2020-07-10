@@ -28,7 +28,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -622,57 +621,35 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 	defer emptyTemp(t.Name())
 
 	t.Run("ok", func(t *testing.T) {
-		csr, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
+		csrAsBytes, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
 		if !assert.NoError(t, err) {
 			return
 		}
-		assert.NotNil(t, csr)
-		println(string(pem.EncodeToMemory(&pem.Block{
-			Type:    "CERTIFICATE REQUEST",
-			Bytes:   csr,
-		})))
+		assert.NotNil(t, csrAsBytes)
 		// Verify result is a valid PKCS10 CSR
-		parsedCSR, err := x509.ParseCertificateRequest(csr)
+		csr, err := x509.ParseCertificateRequest(csrAsBytes)
 		if !assert.NoError(t, err) {
 			return
 		}
 		// Verify signature
-		err = parsedCSR.CheckSignature()
+		err = csr.CheckSignature()
 		if !assert.NoError(t, err) {
 			return
 		}
-		// Verify contents of CSR
-		assert.Equal(t, "BecauseWeCare B.V. CA", parsedCSR.Subject.CommonName)
-		assert.Equal(t, []string{"BecauseWeCare B.V."}, parsedCSR.Subject.Organization)
-		assert.Equal(t, []string{"NL"}, parsedCSR.Subject.Country)
-		// Verify SAN = vendorID
-		var san pkix.Extension
-		var domain pkix.Extension
-		for _, ext := range parsedCSR.Extensions {
-			println(ext.Id.String() + " = " + strings.TrimSpace(string(ext.Value)))
-			if ext.Id.String() == "2.5.29.17" {
-				if san.Id != nil {
-					assert.Fail(t, "multiple SAN extensions found")
-					return
-				}
-				san = ext
-			}
-			if ext.Id.String() == "1.3.6.1.4.1.54851.3" {
-				if domain.Id != nil {
-					assert.Fail(t, "multiple Nuts domain extensions found")
-					return
-				}
-				domain = ext
-			}
-		}
-		if !assert.NotNil(t, san, "no SAN extension found in CSR") {
-			return
-		}
-		if !assert.NotNil(t, domain, "no Nuts domain extension found in CSR") {
-			return
-		}
-		assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, san.Value)
-		assert.Equal(t, "healthcare", strings.TrimSpace(string(domain.Value)))
+
+		t.Run("verify subject", func(t *testing.T) {
+			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", csr.Subject.String())
+		})
+		t.Run("verify VendorID SAN", func(t *testing.T) {
+			extension, err := CertificateRequest(*csr).getUniqueExtension("2.5.29.17")
+			assert.NoError(t, err)
+			assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, extension.Value)
+		})
+		t.Run("verify Domain extension", func(t *testing.T) {
+			extension, err := CertificateRequest(*csr).getUniqueExtension("1.3.6.1.4.1.54851.3")
+			assert.NoError(t, err)
+			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
+		})
 	})
 	t.Run("ok - key exists", func(t *testing.T) {
 		client.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{core.NutsConfig().Identity()}))
@@ -1210,4 +1187,22 @@ func Test_symmetricKeyToBlockCipher(t *testing.T) {
 		assert.Nil(t, c)
 		assert.EqualError(t, err, "crypto/aes: invalid key size 3")
 	})
+}
+
+type CertificateRequest x509.CertificateRequest
+
+func (csr CertificateRequest) getUniqueExtension(oid string) (*pkix.Extension, error) {
+	var result pkix.Extension
+	for _, ext := range csr.Extensions {
+		if ext.Id.String() == oid {
+			if result.Id.String() != "" {
+				return nil, fmt.Errorf("multiple extensions in certificate with OID: %s", oid)
+			}
+			result = ext
+		}
+	}
+	if result.Id.String() == "" {
+		return nil, fmt.Errorf("no extensions in certificate with OID: %s", oid)
+	}
+	return &result, nil
 }

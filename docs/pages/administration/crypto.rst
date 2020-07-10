@@ -1,4 +1,4 @@
-.. _nuts-registry-administration:
+.. _nuts-crypto-administration:
 
 Nuts Crypto Administration
 ############################
@@ -25,7 +25,7 @@ The syntax of this command is as follows:
 
 .. code-block:: shell
 
-    ./nuts crypto generate-vendor-csr <name> <domain>
+    ./nuts crypto generate-vendor-csr <name>
 
 To register vendor "BecauseWeCare B.V.", run the following command:
 
