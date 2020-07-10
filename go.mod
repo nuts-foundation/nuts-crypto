@@ -3,7 +3,7 @@ module github.com/nuts-foundation/nuts-crypto
 go 1.13
 
 require (
-	github.com/deepmap/oapi-codegen v1.3.8
+	github.com/deepmap/oapi-codegen v1.3.9
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.4.3
 	github.com/json-iterator/go v1.1.9 // indirect
