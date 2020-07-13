@@ -182,14 +182,14 @@ func (fsc *fileSystemBackend) GetExpiringCertificates(from time.Time, till time.
 	err := filepath.Walk(fsc.fspath, func(path string, info os.FileInfo, err error) error {
 		// only target expiringCertificates
 		if strings.Contains(info.Name(), string(certificateEntry)) {
-			x509, err := fsc.readCertificate(path)
+			certificate, err := fsc.readCertificate(path)
 			if err != nil {
 				return errors2.Wrap(err, fmt.Sprintf("error parsing file at %s", path))
 			}
 
 			// check if not_after is between from and till
-			if x509.NotAfter.After(from) && x509.NotAfter.Before(till) {
-				expiringCertificates = append(expiringCertificates, x509)
+			if certificate.NotAfter.After(from) && certificate.NotAfter.Before(till) {
+				expiringCertificates = append(expiringCertificates, certificate)
 			}
 		}
 		return nil

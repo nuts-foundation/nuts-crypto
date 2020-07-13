@@ -39,7 +39,8 @@ type Storage interface {
 	SaveCertificate(key types.KeyIdentifier, certificate []byte) error
 	GetCertificate(key types.KeyIdentifier) (*x509.Certificate, error)
 	CertificateExists(key types.KeyIdentifier) bool
-	// GetExpiringCertificates lists all certificates will expire between given times
+	// GetExpiringCertificates lists all certificates that will expire between given times.
+	// Till must be > from, otherwise an error is returned.
 	GetExpiringCertificates(from time.Time, till time.Time) ([]*x509.Certificate, error)
 }
 

@@ -25,7 +25,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
-	"fmt"
 
 	"github.com/lestrrat-go/jwx/jwk"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -39,7 +38,7 @@ var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing pub
 var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
 
 // ErrWrongPublicKey indicates a wrong certificate format
-var ErrWrongCertificate = core.NewError("failed to decode PEM block containing certificate", false)
+var ErrInvalidCertificate = core.NewError("failed to decode PEM block containing certificate", false)
 
 // PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
 func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
@@ -192,10 +191,10 @@ func GetX509ChainFromHeaders(headers jwkHeaderReader) ([]*x509.Certificate, erro
 func PemToX509(rawData []byte) (*x509.Certificate, error) {
 	block, rest := pem.Decode(rawData)
 	if len(rest) > 0 {
-		return nil, fmt.Errorf("found %d rest bytes after decoding PEM", len(rest))
+		return nil, errors2.Wrapf(ErrInvalidCertificate, "found %d rest bytes after decoding PEM", len(rest))
 	}
 	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, ErrWrongCertificate
+		return nil, ErrInvalidCertificate
 	}
 	return x509.ParseCertificate(block.Bytes)
 }
