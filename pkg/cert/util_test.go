@@ -292,7 +292,7 @@ func TestPemToX509(t *testing.T) {
 
 		_, err := PemToX509(pemCopy)
 		if assert.Error(t, err) {
-			assert.Equal(t, "found 1 rest bytes after decoding PEM", err.Error())
+			assert.True(t, strings.Contains(err.Error(), ErrInvalidCertificate.Error()))
 		}
 	})
 }
