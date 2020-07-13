@@ -25,6 +25,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+
 	"github.com/lestrrat-go/jwx/jwk"
 	core "github.com/nuts-foundation/nuts-go-core"
 	errors2 "github.com/pkg/errors"
@@ -35,6 +36,9 @@ var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing pub
 
 // ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
 var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
+
+// ErrWrongPublicKey indicates a wrong certificate format
+var ErrInvalidCertificate = core.NewError("failed to decode PEM block containing certificate", false)
 
 // PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
 func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
@@ -125,6 +129,7 @@ func deepCopyMap(m map[string]interface{}) map[string]interface{} {
 	}
 	return cp
 }
+
 // JwkToMap transforms a Jwk key to a map. Can be used for json serialization
 func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
 	root := map[string]interface{}{}
@@ -180,6 +185,18 @@ func GetX509ChainFromHeaders(headers jwkHeaderReader) ([]*x509.Certificate, erro
 	}
 	// For the case of JWS the returned header is either a string slice
 	return unmarshalX509CertChain(chainInterf.([]string))
+}
+
+// PemToX509 decodes PEM data as bytes to a *x509.Certificate
+func PemToX509(rawData []byte) (*x509.Certificate, error) {
+	block, rest := pem.Decode(rawData)
+	if len(rest) > 0 {
+		return nil, errors2.Wrapf(ErrInvalidCertificate, "found %d rest bytes after decoding PEM", len(rest))
+	}
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, ErrInvalidCertificate
+	}
+	return x509.ParseCertificate(block.Bytes)
 }
 
 func unmarshalX509CertChain(chain []string) ([]*x509.Certificate, error) {

@@ -5,14 +5,17 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/stretchr/testify/assert"
 )
 
-const cert = `
+const testCert = `
 -----BEGIN CERTIFICATE-----
 MIICvDCCAaSgAwIBAgIIFQhlqiLrrbgwDQYJKoZIhvcNAQELBQAwEjEQMA4GA1UE
 AxMHUm9vdCBDQTAeFw0yMDAyMTMxMjQzNTdaFw0yMDAyMTQxMjQzNTdaMBIxEDAO
@@ -39,7 +42,7 @@ func Test_fs_SaveThenLoadCertificate(t *testing.T) {
 	defer emptyTemp(t.Name())
 
 	t.Run("save certificate", func(t *testing.T) {
-		block, rest := pem.Decode([]byte(cert))
+		block, rest := pem.Decode([]byte(testCert))
 		if !assert.Len(t, rest, 0, "unable to decode cert") {
 			return
 		}
@@ -71,7 +74,7 @@ func Test_fs_GetCertificate(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("trailing bytes", func(t *testing.T) {
-		block, _ := pem.Decode([]byte(cert))
+		block, _ := pem.Decode([]byte(testCert))
 		err := storage.SaveCertificate(key, block.Bytes)
 		if !assert.NoError(t, err) {
 			return
@@ -181,6 +184,41 @@ func Test_fs_CertificateExistsFor(t *testing.T) {
 	t.Run("ok - existing entry with qualifier", func(t *testing.T) {
 		storage.SaveCertificate(key.WithQualifier("foo"), []byte{1, 2, 3})
 		assert.True(t, storage.CertificateExists(key))
+	})
+}
+
+func Test_fs_GetExpiringCertificates(t *testing.T) {
+	storage := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	// expires in 8 days
+	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	storage.SaveCertificate(key, test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 9, rsaKey))
+
+	t.Run("Expiring certificate is found within correct period", func(t *testing.T) {
+		certs, err := storage.GetExpiringCertificates(time.Now(), time.Now().AddDate(0, 0, 14))
+		if assert.NoError(t, err) {
+			assert.Len(t, certs, 1)
+		}
+	})
+
+	t.Run("Expiring certificate is not found outside period", func(t *testing.T) {
+		certs, err := storage.GetExpiringCertificates(time.Now(), time.Now().AddDate(0, 0, 7))
+		if assert.NoError(t, err) {
+			assert.Len(t, certs, 0)
+		}
+	})
+
+	t.Run("returns error when certificate with incorrect format is on the path", func(t *testing.T) {
+		storage := createTempStorage(t.Name())
+		defer emptyTemp(t.Name())
+
+		fileName := fmt.Sprintf("temp/%s/incorrect_%s", t.Name(), certificateEntry)
+		_ = os.MkdirAll(fmt.Sprintf("temp/%s", t.Name()), 0644)
+		_ = ioutil.WriteFile(fileName, []byte("this will return an error, this is not PEM encoded"), 0644)
+
+		_, err := storage.GetExpiringCertificates(time.Now(), time.Now())
+		assert.Error(t, err)
 	})
 }
 

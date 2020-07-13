@@ -26,16 +26,22 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
+	errors2 "github.com/pkg/errors"
 )
 
 type entryType string
+
 const (
 	certificateEntry entryType = "certificate.pem"
-	privateKeyEntry entryType = "private.pem"
+	privateKeyEntry  entryType = "private.pem"
 )
 
 type FileOpenError struct {
@@ -46,6 +52,9 @@ type FileOpenError struct {
 
 // ErrNotFound indicates that the specified crypto storage entry couldn't be found.
 var ErrNotFound = errors.New("entry not found")
+
+// ErrInvalidDuration is given when a period duration is 0 or negative
+var ErrInvalidDuration = errors.New("given time period is invalid")
 
 // Error returns the string representation
 func (f *FileOpenError) Error() string {
@@ -106,11 +115,15 @@ func (fsc *fileSystemBackend) GetCertificate(key types.KeyIdentifier) (*x509.Cer
 	if err != nil {
 		return nil, err
 	}
-	asn1bytes, rest := pem.Decode(rawData)
-	if len(rest) > 0 {
-		return nil, fmt.Errorf("found %d rest bytes after decoding PEM", len(rest))
+	return cert.PemToX509(rawData)
+}
+
+func (fsc *fileSystemBackend) readCertificate(filePath string) (*x509.Certificate, error) {
+	rawData, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
 	}
-	return x509.ParseCertificate(asn1bytes.Bytes)
+	return cert.PemToX509(rawData)
 }
 
 // Load the privatekey for the given legalEntity from disk. Since a legalEntity has a URI as identifier, the URI is base64 encoded and postfixed with '_private.pem'. Keys are stored in pem format and are 2k RSA keys.
@@ -154,6 +167,37 @@ func (fsc *fileSystemBackend) SavePrivateKey(keyIdentifier types.KeyIdentifier, 
 	err = pem.Encode(outFile, privateKey)
 
 	return err
+}
+
+// GetExpiringCertificates naive implementation, uses the fileTree to check every certificate
+// it'll not group certificates based on legalEntity. This is up to a more robust implementation
+func (fsc *fileSystemBackend) GetExpiringCertificates(from time.Time, till time.Time) ([]*x509.Certificate, error) {
+	if from.Equal(till) || from.After(till) {
+		return nil, ErrInvalidDuration
+	}
+
+	var expiringCertificates = make([]*x509.Certificate, 0)
+
+	// list all files ending on certificateEntry in fcs.path
+	err := filepath.Walk(fsc.fspath, func(path string, info os.FileInfo, err error) error {
+		// only target expiringCertificates
+		if strings.Contains(info.Name(), string(certificateEntry)) {
+			certificate, err := fsc.readCertificate(path)
+			if err != nil {
+				return errors2.Wrap(err, fmt.Sprintf("error parsing file at %s", path))
+			}
+
+			// check if not_after is between from and till
+			if certificate.NotAfter.After(from) && certificate.NotAfter.Before(till) {
+				expiringCertificates = append(expiringCertificates, certificate)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return expiringCertificates, nil
 }
 
 func (fsc fileSystemBackend) readEntry(key types.KeyIdentifier, entryType entryType) ([]byte, error) {
