@@ -21,7 +21,6 @@ package storage
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"os"
 	"testing"
 	"time"
 
@@ -32,8 +31,8 @@ import (
 )
 
 func TestCertificateMonitor_Start(t *testing.T) {
-	fs := CreateTempStorage()
-	defer EmptyTemp()
+	fs := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
 
 	t.Run("Starting a monitor twice returns an error", func(t *testing.T) {
 		m := CertificateMonitor{
@@ -77,8 +76,8 @@ func TestCertificateMonitor_Start(t *testing.T) {
 
 func TestCertificateMonitor_init(t *testing.T) {
 	metric = nil
-	fs := CreateTempStorage()
-	defer EmptyTemp()
+	fs := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
 	m := CertificateMonitor{
 		Period:      time.Hour,
 		PeriodLabel: "hour",
@@ -93,8 +92,8 @@ func TestCertificateMonitor_init(t *testing.T) {
 }
 
 func TestCertificateMonitor_checkExpiry(t *testing.T) {
-	fs := CreateTempStorage()
-	defer EmptyTemp()
+	fs := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
 
 	m := CertificateMonitor{
 		Period:      time.Hour * 48,
@@ -139,21 +138,4 @@ func TestCertificateMonitor_checkExpiry(t *testing.T) {
 			}
 		}
 	})
-}
-
-func CreateTempStorage() Storage {
-	b, _ := NewFileSystemBackend("../../temp")
-	return b
-}
-
-func EmptyTemp() {
-	err := os.RemoveAll("../../temp/")
-
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove("temp")
-	if err != nil {
-		println(err.Error())
-	}
 }
