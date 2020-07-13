@@ -149,6 +149,18 @@ func testResponseCode(expectedStatusCode int, response *http.Response) error {
 	return nil
 }
 
+func (hb HttpClient) SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error) {
+	panic(ErrNotImplemented)
+}
+
+func (hb HttpClient) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	panic(ErrNotImplemented)
+}
+
+func (hb HttpClient) StoreCertificate(key types.KeyIdentifier, certificate *x509.Certificate) error {
+	panic(ErrNotImplemented)
+}
+
 func (hb HttpClient) GetPublicKeyAsPEM(key types.KeyIdentifier) (string, error) {
 	panic(ErrNotImplemented)
 }
@@ -181,7 +193,7 @@ func (hb HttpClient) VerifyWith(data []byte, sig []byte, jwk jwk.Key) (bool, err
 	panic(ErrNotImplemented)
 }
 
-func (hb HttpClient) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
+func (hb HttpClient) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
 	panic(ErrNotImplemented)
 }
 

@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -93,7 +94,10 @@ var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
 const jwsAlgorithm = jwa.RS256
 
 // TLSCertificateValidityInDays holds the number of days issued TLS certificates are valid
-const TLSCertificateValidityInDays = 60
+const TLSCertificateValidityInDays = 365
+
+// SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
+const SigningCertificateValidityInDays = 365
 
 type CryptoConfig struct {
 	Mode          string
@@ -199,6 +203,21 @@ func (client *Crypto) SignCertificate(subjectKey types.KeyIdentifier, caKey type
 	return certificate, nil
 }
 
+func (client *Crypto) StoreCertificate(key types.KeyIdentifier, certificate *x509.Certificate) error {
+	if certificate == nil {
+		return errors.New("certificate is nil")
+	}
+	if client.Storage.PrivateKeyExists(key) {
+		// GetPublicKey used GetPrivateKey
+		if publicKey, err := client.Storage.GetPublicKey(key); err != nil {
+			return err
+		} else if !reflect.DeepEqual(publicKey, certificate.PublicKey) {
+			return errors.New("public key in certificate does not match stored private key")
+		}
+	}
+	return client.Storage.SaveCertificate(key, certificate.Raw)
+}
+
 func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 	identity := core.NutsConfig().Identity()
 	log.Logger().Infof("Generating CSR for Vendor CA certificate (for current vendor: %s, name: %s)", identity, name)
@@ -230,7 +249,32 @@ func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 	return pkcs10, nil
 }
 
-func (client *Crypto) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
+func (client *Crypto) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	return client.getSubCertificate(entity, "sign", CertificateProfile{
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
+		NumDaysValid: SigningCertificateValidityInDays,
+	})
+}
+
+func (client *Crypto) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	return client.getSubCertificate(entity, "tls", CertificateProfile{
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		NumDaysValid: TLSCertificateValidityInDays,
+	})
+}
+
+// getSubCertificate gets a 'sub certificate' for the specified entity, meaning a certificate issued by ('under') the CA
+// certificate of the entity. This is useful for providing specialized certificates for specific use cases (TLS and signing).
+// The entity must have a (valid) CA certificate and its private key must be present.
+// If the specified sub certificate is present (and valid) it is returned (along with its private key). If it doesn't
+// exist or has expired a new certificate will be issued. If the existing sub certificate has expired, a new key pair
+// will be generated for the new certificate (key rotation).
+func (client *Crypto) getSubCertificate(entity types.LegalEntity, qualifier string, profile CertificateProfile) (*x509.Certificate, crypto.PrivateKey, error) {
+	if qualifier == "" {
+		return nil, nil, errors.New("missing qualifier")
+	}
+	caKey := types.KeyForEntity(entity)
 	caCertificate, err := client.Storage.GetCertificate(caKey)
 	if err != nil || caCertificate == nil {
 		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s", caKey)
@@ -241,62 +285,70 @@ func (client *Crypto) GetTLSCertificate(caKey types.KeyIdentifier) (*x509.Certif
 	if len(caCertificate.Subject.Country) == 0 {
 		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
 	}
-	tlsKey := caKey.WithQualifier("tls")
-	var tlsCertificate *x509.Certificate
-	var tlsPrivateKey crypto.PrivateKey
-	mustIssue := false
-	if client.Storage.CertificateExists(tlsKey) {
-		tlsCertificate, err = client.Storage.GetCertificate(tlsKey)
-		if err != nil {
+	// TODO: What if the CA certificate isn't valid?
+	certKey := caKey.WithQualifier(qualifier)
+	var certificate *x509.Certificate
+	if certificate, err = client.tryGetSubCertificate(certKey); err != nil {
+		return nil, nil, err
+	}
+	if certificate == nil {
+		if certificate, err = client.issueSubCertificate(certKey, caKey, caCertificate, profile); err != nil {
 			return nil, nil, err
 		}
-		now := time.Now()
-		if now.After(tlsCertificate.NotAfter) || now.Before(tlsCertificate.NotBefore) {
-			log.Logger().Infof("Current TLS certificate (%s) isn't currently valid, will issue new one (not before=%s,not after=%s)", tlsKey, tlsCertificate.NotBefore, tlsCertificate.NotAfter)
-			mustIssue = true
-		}
+	}
+	if privateKey, err := client.Storage.GetPrivateKey(certKey); err != nil {
+		return nil, nil, errors2.Wrapf(err, "unable to retrieve private key corresponding with %s certificate (recover your key material)", qualifier)
 	} else {
-		log.Logger().Infof("No TLS certificate (%s) found will issue new one.", tlsKey)
-		mustIssue = true
+		return certificate, privateKey, nil
 	}
-	if mustIssue {
-		var tlsPublicKey crypto.PublicKey
-		if tlsPublicKey, err = client.GenerateKeyPair(tlsKey); err != nil {
-			return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new TLS certificate (%s)", tlsKey)
-		}
-		csr := x509.CertificateRequest{
-			Subject: pkix.Name{
-				Country:      []string{caCertificate.Subject.Country[0]},
-				Organization: []string{caCertificate.Subject.Organization[0]},
-				// TODO: We really want just the entity's name here, but CA certificates have 'CA' postfixed to their common name,
-				//  which we don't want for our TLS certificates. Taking the 'O' component for common name should work in practice,
-				//  but is pretty ugly.
-				CommonName: caCertificate.Subject.Organization[0],
-			},
-			PublicKey: tlsPublicKey,
-		}
-		tlsCertificateAsBytes, err := client.signCertificate(&csr, caKey, CertificateProfile{
-			KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
-			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-			NumDaysValid: TLSCertificateValidityInDays,
-		}, false)
-		if err != nil {
-			return nil, nil, errors2.Wrapf(err, "unable to issue TLS certificate %s", caKey)
-		} else {
-			tlsCertificate, err = x509.ParseCertificate(tlsCertificateAsBytes)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		if err = client.Storage.SaveCertificate(tlsKey, tlsCertificateAsBytes); err != nil {
-			return nil, nil, errors2.Wrap(err, "unable to store issued TLS certificate")
-		}
+}
+
+func (client *Crypto) issueSubCertificate(certKey types.KeyIdentifier, caKey types.KeyIdentifier, caCertificate *x509.Certificate, profile CertificateProfile) (*x509.Certificate, error) {
+	var publicKey crypto.PublicKey
+	var certificate *x509.Certificate
+	var err error
+	if publicKey, err = client.GenerateKeyPair(certKey); err != nil {
+		return nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate (%s)", certKey.Qualifier(), certKey)
 	}
-	tlsPrivateKey, err = client.Storage.GetPrivateKey(tlsKey)
+	csr := x509.CertificateRequest{
+		Subject: pkix.Name{
+			Country:      caCertificate.Subject.Country,
+			Organization: caCertificate.Subject.Organization,
+			CommonName:   caCertificate.Subject.Organization[0],
+		},
+		PublicKey: publicKey,
+		// Copy Subject Alternative Name (SAN) extensions. Since Node CA only issues certificates to itself, any SAN
+		// applicable to the CA are also applicable to the certificates it issues.
+		Extensions: cert.CopySANs(caCertificate),
+	}
+	certificateAsBytes, err := client.signCertificate(&csr, caKey, profile, false)
 	if err != nil {
-		return nil, nil, errors2.Wrap(err, "unable to retrieve private key corresponding with TLS certificate (recover your key material)")
+		return nil, errors2.Wrapf(err, "unable to issue %s certificate %s", certKey.Qualifier(), caKey)
+	} else {
+		certificate, err = x509.ParseCertificate(certificateAsBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return tlsCertificate, tlsPrivateKey, nil
+	if err = client.Storage.SaveCertificate(certKey, certificateAsBytes); err != nil {
+		return nil, errors2.Wrapf(err, "unable to store issued %s certificate", certKey.Qualifier())
+	}
+	return certificate, nil
+}
+
+func (client *Crypto) tryGetSubCertificate(certKey types.KeyIdentifier) (*x509.Certificate, error) {
+	if client.Storage.CertificateExists(certKey) {
+		if certificate, err := client.Storage.GetCertificate(certKey); err != nil {
+			return nil, err
+		} else if !cert.IsCertificateValid(certificate, time.Now()) {
+			log.Logger().Infof("Current %s certificate (%s) isn't currently valid, should issue new one (not before=%s,not after=%s)", certKey.Qualifier(), certKey, certificate.NotBefore, certificate.NotAfter)
+			return nil, nil
+		} else {
+			return certificate, nil
+		}
+	}
+	log.Logger().Infof("No %s certificate (%s) found, should issue new one.", certKey.Qualifier(), certKey)
+	return nil, nil
 }
 
 func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.KeyIdentifier, profile CertificateProfile, selfSigned bool) ([]byte, error) {
@@ -636,6 +688,18 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	return token.SignedString(rsaPrivateKey)
+}
+
+func (client Crypto) SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error) {
+	certificate, privateKey, err := client.GetSigningCertificate(entity)
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to get signing certificate")
+	}
+	// Now sign
+	headers := jws.StandardHeaders{
+		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
+	}
+	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(&headers))
 }
 
 func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {

@@ -22,9 +22,11 @@ import (
 	"crypto"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"time"
 
 	"github.com/lestrrat-go/jwx/jwk"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -197,6 +199,30 @@ func PemToX509(rawData []byte) (*x509.Certificate, error) {
 		return nil, ErrInvalidCertificate
 	}
 	return x509.ParseCertificate(block.Bytes)
+}
+
+func CertificateToPEM(certificate *x509.Certificate) string {
+	bytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certificate.Raw,
+	})
+	return string(bytes)
+}
+
+// CopySANs copies the Subject Alternative Name extensions from the certificate and returns them as a new slice.
+func CopySANs(certificate *x509.Certificate) []pkix.Extension {
+	sans := make([]pkix.Extension, 0)
+	for _, extension := range certificate.Extensions {
+		if OIDSubjectAltName.Equal(extension.Id) {
+			sans = append(sans, extension)
+		}
+	}
+	return sans
+}
+
+// IsCertificateValid tests whether a certificate's validity spans the given moment in time.
+func IsCertificateValid(certificate *x509.Certificate, moment time.Time) bool {
+	return !(moment.After(certificate.NotAfter) || moment.Before(certificate.NotBefore))
 }
 
 func unmarshalX509CertChain(chain []string) ([]*x509.Certificate, error) {

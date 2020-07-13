@@ -199,7 +199,10 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 			c.VerifyWith(nil, nil, nil)
 		},
 		"GetTLSCertificate": func() {
-			c.GetTLSCertificate(nil)
+			c.GetTLSCertificate(types.LegalEntity{})
+		},
+		"GetSigningCertificate": func() {
+			c.GetSigningCertificate(types.LegalEntity{})
 		},
 		"SignJWT": func() {
 			c.SignJWT(nil, nil)

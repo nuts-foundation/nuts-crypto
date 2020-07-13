@@ -54,7 +54,8 @@ import (
 )
 
 var extension = pkix.Extension{Id: []int{1, 2}, Critical: false, Value: []byte("test")}
-var key = types.KeyForEntity(types.LegalEntity{URI: "urn:oid:2.16.840.1.113883.2.4.6.1:00000000"})
+var entity = types.LegalEntity{URI: "urn:oid:2.16.840.1.113883.2.4.6.1:00000000"}
+var key = types.KeyForEntity(entity)
 
 func TestCryptoBackend(t *testing.T) {
 	t.Run("CryptoInstance always returns same instance", func(t *testing.T) {
@@ -677,6 +678,80 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
+func TestCrypto_StoreCertificate(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("ok - private key does not exist", func(t *testing.T) {
+		key := types.KeyForEntity(types.LegalEntity{t.Name()})
+		privateKey, _ := client.generateKeyPair()
+		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		err := client.StoreCertificate(key, certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("ok - private key exists", func(t *testing.T) {
+		key := types.KeyForEntity(types.LegalEntity{t.Name()})
+		client.GenerateKeyPair(key)
+		privateKey, _ := client.GetPrivateKey(key)
+		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		err := client.StoreCertificate(key, certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("error - existing private key differs", func(t *testing.T) {
+		key := types.KeyForEntity(types.LegalEntity{t.Name()})
+		client.GenerateKeyPair(key)
+		privateKey, _ := client.GetPrivateKey(key)
+		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		client.GenerateKeyPair(key)
+		err := client.StoreCertificate(key, certificate)
+		assert.EqualError(t, err, "public key in certificate does not match stored private key")
+	})
+	t.Run("error - certificate is nil", func(t *testing.T) {
+		key := types.KeyForEntity(types.LegalEntity{t.Name()})
+		err := client.StoreCertificate(key, nil)
+		assert.EqualError(t, err, "certificate is nil")
+	})
+}
+
+
+func TestCrypto_GetSigningCertificate(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	client.GenerateKeyPair(key)
+	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
+		Country:      []string{"NL"},
+		Organization: []string{"Zorg Inc."},
+	}, time.Now(), 1)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.NotNil(t, caCertificate)
+
+	t.Run("ok", func(t *testing.T) {
+		certificate, privateKey, err := client.GetSigningCertificate(entity)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, certificate)
+		assert.NotNil(t, privateKey)
+		assert.Equal(t, x509.KeyUsageContentCommitment | x509.KeyUsageDigitalSignature, certificate.KeyUsage)
+		assert.NotEqual(t, certificate.NotAfter, certificate.NotBefore)
+		assert.Equal(t, 365, int(certificate.NotAfter.Sub(certificate.NotBefore).Hours() / 24))
+	})
+}
+
+func TestCrypto_getSubCertificate(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	t.Run("error - qualifier not set", func(t *testing.T) {
+		_, _, err := client.getSubCertificate(types.LegalEntity{}, "", CertificateProfile{})
+		assert.EqualError(t, err, "missing qualifier")
+	})
+}
+
 func TestCrypto_GetTLSCertificate(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
@@ -691,19 +766,33 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 	assert.NotNil(t, caCertificate)
 
 	t.Run("ok", func(t *testing.T) {
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
 		assert.NotNil(t, certificate)
 		assert.NotNil(t, privateKey)
-	})
-	t.Run("ok - cert exists", func(t *testing.T) {
-		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(key)
+
+		// Verify SAN is copied from CA certificate
+		var san pkix.Extension
+		for _, extension := range certificate.Extensions {
+			if cert.OIDSubjectAltName.Equal(extension.Id) {
+				san = extension
+			}
+		}
+		assert.False(t, san.Id.String() == "", "SAN not found")
+		altName, err := cert.UnmarshalOtherSubjectAltName(cert.OIDNutsVendor, san.Value)
 		if !assert.NoError(t, err) {
 			return
 		}
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		assert.Equal(t, "Foobar", altName)
+	})
+	t.Run("ok - cert exists", func(t *testing.T) {
+		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(entity)
+		if !assert.NoError(t, err) {
+			return
+		}
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -714,7 +803,7 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 		publicKey, _ := client.GenerateKeyPair(key)
 		existingCert, _ := selfSignCACertificateEx(client, key, caCertificate.Subject, time.Now().Add(-48*time.Hour), 1)
 		client.Storage.SaveCertificate(key.WithQualifier("tls"), existingCert.Raw)
-		newCertificate, newPrivateKey, err := client.GetTLSCertificate(key)
+		newCertificate, newPrivateKey, err := client.GetTLSCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -725,11 +814,11 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 		assert.NotEqual(t, (newPrivateKey.(crypto.Signer)).Public(), publicKey)
 	})
 	t.Run("error - cert exists, private key is invalid", func(t *testing.T) {
-		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(key)
+		expectedCert, expectedPrivateKey, err := client.GetTLSCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -738,13 +827,13 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 	})
 	t.Run("error - existing cert invalid", func(t *testing.T) {
 		client.Storage.SaveCertificate(key.WithQualifier("tls"), []byte{1, 2, 3})
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		assert.Error(t, err)
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
 	})
 	t.Run("error - no CA certificate found", func(t *testing.T) {
-		certificate, privateKey, err := client.GetTLSCertificate(types.KeyForEntity(types.LegalEntity{URI: "non-existent"}))
+		certificate, privateKey, err := client.GetTLSCertificate(types.LegalEntity{URI: "non-existent"})
 		assert.EqualError(t, err, "unable to retrieve CA certificate [non-existent|]")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
@@ -753,7 +842,7 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 		_, _ = selfSignCACertificateEx(client, key, pkix.Name{
 			Organization: []string{"Zorg Inc."},
 		}, time.Now(), 1)
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'C' component")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
@@ -762,7 +851,7 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 		_, _ = selfSignCACertificateEx(client, key, pkix.Name{
 			Country: []string{"NL"},
 		}, time.Now(), 1)
-		certificate, privateKey, err := client.GetTLSCertificate(key)
+		certificate, privateKey, err := client.GetTLSCertificate(entity)
 		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'O' component")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
@@ -1166,9 +1255,13 @@ func selfSignCACertificate(client Client, key types.KeyIdentifier) (*x509.Certif
 }
 
 func selfSignCACertificateEx(client Client, key types.KeyIdentifier, name pkix.Name, notBefore time.Time, daysValid int) (*x509.Certificate, error) {
+	subjectAltName, _ := cert.MarshalOtherSubjectAltName(cert.OIDNutsVendor, "Foobar")
 	csrTemplate := x509.CertificateRequest{
-		Subject:         name,
-		ExtraExtensions: []pkix.Extension{extension},
+		Subject: name,
+		ExtraExtensions: []pkix.Extension{
+			extension,
+			{Id: cert.OIDSubjectAltName, Critical: false, Value: subjectAltName},
+		},
 	}
 	privateKey, err := client.GetPrivateKey(key)
 	if err != nil {

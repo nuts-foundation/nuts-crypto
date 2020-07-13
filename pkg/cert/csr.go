@@ -10,9 +10,9 @@ import (
 )
 
 
-var oidSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
+var OIDSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
 var oidNuts = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54851}
-var oidNutsVendor = asn12.OIDAppend(oidNuts, 4)
+var OIDNutsVendor = asn12.OIDAppend(oidNuts, 4)
 var oidNutsDomain = asn12.OIDAppend(oidNuts, 3)
 
 // VendorCertificateRequest creates a CertificateRequest template for issuing a vendor certificate.
@@ -33,12 +33,12 @@ func VendorCertificateRequest(vendorID string, vendorName string, qualifier stri
 	// The supplied vendorID is prefixed with the type (URN+OID), which is also specified in the ASN.1 structure.
 	// Thus we should just take the value part (everything after the last colon) from the vendorID.
 	vendorIDParts := strings.Split(vendorID, ":")
-	subjectAltName, err := MarshalOtherSubjectAltName(oidNutsVendor, vendorIDParts[len(vendorIDParts) - 1])
+	subjectAltName, err := MarshalOtherSubjectAltName(OIDNutsVendor, vendorIDParts[len(vendorIDParts) - 1])
 	if err != nil {
 		return nil, err
 	}
 	extensions := []pkix.Extension{
-		{Id: oidSubjectAltName, Critical: false, Value: subjectAltName},
+		{Id: OIDSubjectAltName, Critical: false, Value: subjectAltName},
 	}
 
 	domainData, err := MarshalNutsDomain(domain)
