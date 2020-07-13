@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/nuts-foundation/nuts-crypto/api"
@@ -52,6 +53,8 @@ func NewCryptoEngine() *engine.Engine {
 		Routes: func(router engine.EchoRouter) {
 			api.RegisterHandlers(router, &api.ApiWrapper{C: cb})
 		},
+		Start:    cb.Start,
+		Shutdown: cb.Shutdown,
 	}
 }
 

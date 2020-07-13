@@ -30,13 +30,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	core "github.com/nuts-foundation/nuts-go-core"
-	"github.com/spf13/cobra"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/spf13/cobra"
 
 	"github.com/lestrrat-go/jwx/jwe/aescbc"
 	"github.com/lestrrat-go/jwx/jws"
@@ -1107,6 +1108,18 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
+	})
+}
+
+func TestCrypto_Start(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("adds 3 certificate monitors", func(t *testing.T) {
+		client.Start()
+		defer client.Shutdown()
+
+		assert.Len(t, client.certMonitors, 3)
 	})
 }
 
