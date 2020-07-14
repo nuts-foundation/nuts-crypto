@@ -30,7 +30,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
-// storage interface containing functions for storing and retrieving keys
+// Storage interface containing functions for storing and retrieving keys
 type Storage interface {
 	GetPrivateKey(key types.KeyIdentifier) (*rsa.PrivateKey, error)
 	GetPublicKey(key types.KeyIdentifier) (*rsa.PublicKey, error)

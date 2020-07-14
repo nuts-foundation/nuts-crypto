@@ -66,7 +66,7 @@ func flagSet() *pflag.FlagSet {
 	flags.String(types.ConfigMode, defs.Mode, fmt.Sprintf("Server or client, when client it uses the HttpClient, default: %s", defs.Mode))
 	flags.String(types.ConfigAddress, defs.Address, fmt.Sprintf("Interface and port for http server to bind to, default: %s", defs.Address))
 	flags.Int(types.ConfigClientTimeout, defs.ClientTimeout, fmt.Sprintf("Time-out for the client in seconds (e.g. when using the CLI), default: %d", defs.ClientTimeout))
-	flags.String(types.ConfigStorage, defs.Storage, fmt.Sprintf("storage to use, 'fs' for file system, default: %s", defs.Storage))
+	flags.String(types.ConfigStorage, defs.Storage, fmt.Sprintf("Storage to use, 'fs' for file system, default: %s", defs.Storage))
 	flags.String(types.ConfigFSPath, defs.Fspath, fmt.Sprintf("When file system is used as storage, this configures the path where key material and the truststore are persisted, default: %v", defs.Fspath))
 	flags.Int(types.ConfigKeySize, defs.Keysize, fmt.Sprintf("Number of bits to use when creating new RSA keys, default: %d", defs.Keysize))
 
