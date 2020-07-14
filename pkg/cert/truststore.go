@@ -102,12 +102,6 @@ func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment tim
 		}
 	}
 
-	var signers []*x509.Certificate
-	// get signers which are first in the chain
-	for _, subChain := range chain {
-		signers = append(signers, subChain[0])
-	}
-
 	for _, c := range m.certs {
 		if c.IsCA == isCA {
 			chain, err := c.Verify(x509.VerifyOptions{Roots: pool, CurrentTime: moment})
