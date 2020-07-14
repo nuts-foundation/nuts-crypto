@@ -139,3 +139,17 @@ func TestCertificateMonitor_checkExpiry(t *testing.T) {
 		}
 	})
 }
+
+func TestDefaultCertificateMonitors(t *testing.T) {
+	fs := createTempStorage(t.Name())
+	defer emptyTemp(t.Name())
+
+	t.Run("it returns three monitors", func(t *testing.T) {
+		certMonitors := DefaultCertificateMonitors(fs)
+
+		assert.Len(t, certMonitors, 3)
+		assert.Equal(t, "day", certMonitors[0].periodLabel)
+		assert.Equal(t, "week", certMonitors[1].periodLabel)
+		assert.Equal(t, "4_weeks", certMonitors[2].periodLabel)
+	})
+}
