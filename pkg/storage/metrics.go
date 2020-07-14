@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/nuts-foundation/nuts-crypto/log"
-	errors2 "github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -43,14 +42,47 @@ var mutex sync.Mutex
 // CertificateMonitor represents a go procedure which monitors expiring certificates within a given period.
 type CertificateMonitor struct {
 	exit        chan bool
-	Period      time.Duration
-	PeriodLabel string
-	Storage     Storage
+	period      time.Duration
+	periodLabel string
+	storage     Storage
+}
+
+// DefaultCertificateMonitors returns 3 CertificateMonitors with the following periods: 1 day, 1 week and 4 weeks.
+func DefaultCertificateMonitors(storage Storage) []*CertificateMonitor {
+	var certMonitors []*CertificateMonitor
+
+	periods := []struct {
+		period time.Duration
+		label  string
+	}{
+		{
+			time.Hour * 24,
+			"day",
+		},
+		{
+			time.Hour * 24 * 7,
+			"week",
+		},
+		{
+			time.Hour * 24 * 7 * 4,
+			"4_weeks",
+		},
+	}
+
+	for _, p := range periods {
+		m := &CertificateMonitor{
+			period:      p.period,
+			periodLabel: p.label,
+			storage:     storage,
+		}
+		certMonitors = append(certMonitors, m)
+	}
+
+	return certMonitors
 }
 
 // Start the certificate monitor for checking expiring certificates between now and the configure period.
 func (cm *CertificateMonitor) Start() error {
-
 	err := cm.init()
 	if err != nil {
 		return err
@@ -86,6 +118,13 @@ func (cm *CertificateMonitor) init() error {
 // Stop the certificate monitor
 func (cm *CertificateMonitor) Stop() {
 	cm.exit <- true
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if metric != nil {
+		prometheus.Unregister(metric)
+	}
 }
 
 func (cm *CertificateMonitor) loop() {
@@ -100,11 +139,11 @@ func (cm *CertificateMonitor) loop() {
 }
 
 func (cm CertificateMonitor) checkExpiry() {
-	expiringCerts, err := cm.Storage.GetExpiringCertificates(time.Now(), time.Now().Add(cm.Period))
+	expiringCerts, err := cm.storage.GetExpiringCertificates(time.Now(), time.Now().Add(cm.period))
 
 	if err != nil {
-		log.Logger().Error(errors2.Wrap(err, "failed to check expiry"))
+		log.Logger().Error("failed to check expiry:", err)
 	}
 	l := len(expiringCerts)
-	metric.WithLabelValues(cm.PeriodLabel).Set(float64(l))
+	metric.WithLabelValues(cm.periodLabel).Set(float64(l))
 }

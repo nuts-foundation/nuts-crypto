@@ -130,7 +130,7 @@ type Crypto struct {
 	trustStore   cert.TrustStore
 	configOnce   sync.Once
 	configDone   bool
-	certMonitors []storage.CertificateMonitor
+	certMonitors []*storage.CertificateMonitor
 }
 
 type opaquePrivateKey struct {
@@ -148,34 +148,12 @@ func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 
 // Start the certificate monitors
 func (client *Crypto) Start() error {
-	periods := []struct {
-		period time.Duration
-		label  string
-	}{
-		{
-			time.Hour * 24,
-			"day",
-		},
-		{
-			time.Hour * 24 * 7,
-			"week",
-		},
-		{
-			time.Hour * 24 * 7 * 4,
-			"4_weeks",
-		},
-	}
+	client.certMonitors = storage.DefaultCertificateMonitors(client.Storage)
 
-	for _, p := range periods {
-		m := storage.CertificateMonitor{
-			Period:      p.period,
-			PeriodLabel: p.label,
-			Storage:     client.Storage,
-		}
+	for _, m := range client.certMonitors {
 		if err := m.Start(); err != nil {
 			return err
 		}
-		client.certMonitors = append(client.certMonitors, m)
 	}
 
 	return nil

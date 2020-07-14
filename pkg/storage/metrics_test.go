@@ -36,9 +36,9 @@ func TestCertificateMonitor_Start(t *testing.T) {
 
 	t.Run("Starting a monitor twice returns an error", func(t *testing.T) {
 		m := CertificateMonitor{
-			Period:      time.Hour,
-			PeriodLabel: "hour",
-			Storage:     fs,
+			period:      time.Hour,
+			periodLabel: "hour",
+			storage:     fs,
 		}
 
 		err := m.Start()
@@ -51,15 +51,15 @@ func TestCertificateMonitor_Start(t *testing.T) {
 
 	t.Run("Registering multiple monitors results in a single GaugeVec registered with prometheus", func(t *testing.T) {
 		m := CertificateMonitor{
-			Period:      time.Hour,
-			PeriodLabel: "hour",
-			Storage:     fs,
+			period:      time.Hour,
+			periodLabel: "hour",
+			storage:     fs,
 		}
 
 		m2 := CertificateMonitor{
-			Period:      time.Hour * 2,
-			PeriodLabel: "two_hour",
-			Storage:     fs,
+			period:      time.Hour * 2,
+			periodLabel: "two_hour",
+			storage:     fs,
 		}
 
 		err := m.Start()
@@ -79,9 +79,9 @@ func TestCertificateMonitor_init(t *testing.T) {
 	fs := createTempStorage(t.Name())
 	defer emptyTemp(t.Name())
 	m := CertificateMonitor{
-		Period:      time.Hour,
-		PeriodLabel: "hour",
-		Storage:     fs,
+		period:      time.Hour,
+		periodLabel: "hour",
+		storage:     fs,
 	}
 
 	t.Run("Calling init registers the metric with prometheus", func(t *testing.T) {
@@ -96,9 +96,9 @@ func TestCertificateMonitor_checkExpiry(t *testing.T) {
 	defer emptyTemp(t.Name())
 
 	m := CertificateMonitor{
-		Period:      time.Hour * 48,
-		PeriodLabel: "within_2_days",
-		Storage:     fs,
+		period:      time.Hour * 48,
+		periodLabel: "within_2_days",
+		storage:     fs,
 	}
 	m.init()
 
