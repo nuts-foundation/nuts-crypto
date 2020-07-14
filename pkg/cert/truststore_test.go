@@ -52,7 +52,7 @@ func TestNewTrustStore(t *testing.T) {
 		}
 		ts := trustStore.(*fileTrustStore)
 		assert.Len(t, ts.certs, 0)
-		err = trustStore.AddCertificate(generateCertificate("Test", time.Now(), 1, generateKeyPair()))
+		err = trustStore.AddCertificate(generateSelfSignedsCertificate("Test", time.Now(), 1, generateKeyPair()))
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -91,10 +91,10 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, privateKey))
+		err = trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 		assert.NoError(t, err)
 		assert.Len(t, ts.certs, 1)
-		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, privateKey))
+		err = trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 		assert.NoError(t, err)
 		assert.Len(t, ts.certs, 2)
 	})
@@ -106,7 +106,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		certificate := generateCertificate(t.Name(), time.Now(), 1, privateKey)
+		certificate := generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey)
 		err = trustStore.AddCertificate(certificate)
 		assert.NoError(t, err)
 		err = trustStore.AddCertificate(certificate)
@@ -125,7 +125,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		wg.Add(100)
 		for i = 0; i < 100; i++ {
 			go func() {
-				err := trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, privateKey))
+				err := trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 				assert.NoError(t, err)
 				wg.Done()
 			}()
@@ -163,6 +163,71 @@ func Test_fileTrustStore_Verify(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
 		err := trustStore.Verify((trustStore.(*fileTrustStore)).certs[0], time.Unix(2000, 0))
 		assert.Error(t, err)
+	})
+}
+
+func Test_fileTrustStore_GetRoots(t *testing.T) {
+	trustStore, _ := NewTrustStore("../../test/truststore.pem")
+	t.Run("returns root", func(t *testing.T) {
+		roots := trustStore.GetRoots(time.Now())
+
+		assert.Len(t, roots, 1)
+		assert.Equal(t, (trustStore.(*fileTrustStore)).certs[0], roots[0])
+	})
+
+	t.Run("returns nothing when not active", func(t *testing.T) {
+		roots := trustStore.GetRoots(time.Unix(2000, 0))
+
+		assert.Len(t, roots, 0)
+	})
+}
+
+func Test_fileTrustStore_GetCertificates(t *testing.T) {
+	t.Run("finds no certs when only root present", func(t *testing.T) {
+		trustStore, _ := NewTrustStore("../../test/truststore.pem")
+		roots := trustStore.GetRoots(time.Now())
+		var chains [][]*x509.Certificate
+		for _, r := range roots {
+			chains = append(chains, []*x509.Certificate{r})
+		}
+
+		certs := trustStore.GetCertificates(chains, time.Now(), false)
+		assert.Len(t, certs, 0)
+	})
+
+	t.Run("finds a single chain when a certificate is added", func(t *testing.T) {
+		const file = "../../test/addcert.pem"
+		rootKey := generateKeyPair()
+
+		// add a new root and a certificate
+		os.Remove(file)
+		defer os.Remove(file)
+		trustStore, err := NewTrustStore(file)
+		if !assert.NoError(t, err) {
+			return
+		}
+		root := generateSelfSignedsCertificate(t.Name(), time.Now(), 1, rootKey)
+		err = trustStore.AddCertificate(root)
+		if !assert.NoError(t, err) {
+			return
+		}
+		chains := [][]*x509.Certificate{{root}}
+		privateKey := generateKeyPair()
+		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &privateKey.PublicKey, rootKey))
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		certs := trustStore.GetCertificates(chains, time.Now(), false)
+		assert.Len(t, certs, 1)
+
+		// but not as CA
+		certs = trustStore.GetCertificates(chains, time.Now(), true)
+		assert.Len(t, certs, 0)
+
+		// or at another time
+		certs = trustStore.GetCertificates(chains, time.Unix(2000, 0), false)
+		assert.Len(t, certs, 0)
 	})
 }
 
@@ -211,7 +276,7 @@ func generateKeyPair() *rsa.PrivateKey {
 	return keyPair
 }
 
-func generateCertificate(commonName string, notBefore time.Time, validityInDays int, privKey *rsa.PrivateKey) *x509.Certificate {
+func generateSelfSignedsCertificate(commonName string, notBefore time.Time, validityInDays int, privKey *rsa.PrivateKey) *x509.Certificate {
 	sn, _ := SerialNumber()
 	template := x509.Certificate{
 		SerialNumber: sn,
@@ -225,6 +290,27 @@ func generateCertificate(commonName string, notBefore time.Time, validityInDays 
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 	data, err := x509.CreateCertificate(rand.Reader, &template, &template, privKey.Public(), privKey)
+	if err != nil {
+		panic(err)
+	}
+	certificate, _ := x509.ParseCertificate(data)
+	return certificate
+}
+
+func generateCertificate(commonName string, notBefore time.Time, validityInDays int, parent *x509.Certificate, pubKey *rsa.PublicKey, privKey *rsa.PrivateKey) *x509.Certificate {
+	sn, _ := SerialNumber()
+	template := x509.Certificate{
+		SerialNumber: sn,
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		PublicKey:   privKey.PublicKey,
+		NotBefore:   notBefore,
+		NotAfter:    notBefore.AddDate(0, 0, validityInDays),
+		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	}
+	data, err := x509.CreateCertificate(rand.Reader, &template, parent, pubKey, privKey)
 	if err != nil {
 		panic(err)
 	}
