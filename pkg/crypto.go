@@ -125,11 +125,12 @@ func DefaultCryptoConfig() CryptoConfig {
 
 // default implementation for CryptoInstance
 type Crypto struct {
-	Storage    storage.Storage
-	Config     CryptoConfig
-	trustStore cert.TrustStore
-	configOnce sync.Once
-	configDone bool
+	Storage      storage.Storage
+	Config       CryptoConfig
+	trustStore   cert.TrustStore
+	configOnce   sync.Once
+	configDone   bool
+	certMonitors []*storage.CertificateMonitor
 }
 
 type opaquePrivateKey struct {
@@ -143,6 +144,27 @@ func (k opaquePrivateKey) Public() crypto.PublicKey {
 
 func (k opaquePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	return k.signFn(rand, digest, opts)
+}
+
+// Start the certificate monitors
+func (client *Crypto) Start() error {
+	client.certMonitors = storage.DefaultCertificateMonitors(client.Storage)
+
+	for _, m := range client.certMonitors {
+		if err := m.Start(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Shutdown stops the certificate monitors
+func (client *Crypto) Shutdown() error {
+	for _, m := range client.certMonitors {
+		m.Stop()
+	}
+	return nil
 }
 
 // GetPrivateKey returns the specified private key. It can be used for signing, but cannot be exported.
