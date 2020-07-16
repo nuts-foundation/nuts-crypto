@@ -83,7 +83,7 @@ func (m *fileTrustStore) GetRoots(moment time.Time) []*x509.Certificate {
 	var certs []*x509.Certificate
 
 	for _, c := range m.certs {
-		if isSelfSigned(c, moment) {
+		if isSelfSigned(c) && isValidAt(c, moment) {
 			certs = append(certs, c)
 		}
 	}
@@ -116,15 +116,16 @@ func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment tim
 	return certs
 }
 
-func isSelfSigned(cert *x509.Certificate, moment time.Time) bool {
+func isSelfSigned(cert *x509.Certificate) bool {
 	if bytes.Equal(cert.RawIssuer, cert.RawSubject) && cert.IsCA {
-		pool := x509.NewCertPool()
-		pool.AddCert(cert)
-		chain, err := cert.Verify(x509.VerifyOptions{Roots: pool, CurrentTime: moment})
-		return err == nil && len(chain) == 1 && len(chain[0]) == 1
+		return cert.CheckSignatureFrom(cert) == nil
 	}
 
 	return false
+}
+
+func isValidAt(cert *x509.Certificate, moment time.Time) bool {
+	return cert.NotBefore.Before(moment) && cert.NotAfter.After(moment)
 }
 
 func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
