@@ -992,42 +992,7 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 	})
 }
 
-func TestCrypto_Configure(t *testing.T) {
-	defer emptyTemp(t.Name())
-	t.Run("ok - configOnce", func(t *testing.T) {
-		e := defaultBackend(t.Name())
-		assert.False(t, e.configDone)
-		err := e.Configure()
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.True(t, e.configDone)
-		err = e.Configure()
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.True(t, e.configDone)
-	})
-	t.Run("ok", func(t *testing.T) {
-		e := defaultBackend(t.Name())
-		e.Config.Keysize = 4096
-		err := e.Configure()
-		assert.NoError(t, err)
-	})
-	t.Run("Configure returns an error when keySize is too small", func(t *testing.T) {
-		e := defaultBackend(t.Name())
-		assert.False(t, e.configDone)
-		err := e.Configure()
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.True(t, e.configDone)
-		err = e.Configure()
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.True(t, e.configDone)
-	})
+func TestCrypto_doConfigure(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		e := defaultBackend(t.Name())
 		err := e.doConfigure()
@@ -1059,6 +1024,54 @@ func TestCrypto_Configure(t *testing.T) {
 		e.Config.Keysize = 2047
 		err := e.doConfigure()
 		assert.EqualError(t, err, ErrInvalidKeySize.Error())
+	})
+}
+
+func TestCrypto_Configure(t *testing.T) {
+	defer emptyTemp(t.Name())
+	t.Run("ok - configOnce", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		assert.False(t, e.configDone)
+		err := e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
+		err = e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
+	})
+	t.Run("ok - server mode", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Config.Keysize = 4096
+		err := e.Configure()
+		assert.NoError(t, err)
+	})
+	t.Run("ok - client mode", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		e.Storage = nil
+		e.Config.Mode = core.ClientEngineMode
+		err := e.Configure()
+		assert.NoError(t, err)
+		// Assert server-mode services aren't initialized in client mode
+		assert.Nil(t, e.trustStore)
+		assert.Nil(t, e.Storage)
+	})
+	t.Run("error - keySize is too small", func(t *testing.T) {
+		e := defaultBackend(t.Name())
+		assert.False(t, e.configDone)
+		err := e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
+		err = e.Configure()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, e.configDone)
 	})
 }
 
