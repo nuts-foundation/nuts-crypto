@@ -5,12 +5,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"github.com/nuts-foundation/nuts-crypto/log"
-	errors2 "github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/log"
+	errors2 "github.com/pkg/errors"
 )
 
 type Verifier interface {
@@ -22,6 +23,10 @@ type TrustStore interface {
 	Verifier
 	Pool() *x509.CertPool
 	AddCertificate(certificate *x509.Certificate) error
+	// GetRoots returns all roots active at the given time
+	GetRoots(time.Time) []*x509.Certificate
+	// GetCertificates returns all certificates signed by given signer chains, active at the given time and if it must be a CA
+	GetCertificates([][]*x509.Certificate, time.Time, bool) [][]*x509.Certificate
 }
 
 func NewTrustStore(file string) (TrustStore, error) {
@@ -70,6 +75,57 @@ func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
 	m.pool.AddCert(certificate)
 	m.certs = append(m.certs, certificate)
 	return m.save()
+}
+
+// GetRoots checks if certificates have the same issuer as the subject and if they are self signed
+// multiple roots can be active at the same time.
+func (m *fileTrustStore) GetRoots(moment time.Time) []*x509.Certificate {
+	var certs []*x509.Certificate
+
+	for _, c := range m.certs {
+		if isSelfSigned(c) && isValidAt(c, moment) {
+			certs = append(certs, c)
+		}
+	}
+
+	return certs
+}
+
+func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment time.Time, isCA bool) [][]*x509.Certificate {
+	var certs [][]*x509.Certificate
+	pool := x509.NewCertPool()
+
+	// construct pool with signers and its signers
+	for _, subChain := range chain {
+		for _, c := range subChain {
+			pool.AddCert(c)
+		}
+	}
+
+	for _, c := range m.certs {
+		if c.IsCA == isCA {
+			chain, err := c.Verify(x509.VerifyOptions{Roots: pool, CurrentTime: moment})
+			if err == nil {
+				for _, subChain := range chain {
+					certs = append(certs, subChain)
+				}
+			}
+		}
+	}
+
+	return certs
+}
+
+func isSelfSigned(cert *x509.Certificate) bool {
+	if bytes.Equal(cert.RawIssuer, cert.RawSubject) && cert.IsCA {
+		return cert.CheckSignatureFrom(cert) == nil
+	}
+
+	return false
+}
+
+func isValidAt(cert *x509.Certificate, moment time.Time) bool {
+	return cert.NotBefore.Before(moment) && cert.NotAfter.After(moment)
 }
 
 func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
