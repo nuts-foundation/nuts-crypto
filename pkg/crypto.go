@@ -114,7 +114,6 @@ func (cc CryptoConfig) getFSPath() string {
 
 func DefaultCryptoConfig() CryptoConfig {
 	return CryptoConfig{
-		Mode:          "",
 		Address:       "localhost:1323",
 		ClientTimeout: 10,
 		Keysize:       2048,
@@ -366,6 +365,9 @@ func CryptoInstance() *Crypto {
 func (client *Crypto) Configure() error {
 	var err error
 	client.configOnce.Do(func() {
+		if core.NutsConfig().GetEngineMode(client.Config.Mode) != core.ServerEngineMode {
+			return
+		}
 		if err = client.doConfigure(); err == nil {
 			client.configDone = true
 		}
