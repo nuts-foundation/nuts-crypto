@@ -220,6 +220,7 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 
 		certs := trustStore.GetCertificates(chains, time.Now(), false)
 		assert.Len(t, certs, 1)
+		assert.Len(t, certs[0], 2)
 
 		// but not as CA
 		certs = trustStore.GetCertificates(chains, time.Now(), true)
@@ -283,11 +284,13 @@ func generateSelfSignedsCertificate(commonName string, notBefore time.Time, vali
 		Subject: pkix.Name{
 			CommonName: commonName,
 		},
-		PublicKey:   privKey.PublicKey,
-		NotBefore:   notBefore,
-		NotAfter:    notBefore.AddDate(0, 0, validityInDays),
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		PublicKey:             privKey.PublicKey,
+		NotBefore:             notBefore,
+		NotAfter:              notBefore.AddDate(0, 0, validityInDays),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:                  true,
+		BasicConstraintsValid: true,
 	}
 	data, err := x509.CreateCertificate(rand.Reader, &template, &template, privKey.Public(), privKey)
 	if err != nil {
