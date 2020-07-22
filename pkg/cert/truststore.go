@@ -26,6 +26,8 @@ type TrustStore interface {
 	// GetRoots returns all roots active at the given time
 	GetRoots(time.Time) []*x509.Certificate
 	// GetCertificates returns all certificates signed by given signer chains, active at the given time and if it must be a CA
+	// The chain is returned in reverse order, the latest in the chain being the root. This is also the order the certificates in the chain
+	// param are expected
 	GetCertificates([][]*x509.Certificate, time.Time, bool) [][]*x509.Certificate
 }
 
@@ -100,7 +102,7 @@ func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment tim
 	// construct roots with signers and its signers
 	for _, subChain := range chain {
 		for i, c := range subChain {
-			if i == 0 {
+			if i == len(subChain)-1 {
 				roots.AddCert(c)
 			} else {
 				intermediates.AddCert(c)

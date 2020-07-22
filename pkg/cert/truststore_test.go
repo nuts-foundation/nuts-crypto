@@ -218,9 +218,13 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		chains := [][]*x509.Certificate{{root, ca}}
+		chains := [][]*x509.Certificate{{ca, root}}
 
 		certKey := generateKeyPair()
+		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &certKey.PublicKey, caKey))
+		if !assert.NoError(t, err) {
+			return
+		}
 		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &certKey.PublicKey, caKey))
 		if !assert.NoError(t, err) {
 			return
@@ -228,12 +232,19 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 
 		t.Run("finds the correct number of chains", func(t *testing.T) {
 			certs := trustStore.GetCertificates(chains, time.Now(), false)
-			assert.Len(t, certs, 1)
+			assert.Len(t, certs, 2)
 		})
 
 		t.Run("finds chains of the correct length", func(t *testing.T) {
 			certs := trustStore.GetCertificates(chains, time.Now(), false)
 			assert.Len(t, certs[0], 3)
+		})
+
+		t.Run("finds chains in the correct order", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Now(), false)
+			assert.Equal(t, certs[0][2], certs[1][2])
+			assert.Equal(t, certs[0][1], certs[1][1])
+			assert.NotEqual(t, certs[0][0], certs[1][0])
 		})
 
 		t.Run("checks whether the certificate conforms to IsCA", func(t *testing.T) {
