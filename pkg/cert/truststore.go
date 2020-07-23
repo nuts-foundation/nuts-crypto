@@ -26,6 +26,8 @@ type TrustStore interface {
 	// GetRoots returns all roots active at the given time
 	GetRoots(time.Time) []*x509.Certificate
 	// GetCertificates returns all certificates signed by given signer chains, active at the given time and if it must be a CA
+	// The chain is returned in reverse order, the latest in the chain being the root. This is also the order the certificates in the chain
+	// param are expected
 	GetCertificates([][]*x509.Certificate, time.Time, bool) [][]*x509.Certificate
 }
 
@@ -93,18 +95,25 @@ func (m *fileTrustStore) GetRoots(moment time.Time) []*x509.Certificate {
 
 func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment time.Time, isCA bool) [][]*x509.Certificate {
 	var certs [][]*x509.Certificate
-	pool := x509.NewCertPool()
+	roots := x509.NewCertPool()
+	intermediates := x509.NewCertPool()
+	rootsAndIntermediates := map[*x509.Certificate]bool{}
 
-	// construct pool with signers and its signers
+	// construct roots with signers and its signers
 	for _, subChain := range chain {
-		for _, c := range subChain {
-			pool.AddCert(c)
+		for i, c := range subChain {
+			if i == len(subChain)-1 {
+				roots.AddCert(c)
+			} else {
+				intermediates.AddCert(c)
+			}
+			rootsAndIntermediates[c] = true
 		}
 	}
 
 	for _, c := range m.certs {
-		if c.IsCA == isCA {
-			chain, err := c.Verify(x509.VerifyOptions{Roots: pool, CurrentTime: moment})
+		if c.IsCA == isCA && !rootsAndIntermediates[c] {
+			chain, err := c.Verify(x509.VerifyOptions{Roots: roots, Intermediates: intermediates, CurrentTime: moment})
 			if err == nil {
 				for _, subChain := range chain {
 					certs = append(certs, subChain)

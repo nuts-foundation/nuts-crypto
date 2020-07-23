@@ -195,7 +195,7 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 		assert.Len(t, certs, 0)
 	})
 
-	t.Run("finds a single chain when a certificate is added", func(t *testing.T) {
+	t.Run("with an added certificate, intermediate and root", func(t *testing.T) {
 		const file = "../../test/addcert.pem"
 		rootKey := generateKeyPair()
 
@@ -211,23 +211,51 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		chains := [][]*x509.Certificate{{root}}
-		privateKey := generateKeyPair()
-		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &privateKey.PublicKey, rootKey))
+
+		caKey := generateKeyPair()
+		ca := generateCertificateCA(t.Name(), time.Now(), 1, root, &caKey.PublicKey, rootKey)
+		err = trustStore.AddCertificate(ca)
+		if !assert.NoError(t, err) {
+			return
+		}
+		chains := [][]*x509.Certificate{{ca, root}}
+
+		certKey := generateKeyPair()
+		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &certKey.PublicKey, caKey))
+		if !assert.NoError(t, err) {
+			return
+		}
+		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &certKey.PublicKey, caKey))
 		if !assert.NoError(t, err) {
 			return
 		}
 
-		certs := trustStore.GetCertificates(chains, time.Now(), false)
-		assert.Len(t, certs, 1)
+		t.Run("finds the correct number of chains", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Now(), false)
+			assert.Len(t, certs, 2)
+		})
 
-		// but not as CA
-		certs = trustStore.GetCertificates(chains, time.Now(), true)
-		assert.Len(t, certs, 0)
+		t.Run("finds chains of the correct length", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Now(), false)
+			assert.Len(t, certs[0], 3)
+		})
 
-		// or at another time
-		certs = trustStore.GetCertificates(chains, time.Unix(2000, 0), false)
-		assert.Len(t, certs, 0)
+		t.Run("finds chains in the correct order", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Now(), false)
+			assert.Equal(t, certs[0][2], certs[1][2])
+			assert.Equal(t, certs[0][1], certs[1][1])
+			assert.NotEqual(t, certs[0][0], certs[1][0])
+		})
+
+		t.Run("checks whether the certificate conforms to IsCA", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Now(), true)
+			assert.Len(t, certs, 0)
+		})
+
+		t.Run("checks whether the certificate is valid at the given moment", func(t *testing.T) {
+			certs := trustStore.GetCertificates(chains, time.Unix(2000, 0), false)
+			assert.Len(t, certs, 0)
+		})
 	})
 }
 
@@ -283,13 +311,38 @@ func generateSelfSignedsCertificate(commonName string, notBefore time.Time, vali
 		Subject: pkix.Name{
 			CommonName: commonName,
 		},
-		PublicKey:   privKey.PublicKey,
-		NotBefore:   notBefore,
-		NotAfter:    notBefore.AddDate(0, 0, validityInDays),
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		PublicKey:             privKey.PublicKey,
+		NotBefore:             notBefore,
+		NotAfter:              notBefore.AddDate(0, 0, validityInDays),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:                  true,
+		BasicConstraintsValid: true,
 	}
 	data, err := x509.CreateCertificate(rand.Reader, &template, &template, privKey.Public(), privKey)
+	if err != nil {
+		panic(err)
+	}
+	certificate, _ := x509.ParseCertificate(data)
+	return certificate
+}
+
+func generateCertificateCA(commonName string, notBefore time.Time, validityInDays int, parent *x509.Certificate, pubKey *rsa.PublicKey, privKey *rsa.PrivateKey) *x509.Certificate {
+	sn, _ := SerialNumber()
+	template := x509.Certificate{
+		SerialNumber: sn,
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		PublicKey:             privKey.PublicKey,
+		NotBefore:             notBefore,
+		NotAfter:              notBefore.AddDate(0, 0, validityInDays),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	data, err := x509.CreateCertificate(rand.Reader, &template, parent, pubKey, privKey)
 	if err != nil {
 		panic(err)
 	}
