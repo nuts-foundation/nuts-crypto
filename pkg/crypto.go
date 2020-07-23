@@ -99,6 +99,9 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
+const tlsCertificateQualifier = "tls"
+const signingCertificateQualifier = "sign"
+
 type CryptoConfig struct {
 	Mode          string
 	Address       string
@@ -250,27 +253,34 @@ func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 }
 
 func (client *Crypto) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.getSubCertificate(entity, "sign", CertificateProfile{
+	key := types.KeyForEntity(entity).WithQualifier(signingCertificateQualifier)
+	return client.getCertificateAndKey(key)
+}
+
+func (client *Crypto) RenewSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	return client.issueSubCertificate(entity, signingCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
 		NumDaysValid: SigningCertificateValidityInDays,
 	})
 }
 
 func (client *Crypto) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.getSubCertificate(entity, "tls", CertificateProfile{
+	key := types.KeyForEntity(entity).WithQualifier(tlsCertificateQualifier)
+	return client.getCertificateAndKey(key)
+}
+
+func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	return client.issueSubCertificate(entity, tlsCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		NumDaysValid: TLSCertificateValidityInDays,
 	})
 }
 
-// getSubCertificate gets a 'sub certificate' for the specified entity, meaning a certificate issued by ('under') the CA
+// issueSubCertificate issues a 'sub certificate' for the specified entity, meaning a certificate issued by ('under') the CA
 // certificate of the entity. This is useful for providing specialized certificates for specific use cases (TLS and signing).
 // The entity must have a (valid) CA certificate and its private key must be present.
-// If the specified sub certificate is present (and valid) it is returned (along with its private key). If it doesn't
-// exist or has expired a new certificate will be issued. If the existing sub certificate has expired, a new key pair
-// will be generated for the new certificate (key rotation).
-func (client *Crypto) getSubCertificate(entity types.LegalEntity, qualifier string, profile CertificateProfile) (*x509.Certificate, crypto.PrivateKey, error) {
+func (client *Crypto) issueSubCertificate(entity types.LegalEntity, qualifier string, profile CertificateProfile) (*x509.Certificate, crypto.PrivateKey, error) {
 	if qualifier == "" {
 		return nil, nil, errors.New("missing qualifier")
 	}
@@ -285,30 +295,11 @@ func (client *Crypto) getSubCertificate(entity types.LegalEntity, qualifier stri
 	if len(caCertificate.Subject.Country) == 0 {
 		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
 	}
-	// TODO: What if the CA certificate isn't valid?
 	certKey := caKey.WithQualifier(qualifier)
 	var certificate *x509.Certificate
-	if certificate, err = client.tryGetSubCertificate(certKey); err != nil {
-		return nil, nil, err
-	}
-	if certificate == nil {
-		if certificate, err = client.issueSubCertificate(certKey, caKey, caCertificate, profile); err != nil {
-			return nil, nil, err
-		}
-	}
-	if privateKey, err := client.Storage.GetPrivateKey(certKey); err != nil {
-		return nil, nil, errors2.Wrapf(err, "unable to retrieve private key corresponding with %s certificate (recover your key material)", qualifier)
-	} else {
-		return certificate, privateKey, nil
-	}
-}
-
-func (client *Crypto) issueSubCertificate(certKey types.KeyIdentifier, caKey types.KeyIdentifier, caCertificate *x509.Certificate, profile CertificateProfile) (*x509.Certificate, error) {
-	var publicKey crypto.PublicKey
-	var certificate *x509.Certificate
-	var err error
-	if publicKey, err = client.GenerateKeyPair(certKey); err != nil {
-		return nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate (%s)", certKey.Qualifier(), certKey)
+	var privateKey *rsa.PrivateKey
+	if privateKey, err = client.generateAndStoreKeyPair(certKey); err != nil {
+		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate (%s)", certKey.Qualifier(), certKey)
 	}
 	csr := x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -316,39 +307,43 @@ func (client *Crypto) issueSubCertificate(certKey types.KeyIdentifier, caKey typ
 			Organization: caCertificate.Subject.Organization,
 			CommonName:   caCertificate.Subject.Organization[0],
 		},
-		PublicKey: publicKey,
+		PublicKey: privateKey.Public(),
 		// Copy Subject Alternative Name (SAN) extensions. Since Node CA only issues certificates to itself, any SAN
 		// applicable to the CA are also applicable to the certificates it issues.
 		Extensions: cert.CopySANs(caCertificate),
 	}
 	certificateAsBytes, err := client.signCertificate(&csr, caKey, profile, false)
 	if err != nil {
-		return nil, errors2.Wrapf(err, "unable to issue %s certificate %s", certKey.Qualifier(), caKey)
-	} else {
-		certificate, err = x509.ParseCertificate(certificateAsBytes)
-		if err != nil {
-			return nil, err
-		}
+		return nil, nil, errors2.Wrapf(err, "unable to issue %s certificate %s", certKey.Qualifier(), caKey)
+	}
+	certificate, err = x509.ParseCertificate(certificateAsBytes)
+	if err != nil {
+		return nil, nil, err
 	}
 	if err = client.Storage.SaveCertificate(certKey, certificateAsBytes); err != nil {
-		return nil, errors2.Wrapf(err, "unable to store issued %s certificate", certKey.Qualifier())
+		return nil, nil, errors2.Wrapf(err, "unable to store issued %s certificate", certKey.Qualifier())
 	}
-	return certificate, nil
+	return certificate, privateKey, nil
 }
 
-func (client *Crypto) tryGetSubCertificate(certKey types.KeyIdentifier) (*x509.Certificate, error) {
+func (client *Crypto) getCertificateAndKey(certKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {
+	var err error
+	var certificate *x509.Certificate
+	var key crypto.PrivateKey
 	if client.Storage.CertificateExists(certKey) {
-		if certificate, err := client.Storage.GetCertificate(certKey); err != nil {
-			return nil, err
+		if certificate, err = client.Storage.GetCertificate(certKey); err != nil {
+			return nil, nil, err
 		} else if !cert.IsCertificateValid(certificate, time.Now()) {
 			log.Logger().Infof("Current %s certificate (%s) isn't currently valid, should issue new one (not before=%s,not after=%s)", certKey.Qualifier(), certKey, certificate.NotBefore, certificate.NotAfter)
-			return nil, nil
-		} else {
-			return certificate, nil
+			return nil, nil, nil
 		}
+		if key, err = client.Storage.GetPrivateKey(certKey); err != nil {
+			return nil, nil, errors2.Wrapf(err, "unable to retrieve private key for certificate: %s", certKey)
+		}
+		return certificate, key, nil
 	}
 	log.Logger().Infof("No %s certificate (%s) found, should issue new one.", certKey.Qualifier(), certKey)
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.KeyIdentifier, profile CertificateProfile, selfSigned bool) ([]byte, error) {
@@ -387,9 +382,17 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.
 		parentTemplate = template
 	} else {
 		parentCertificate, err := client.Storage.GetCertificate(caKey)
-		// TODO: Check if this certificate is a CA certificate
 		if err != nil {
 			return nil, errors2.Wrap(err, ErrUnknownCA.Error())
+		}
+		if !parentCertificate.IsCA {
+			return nil, errors.New("specified CA key isn't a CA certificate")
+		}
+		if template.NotBefore.Before(parentCertificate.NotBefore) {
+			return nil, fmt.Errorf("certificate.NotBefore (%s) must be equal to, or after caCertificate.NotBefore (%s)", template.NotBefore, parentCertificate.NotBefore)
+		}
+		if template.NotAfter.After(parentCertificate.NotAfter) {
+			return nil, fmt.Errorf("certificate.NotAfter (%s) must be equal to, or before caCertificate.NotAfter (%s)", template.NotBefore, parentCertificate.NotBefore)
 		}
 		parentTemplate = parentCertificate
 	}
@@ -444,6 +447,15 @@ func (client *Crypto) doConfigure() error {
 
 // GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
 func (client *Crypto) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
+	privateKey, err := client.generateAndStoreKeyPair(key)
+	if err != nil {
+		return nil, err
+	}
+	return privateKey.Public(), nil
+}
+
+// GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
+func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier) (*rsa.PrivateKey, error) {
 	if key == nil || key.Owner() == "" {
 		return nil, ErrInvalidKeyIdentifier
 	}
@@ -453,7 +465,7 @@ func (client *Crypto) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey
 		if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
 			return nil, err
 		} else {
-			return keyPair.Public(), nil
+			return keyPair, nil
 		}
 	}
 }
