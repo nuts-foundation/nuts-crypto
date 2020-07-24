@@ -336,8 +336,8 @@ func (client *Crypto) getCertificateAndKey(certKey types.KeyIdentifier) (*x509.C
 	if client.Storage.CertificateExists(certKey) {
 		if certificate, err = client.Storage.GetCertificate(certKey); err != nil {
 			return nil, nil, err
-		} else if !cert.IsCertificateValid(certificate, time.Now()) {
-			log.Logger().Infof("Current %s certificate (%s) isn't currently valid, should issue new one (not before=%s,not after=%s)", certKey.Qualifier(), certKey, certificate.NotBefore, certificate.NotAfter)
+		} else if err := cert.ValidateCertificate(certificate, cert.ValidAt(time.Now())); err != nil {
+			log.Logger().Infof("Current '%s' certificate (%s) isn't currently valid, should issue new one (not before=%s,not after=%s)", certKey.Qualifier(), certKey, certificate.NotBefore, certificate.NotAfter)
 			return nil, nil, nil
 		}
 		if key, err = client.Storage.GetPrivateKey(certKey); err != nil {
@@ -345,7 +345,7 @@ func (client *Crypto) getCertificateAndKey(certKey types.KeyIdentifier) (*x509.C
 		}
 		return certificate, key, nil
 	}
-	log.Logger().Infof("No %s certificate (%s) found, should issue new one.", certKey.Qualifier(), certKey)
+	log.Logger().Infof("No '%s' certificate (%s) found, should issue new one.", certKey.Qualifier(), certKey)
 	return nil, nil, nil
 }
 
@@ -384,18 +384,12 @@ func (client *Crypto) signCertificate(csr *x509.CertificateRequest, caKey types.
 	if selfSigned {
 		parentTemplate = template
 	} else {
-		parentCertificate, err := client.Storage.GetCertificate(caKey)
-		if err != nil {
+		var parentCertificate *x509.Certificate
+		if parentCertificate, err = client.Storage.GetCertificate(caKey); err != nil {
 			return nil, errors2.Wrap(err, ErrUnknownCA.Error())
 		}
-		if !parentCertificate.IsCA {
-			return nil, errors.New("specified CA key isn't a CA certificate")
-		}
-		if template.NotBefore.Before(parentCertificate.NotBefore) {
-			return nil, fmt.Errorf("certificate.NotBefore (%s) must be equal to, or after caCertificate.NotBefore (%s)", template.NotBefore, parentCertificate.NotBefore)
-		}
-		if template.NotAfter.After(parentCertificate.NotAfter) {
-			return nil, fmt.Errorf("certificate.NotAfter (%s) must be equal to, or before caCertificate.NotAfter (%s)", template.NotBefore, parentCertificate.NotBefore)
+		if err := cert.ValidateCertificate(parentCertificate, cert.IsCA(), cert.ValidBetween(template.NotBefore, template.NotAfter)); err != nil {
+			return nil, errors2.Wrap(err, "CA certificate validation failed")
 		}
 		parentTemplate = parentCertificate
 	}

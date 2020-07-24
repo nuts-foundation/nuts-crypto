@@ -996,7 +996,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			PublicKey: caPrivateKey.Public(),
 		}
 		certBytes, err := client.signCertificate(&csrTemplate, ca, CertificateProfile{}, false)
-		assert.Contains(t, err.Error(), "specified CA key isn't a CA certificate")
+		assert.EqualError(t, err, "CA certificate validation failed: certificate is not an CA certificate")
 		assert.Nil(t, certBytes)
 	})
 
@@ -1016,7 +1016,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 				notAfter:     root.NotAfter,
 				notBefore:    time.Unix(root.NotBefore.Unix()-1000, 0),
 			}, false)
-			assert.Contains(t, err.Error(), "must be equal to, or after caCertificate.NotBefore")
+			assert.Contains(t, err.Error(), "CA certificate validation failed: certificate validity")
 			assert.Nil(t, certBytes)
 		})
 		t.Run("not after", func(t *testing.T) {
@@ -1025,7 +1025,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 				notBefore:    root.NotBefore,
 				notAfter:     time.Unix(root.NotAfter.Unix()+1000, 0),
 			}, false)
-			assert.Contains(t, err.Error(), "must be equal to, or before caCertificate.NotAfter")
+			assert.Contains(t, err.Error(), "CA certificate validation failed: certificate validity")
 			assert.Nil(t, certBytes)
 		})
 	})
