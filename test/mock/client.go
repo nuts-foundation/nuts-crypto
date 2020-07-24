@@ -297,21 +297,6 @@ func (mr *MockClientMockRecorder) SignJWT(claims, key interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWT", reflect.TypeOf((*MockClient)(nil).SignJWT), claims, key)
 }
 
-// SignJWS mocks base method
-func (m *MockClient) SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SignJWS", payload, entity)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SignJWS indicates an expected call of SignJWS
-func (mr *MockClientMockRecorder) SignJWS(payload, entity interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWS", reflect.TypeOf((*MockClient)(nil).SignJWS), payload, entity)
-}
-
 // SignJWSEphemeral mocks base method
 func (m *MockClient) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	m.ctrl.T.Helper()

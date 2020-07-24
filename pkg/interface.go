@@ -76,12 +76,6 @@ type Client interface {
 	GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error)
 	// SignJWT creates a signed JWT using the given key and map of claims (private key must be present).
 	SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error)
-	// SignJWS signs payload according to the JWS spec with the specified key and certificate. The certificate's key usage
-	// must indicate 'digital signature' and/or 'non-repudiation'.
-	//  payload:     data to be signed
-	//  key:         key of the Certificate Authority which should issue the certificate (private key and certificate must be present).
-	//  signingTime: instant which is checked later when verifying the signature.
-	SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error)
 	// SignJWSEphemeral signs payload according to the JWS spec with a temporary key and certificate which are generated just for this operation.
 	// In other words, the key and certificate are not stored and cannot be used for any other cryptographic operation.
 	// The certificate's validity is as short as possible, just spanning the instant of signing.

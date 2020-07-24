@@ -699,18 +699,6 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 	return token.SignedString(rsaPrivateKey)
 }
 
-func (client Crypto) SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error) {
-	certificate, privateKey, err := client.GetSigningCertificate(entity)
-	if err != nil {
-		return nil, errors2.Wrap(err, "unable to get signing certificate")
-	}
-	// Now sign
-	headers := jws.StandardHeaders{
-		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
-	}
-	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(&headers))
-}
-
 func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	// Generate ephemeral key and certificate
 	entityPrivateKey, err := client.generateKeyPair()
