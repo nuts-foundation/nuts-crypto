@@ -99,18 +99,18 @@ func (mr *MockClientMockRecorder) GenerateVendorCACSR(name interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateVendorCACSR", reflect.TypeOf((*MockClient)(nil).GenerateVendorCACSR), name)
 }
 
-// StoreCertificate mocks base method
-func (m *MockClient) StoreCertificate(key types.KeyIdentifier, certificate *x509.Certificate) error {
+// StoreVendorCACertificate mocks base method
+func (m *MockClient) StoreVendorCACertificate(certificate *x509.Certificate) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreCertificate", key, certificate)
+	ret := m.ctrl.Call(m, "StoreVendorCACertificate", certificate)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// StoreCertificate indicates an expected call of StoreCertificate
-func (mr *MockClientMockRecorder) StoreCertificate(key, certificate interface{}) *gomock.Call {
+// StoreVendorCACertificate indicates an expected call of StoreVendorCACertificate
+func (mr *MockClientMockRecorder) StoreVendorCACertificate(certificate interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreCertificate", reflect.TypeOf((*MockClient)(nil).StoreCertificate), key, certificate)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreVendorCACertificate", reflect.TypeOf((*MockClient)(nil).StoreVendorCACertificate), certificate)
 }
 
 // GenerateKeyPair mocks base method
@@ -204,6 +204,22 @@ func (mr *MockClientMockRecorder) GetTLSCertificate(entity interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTLSCertificate", reflect.TypeOf((*MockClient)(nil).GetTLSCertificate), entity)
 }
 
+// RenewTLSCertificate mocks base method
+func (m *MockClient) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenewTLSCertificate", entity)
+	ret0, _ := ret[0].(*x509.Certificate)
+	ret1, _ := ret[1].(crypto.PrivateKey)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// RenewTLSCertificate indicates an expected call of RenewTLSCertificate
+func (mr *MockClientMockRecorder) RenewTLSCertificate(entity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewTLSCertificate", reflect.TypeOf((*MockClient)(nil).RenewTLSCertificate), entity)
+}
+
 // GetSigningCertificate mocks base method
 func (m *MockClient) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
 	m.ctrl.T.Helper()
@@ -218,6 +234,22 @@ func (m *MockClient) GetSigningCertificate(entity types.LegalEntity) (*x509.Cert
 func (mr *MockClientMockRecorder) GetSigningCertificate(entity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSigningCertificate", reflect.TypeOf((*MockClient)(nil).GetSigningCertificate), entity)
+}
+
+// RenewSigningCertificate mocks base method
+func (m *MockClient) RenewSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenewSigningCertificate", entity)
+	ret0, _ := ret[0].(*x509.Certificate)
+	ret1, _ := ret[1].(crypto.PrivateKey)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// RenewSigningCertificate indicates an expected call of RenewSigningCertificate
+func (mr *MockClientMockRecorder) RenewSigningCertificate(entity interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewSigningCertificate", reflect.TypeOf((*MockClient)(nil).RenewSigningCertificate), entity)
 }
 
 // GetPublicKeyAsPEM mocks base method

@@ -201,8 +201,14 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 		"GetTLSCertificate": func() {
 			c.GetTLSCertificate(types.LegalEntity{})
 		},
+		"RenewTLSCertificate": func() {
+			c.RenewTLSCertificate(types.LegalEntity{})
+		},
 		"GetSigningCertificate": func() {
 			c.GetSigningCertificate(types.LegalEntity{})
+		},
+		"RenewSigningCertificate": func() {
+			c.RenewSigningCertificate(types.LegalEntity{})
 		},
 		"SignJWT": func() {
 			c.SignJWT(nil, nil)
@@ -222,8 +228,8 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 		"TrustStore": func() {
 			c.TrustStore()
 		},
-		"StoreCertificate": func() {
-			c.StoreCertificate(nil, nil)
+		"StoreVendorCACertificate": func() {
+			c.StoreVendorCACertificate(nil)
 		},
 	}
 	for fnName, fn := range funcs {

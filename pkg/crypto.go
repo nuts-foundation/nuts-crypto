@@ -206,17 +206,20 @@ func (client *Crypto) SignCertificate(subjectKey types.KeyIdentifier, caKey type
 	return certificate, nil
 }
 
-func (client *Crypto) StoreCertificate(key types.KeyIdentifier, certificate *x509.Certificate) error {
+func (client *Crypto) StoreVendorCACertificate(certificate *x509.Certificate) error {
 	if certificate == nil {
 		return errors.New("certificate is nil")
 	}
-	if client.Storage.PrivateKeyExists(key) {
-		// GetPublicKey used GetPrivateKey
-		if publicKey, err := client.Storage.GetPublicKey(key); err != nil {
-			return err
-		} else if !reflect.DeepEqual(publicKey, certificate.PublicKey) {
-			return errors.New("public key in certificate does not match stored private key")
-		}
+	identity := core.NutsConfig().Identity()
+	log.Logger().Infof("Storing CA certificate for: %s", identity)
+	key := types.KeyForEntity(types.LegalEntity{URI: identity})
+	if !client.Storage.PrivateKeyExists(key) {
+		return fmt.Errorf("private key not present for key: %s", key)
+	}
+	if publicKey, err := client.Storage.GetPublicKey(key); err != nil {
+		return err
+	} else if !reflect.DeepEqual(publicKey, certificate.PublicKey) {
+		return fmt.Errorf("public key in certificate does not match stored private key (key: %s)", key)
 	}
 	return client.Storage.SaveCertificate(key, certificate.Raw)
 }

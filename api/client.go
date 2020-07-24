@@ -157,7 +157,7 @@ func (hb HttpClient) GetSigningCertificate(entity types.LegalEntity) (*x509.Cert
 	panic(ErrNotImplemented)
 }
 
-func (hb HttpClient) StoreCertificate(key types.KeyIdentifier, certificate *x509.Certificate) error {
+func (hb HttpClient) StoreVendorCACertificate(certificate *x509.Certificate) error {
 	panic(ErrNotImplemented)
 }
 
@@ -214,5 +214,13 @@ func (hb HttpClient) PrivateKeyExists(key types.KeyIdentifier) bool {
 }
 
 func (hb HttpClient) TrustStore() cert.TrustStore {
+	panic(ErrNotImplemented)
+}
+
+func (hb HttpClient) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
+	panic(ErrNotImplemented)
+}
+
+func (hb HttpClient) RenewSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
 	panic(ErrNotImplemented)
 }

@@ -53,7 +53,7 @@ import (
 )
 
 var extension = pkix.Extension{Id: []int{1, 2}, Critical: false, Value: []byte("test")}
-var entity = types.LegalEntity{URI: "urn:oid:2.16.840.1.113883.2.4.6.1:00000000"}
+var entity = types.LegalEntity{URI: "urn:oid:1.3.6.1.4.1.54851.4:123"}
 var key = types.KeyForEntity(entity)
 
 func TestCryptoBackend(t *testing.T) {
@@ -679,40 +679,38 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
-func TestCrypto_StoreCertificate(t *testing.T) {
+func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
 
-	t.Run("ok - private key does not exist", func(t *testing.T) {
-		key := types.KeyForEntity(types.LegalEntity{t.Name()})
+	t.Run("ok - private key exists", func(t *testing.T) {
+		client.GenerateKeyPair(key)
+		privateKey, _ := client.GetPrivateKey(key)
+		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		err := client.StoreVendorCACertificate(certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("error - private key does not exist", func(t *testing.T) {
+		client := defaultBackend(t.Name())
+		defer emptyTemp(t.Name())
 		privateKey, _ := client.generateKeyPair()
 		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
-		err := client.StoreCertificate(key, certificate)
-		assert.NoError(t, err)
-	})
-	t.Run("ok - private key exists", func(t *testing.T) {
-		key := types.KeyForEntity(types.LegalEntity{t.Name()})
-		client.GenerateKeyPair(key)
-		privateKey, _ := client.GetPrivateKey(key)
-		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
-		certificate, _ := x509.ParseCertificate(certificateAsBytes)
-		err := client.StoreCertificate(key, certificate)
-		assert.NoError(t, err)
+		err := client.StoreVendorCACertificate(certificate)
+		assert.EqualError(t, err, "private key not present for key: [urn:oid:1.3.6.1.4.1.54851.4:123|]")
 	})
 	t.Run("error - existing private key differs", func(t *testing.T) {
-		key := types.KeyForEntity(types.LegalEntity{t.Name()})
 		client.GenerateKeyPair(key)
 		privateKey, _ := client.GetPrivateKey(key)
 		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		client.GenerateKeyPair(key)
-		err := client.StoreCertificate(key, certificate)
-		assert.EqualError(t, err, "public key in certificate does not match stored private key")
+		err := client.StoreVendorCACertificate(certificate)
+		assert.EqualError(t, err, "public key in certificate does not match stored private key (key: [urn:oid:1.3.6.1.4.1.54851.4:123|])")
 	})
 	t.Run("error - certificate is nil", func(t *testing.T) {
-		key := types.KeyForEntity(types.LegalEntity{t.Name()})
-		err := client.StoreCertificate(key, nil)
+		err := client.StoreVendorCACertificate(nil)
 		assert.EqualError(t, err, "certificate is nil")
 	})
 }
@@ -818,7 +816,7 @@ func TestCrypto_issueSubCertificate(t *testing.T) {
 			Organization: []string{"Zorg Inc."},
 		}, time.Now(), 1)
 		certificate, privateKey, err := client.issueSubCertificate(entity, "test", CertificateProfile{})
-		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'C' component")
+		assert.EqualError(t, err, "subject of CA certificate [urn:oid:1.3.6.1.4.1.54851.4:123|] doesn't contain 'C' component")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
 	})
@@ -827,7 +825,7 @@ func TestCrypto_issueSubCertificate(t *testing.T) {
 			Country: []string{"NL"},
 		}, time.Now(), 1)
 		certificate, privateKey, err := client.issueSubCertificate(entity, "test", CertificateProfile{})
-		assert.EqualError(t, err, "subject of CA certificate [urn:oid:2.16.840.1.113883.2.4.6.1:00000000|] doesn't contain 'O' component")
+		assert.EqualError(t, err, "subject of CA certificate [urn:oid:1.3.6.1.4.1.54851.4:123|] doesn't contain 'O' component")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
 	})
@@ -1309,7 +1307,7 @@ func TestCrypto_Start(t *testing.T) {
 }
 
 func defaultBackend(name string) *Crypto {
-	os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:123")
+	os.Setenv("NUTS_IDENTITY", entity.URI)
 	if err := core.NutsConfig().Load(&cobra.Command{}); err != nil {
 		panic(err)
 	}
