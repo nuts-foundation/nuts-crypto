@@ -290,7 +290,7 @@ func (client *Crypto) issueSubCertificate(entity types.LegalEntity, qualifier st
 	caKey := types.KeyForEntity(entity)
 	caCertificate, err := client.Storage.GetCertificate(caKey)
 	if err != nil || caCertificate == nil {
-		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s", caKey)
+		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s: %v", caKey, err)
 	}
 	if len(caCertificate.Subject.Organization) == 0 {
 		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'O' component", caKey)

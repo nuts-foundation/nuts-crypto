@@ -748,6 +748,28 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		assert.NotNil(t, certificate)
 		assert.NotNil(t, privateKey)
 	})
+	t.Run("ok - exists but expired", func(t *testing.T) {
+		privateKey, _ := client.generateAndStoreKeyPair(key.WithQualifier(signingCertificateQualifier))
+		certificateAsASN1 := test.GenerateCertificateEx(time.Now().AddDate(-1, 0, 0), 1, privateKey)
+		client.Storage.SaveCertificate(key.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		certificate, pk, err := client.GetSigningCertificate(entity)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Nil(t, certificate)
+		assert.Nil(t, pk)
+	})
+	t.Run("error - exists, missing private key", func(t *testing.T) {
+		entity2 := types.LegalEntity{"foobar2"}
+		key2 := types.KeyForEntity(entity2)
+		privateKey, _ := client.generateKeyPair()
+		certificateAsASN1 := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		client.Storage.SaveCertificate(key2.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		certificate, pk, err := client.GetSigningCertificate(entity2)
+		assert.EqualError(t, err, "unable to retrieve private key for certificate: [foobar2|sign]: could not open entry [foobar2|sign] with filename temp/TestCrypto_GetSigningCertificate/Zm9vYmFyMg==_sign_private.pem: entry not found")
+		assert.Nil(t, certificate)
+		assert.Nil(t, pk)
+	})
 }
 
 func TestCrypto_RenewSigningCertificate(t *testing.T) {
@@ -806,6 +828,12 @@ func TestCrypto_issueSubCertificate(t *testing.T) {
 			return
 		}
 		assert.Equal(t, "Foobar", altName)
+	})
+	t.Run("error - CA certificate not found", func(t *testing.T) {
+		certificate, privateKey, err := client.issueSubCertificate(types.LegalEntity{"foobar"}, "test", CertificateProfile{})
+		assert.EqualError(t, err, "unable to retrieve CA certificate [foobar|]: could not open entry [foobar|] with filename temp/TestCrypto_issueSubCertificate/Zm9vYmFy_certificate.pem: entry not found")
+		assert.Nil(t, certificate)
+		assert.Nil(t, privateKey)
 	})
 	t.Run("error - qualifier not set", func(t *testing.T) {
 		_, _, err := client.issueSubCertificate(types.LegalEntity{}, "", CertificateProfile{})
