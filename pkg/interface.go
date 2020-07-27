@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-// CryptoClient efines the functions than can be called by a Cmd, Direct or via rest call.
+// Client defines the functions than can be called by a Cmd, Direct or via rest call.
 type Client interface {
 	// DecryptKeyAndCipherText decrypts a cipherText using the given key (private key must be present).
 	DecryptKeyAndCipherText(cipherText types.DoubleEncryptedCipherText, key types.KeyIdentifier) ([]byte, error)
