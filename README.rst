@@ -50,7 +50,7 @@ Generating mocks
 
 .. code-block:: shell
 
-   mockgen -destination=test/mock/client.go -package=mock -source=pkg/client.go Client
+   mockgen -destination=test/mock/client.go -package=mock -source=pkg/interface.go Client
 
 README
 ******

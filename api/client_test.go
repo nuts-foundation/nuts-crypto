@@ -199,13 +199,25 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 			c.VerifyWith(nil, nil, nil)
 		},
 		"GetTLSCertificate": func() {
-			c.GetTLSCertificate(nil)
+			c.GetTLSCertificate(types.LegalEntity{})
+		},
+		"RenewTLSCertificate": func() {
+			c.RenewTLSCertificate(types.LegalEntity{})
+		},
+		"GetSigningCertificate": func() {
+			c.GetSigningCertificate(types.LegalEntity{})
+		},
+		"RenewSigningCertificate": func() {
+			c.RenewSigningCertificate(types.LegalEntity{})
 		},
 		"SignJWT": func() {
 			c.SignJWT(nil, nil)
 		},
 		"SignJWSEphemeral": func() {
 			c.SignJWSEphemeral(nil, nil, x509.CertificateRequest{}, time.Now())
+		},
+		"SignJWS": func() {
+			c.SignJWS(nil, types.LegalEntity{})
 		},
 		"VerifyJWS": func() {
 			c.VerifyJWS(nil, time.Now(), nil)
@@ -216,9 +228,12 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 		"TrustStore": func() {
 			c.TrustStore()
 		},
+		"StoreVendorCACertificate": func() {
+			c.StoreVendorCACertificate(nil)
+		},
 	}
 	for fnName, fn := range funcs {
-		t.Run(fnName + " should panic", func(t *testing.T) {
+		t.Run(fnName+" should panic", func(t *testing.T) {
 			assert.PanicsWithValue(t, ErrNotImplemented, func() {
 				fn()
 			})
