@@ -99,8 +99,8 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
-const tlsCertificateQualifier = "tls"
-const signingCertificateQualifier = "sign"
+const TLSCertificateQualifier = "tls"
+const SigningCertificateQualifier = "sign"
 
 type CryptoConfig struct {
 	Mode          string
@@ -255,24 +255,24 @@ func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 }
 
 func (client *Crypto) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	key := types.KeyForEntity(entity).WithQualifier(signingCertificateQualifier)
+	key := types.KeyForEntity(entity).WithQualifier(SigningCertificateQualifier)
 	return client.getCertificateAndKey(key)
 }
 
 func (client *Crypto) RenewSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.issueSubCertificate(entity, signingCertificateQualifier, CertificateProfile{
+	return client.issueSubCertificate(entity, SigningCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
 		NumDaysValid: SigningCertificateValidityInDays,
 	})
 }
 
 func (client *Crypto) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	key := types.KeyForEntity(entity).WithQualifier(tlsCertificateQualifier)
+	key := types.KeyForEntity(entity).WithQualifier(TLSCertificateQualifier)
 	return client.getCertificateAndKey(key)
 }
 
 func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.issueSubCertificate(entity, tlsCertificateQualifier, CertificateProfile{
+	return client.issueSubCertificate(entity, TLSCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		NumDaysValid: TLSCertificateValidityInDays,

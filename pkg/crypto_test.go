@@ -800,9 +800,9 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		assert.NotNil(t, privateKey)
 	})
 	t.Run("ok - exists but expired", func(t *testing.T) {
-		privateKey, _ := client.generateAndStoreKeyPair(key.WithQualifier(signingCertificateQualifier))
+		privateKey, _ := client.generateAndStoreKeyPair(key.WithQualifier(SigningCertificateQualifier))
 		certificateAsASN1 := test.GenerateCertificate(time.Now().AddDate(-1, 0, 0), 1, privateKey)
-		client.Storage.SaveCertificate(key.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		client.Storage.SaveCertificate(key.WithQualifier(SigningCertificateQualifier), certificateAsASN1)
 		certificate, pk, err := client.GetSigningCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
@@ -815,7 +815,7 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		key2 := types.KeyForEntity(entity2)
 		privateKey, _ := client.generateKeyPair()
 		certificateAsASN1 := test.GenerateCertificate(time.Now(), 1, privateKey)
-		client.Storage.SaveCertificate(key2.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		client.Storage.SaveCertificate(key2.WithQualifier(SigningCertificateQualifier), certificateAsASN1)
 		certificate, pk, err := client.GetSigningCertificate(entity2)
 		assert.EqualError(t, err, "unable to retrieve private key for certificate: [foobar2|sign]: could not open entry [foobar2|sign] with filename temp/TestCrypto_GetSigningCertificate/Zm9vYmFyMg==_sign_private.pem: entry not found")
 		assert.Nil(t, certificate)
