@@ -126,7 +126,7 @@ func TestCertificateMonitor_checkExpiry(t *testing.T) {
 
 	t.Run("expiring certificate is count", func(t *testing.T) {
 		rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-		asn1 := test.GenerateCertificateEx(time.Now(), 1, rsaKey)
+		asn1 := test.GenerateCertificate(time.Now(), 1, rsaKey)
 		fs.SaveCertificate(types.KeyForEntity(types.LegalEntity{URI: "test"}), asn1)
 
 		m.checkExpiry()

@@ -149,7 +149,7 @@ func testResponseCode(expectedStatusCode int, response *http.Response) error {
 	return nil
 }
 
-func (hb HttpClient) SignJWS(payload []byte, entity types.LegalEntity) ([]byte, error) {
+func (hb HttpClient) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error) {
 	panic(ErrNotImplemented)
 }
 

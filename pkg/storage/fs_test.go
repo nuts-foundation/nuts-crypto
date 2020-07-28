@@ -193,7 +193,7 @@ func Test_fs_GetExpiringCertificates(t *testing.T) {
 
 	// expires in 8 days
 	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	storage.SaveCertificate(key, test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 9, rsaKey))
+	storage.SaveCertificate(key, test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 9, rsaKey))
 
 	t.Run("Expiring certificate is found within correct period", func(t *testing.T) {
 		certs, err := storage.GetExpiringCertificates(time.Now(), time.Now().AddDate(0, 0, 14))

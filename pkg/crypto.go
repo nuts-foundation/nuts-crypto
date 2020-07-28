@@ -701,6 +701,23 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 	return token.SignedString(rsaPrivateKey)
 }
 
+func (client Crypto) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error) {
+	certificate, privateKey, err := client.getCertificateAndKey(key)
+	if err != nil {
+		return nil, errors2.Wrapf(err, "error while retrieving signing certificate and key (%s)", key)
+	}
+	if certificate == nil || privateKey == nil {
+		return nil, fmt.Errorf("signing certificate and/or private not present: %s", key)
+	}
+	if err := cert.ValidateCertificate(certificate, cert.MeantForSigning()); err != nil {
+		return nil, err
+	}
+	headers := jws.StandardHeaders{
+		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
+	}
+	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(&headers))
+}
+
 func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	// Generate ephemeral key and certificate
 	entityPrivateKey, err := client.generateKeyPair()
@@ -763,8 +780,8 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing
-	if signingCert.KeyUsage&x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
-		return nil, errors.New("certificate is not meant for signing (keyUsage != digitalSignature)")
+	if err := cert.ValidateCertificate(signingCert, cert.MeantForSigning()); err != nil {
+		return nil, err
 	}
 	// TODO: CRL checking
 	return jws.Verify(signature, sig.ProtectedHeaders().Algorithm(), signingCert.PublicKey)
