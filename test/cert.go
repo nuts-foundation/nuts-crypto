@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func GenerateCertificateEx(notBefore time.Time, validityInDays int, privKey crypto.Signer) []byte {
+func GenerateCertificateEx(notBefore time.Time, privKey crypto.Signer, validityInDays int, isCA bool, keyUsage x509.KeyUsage) []byte {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -18,7 +18,8 @@ func GenerateCertificateEx(notBefore time.Time, validityInDays int, privKey cryp
 		PublicKey:             privKey.Public(),
 		NotBefore:             notBefore,
 		NotAfter:              notBefore.AddDate(0, 0, validityInDays),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		IsCA:                  isCA,
+		KeyUsage:              keyUsage,
 		EmailAddresses:        []string{"test@test.nl"},
 		BasicConstraintsValid: true,
 	}
@@ -27,4 +28,8 @@ func GenerateCertificateEx(notBefore time.Time, validityInDays int, privKey cryp
 		panic(err)
 	}
 	return data
+}
+
+func GenerateCertificate(notBefore time.Time, validityInDays int, privKey crypto.Signer) []byte {
+	return GenerateCertificateEx(notBefore, privKey, validityInDays, false, x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature)
 }

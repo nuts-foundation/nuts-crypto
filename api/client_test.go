@@ -217,7 +217,7 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 			c.SignJWSEphemeral(nil, nil, x509.CertificateRequest{}, time.Now())
 		},
 		"SignJWS": func() {
-			c.SignJWS(nil, types.LegalEntity{})
+			c.SignJWS(nil, nil)
 		},
 		"VerifyJWS": func() {
 			c.VerifyJWS(nil, time.Now(), nil)

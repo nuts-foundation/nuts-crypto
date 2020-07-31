@@ -466,6 +466,23 @@ type poolCertVerifier struct {
 	pool *x509.CertPool
 }
 
+func (n poolCertVerifier) Pool() *x509.CertPool {
+	return n.pool
+}
+
+func (n * poolCertVerifier) AddCertificate(certificate *x509.Certificate) error {
+	n.pool.AddCert(certificate)
+	return nil
+}
+
+func (n poolCertVerifier) GetRoots(t time.Time) []*x509.Certificate {
+	panic("implement me")
+}
+
+func (n poolCertVerifier) GetCertificates(i [][]*x509.Certificate, t time.Time, b bool) [][]*x509.Certificate {
+	panic("implement me")
+}
+
 func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error {
 	if n.pool == nil {
 		return nil
@@ -474,8 +491,42 @@ func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error
 	return err
 }
 
-// Tests both JWSSignEphemeral and VerifyJWS functions
-func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
+func TestCrypto_SignJWS(t *testing.T) {
+	client := defaultBackend(t.Name())
+	defer emptyTemp(t.Name())
+	key := types.KeyForEntity(types.LegalEntity{URI: t.Name()})
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	_ = client.Storage.SavePrivateKey(key, privateKey)
+	t.Run("ok", func(t *testing.T) {
+		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageContentCommitment)
+		_ = client.Storage.SaveCertificate(key, certAsASN1)
+		dataToBeSigned := []byte("Hello, World!")
+		jwsAsBytes, err := client.SignJWS(dataToBeSigned, key)
+		if !assert.NoError(t, err) {
+			return
+		}
+		// Validate signature
+		payload, err := client.VerifyJWS(jwsAsBytes, time.Now(), client.trustStore)
+		assert.NoError(t, err)
+		assert.Equal(t, dataToBeSigned, payload)
+	})
+	t.Run("error - key/certificate missing", func(t *testing.T) {
+		jwsAsBytes, err := client.SignJWS([]byte{}, key.WithQualifier("non-existent"))
+		assert.EqualError(t, err, "signing certificate and/or private not present: [TestCrypto_SignJWS|non-existent]")
+		assert.Nil(t, jwsAsBytes)
+	})
+	t.Run("error - non signing certificate", func(t *testing.T) {
+		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageCRLSign)
+		_ = client.Storage.SaveCertificate(key, certAsASN1)
+		dataToBeSigned := []byte("Hello, World!")
+		jwsAsBytes, err := client.SignJWS(dataToBeSigned, key)
+		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage = digitalSignature | contentCommitment)")
+		assert.Nil(t, jwsAsBytes)
+	})
+}
+
+// Tests both SignJWSEphemeral and VerifyJWS functions
+func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
 	selfSignCertificate := func(key types.KeyIdentifier, keyUsage x509.KeyUsage) *x509.Certificate {
@@ -554,7 +605,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 		h.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
-		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage != digitalSignature)")
+		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage = digitalSignature | contentCommitment)")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
@@ -589,7 +640,7 @@ func TestCrypto_JWSSignEphemeralAndVerify(t *testing.T) {
 	})
 	t.Run("error - key strength insufficient", func(t *testing.T) {
 		key, _ := rsa.GenerateKey(rand.Reader, 1024)
-		certBytes := test.GenerateCertificateEx(time.Now(), 2, key)
+		certBytes := test.GenerateCertificate(time.Now(), 2, key)
 		certificate, _ := x509.ParseCertificate(certBytes)
 		headers := jws.StandardHeaders{
 			JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
@@ -686,7 +737,7 @@ func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	t.Run("ok - private key exists", func(t *testing.T) {
 		client.GenerateKeyPair(key)
 		privateKey, _ := client.GetPrivateKey(key)
-		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		err := client.StoreVendorCACertificate(certificate)
 		assert.NoError(t, err)
@@ -695,7 +746,7 @@ func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 		client := defaultBackend(t.Name())
 		defer emptyTemp(t.Name())
 		privateKey, _ := client.generateKeyPair()
-		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		err := client.StoreVendorCACertificate(certificate)
 		assert.EqualError(t, err, "private key not present for key: [urn:oid:1.3.6.1.4.1.54851.4:123|]")
@@ -703,7 +754,7 @@ func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	t.Run("error - existing private key differs", func(t *testing.T) {
 		client.GenerateKeyPair(key)
 		privateKey, _ := client.GetPrivateKey(key)
-		certificateAsBytes := test.GenerateCertificateEx(time.Now(), 1, privateKey)
+		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		client.GenerateKeyPair(key)
 		err := client.StoreVendorCACertificate(certificate)
@@ -749,9 +800,9 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		assert.NotNil(t, privateKey)
 	})
 	t.Run("ok - exists but expired", func(t *testing.T) {
-		privateKey, _ := client.generateAndStoreKeyPair(key.WithQualifier(signingCertificateQualifier))
-		certificateAsASN1 := test.GenerateCertificateEx(time.Now().AddDate(-1, 0, 0), 1, privateKey)
-		client.Storage.SaveCertificate(key.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		privateKey, _ := client.generateAndStoreKeyPair(key.WithQualifier(SigningCertificateQualifier))
+		certificateAsASN1 := test.GenerateCertificate(time.Now().AddDate(-1, 0, 0), 1, privateKey)
+		client.Storage.SaveCertificate(key.WithQualifier(SigningCertificateQualifier), certificateAsASN1)
 		certificate, pk, err := client.GetSigningCertificate(entity)
 		if !assert.NoError(t, err) {
 			return
@@ -763,8 +814,8 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		entity2 := types.LegalEntity{"foobar2"}
 		key2 := types.KeyForEntity(entity2)
 		privateKey, _ := client.generateKeyPair()
-		certificateAsASN1 := test.GenerateCertificateEx(time.Now(), 1, privateKey)
-		client.Storage.SaveCertificate(key2.WithQualifier(signingCertificateQualifier), certificateAsASN1)
+		certificateAsASN1 := test.GenerateCertificate(time.Now(), 1, privateKey)
+		client.Storage.SaveCertificate(key2.WithQualifier(SigningCertificateQualifier), certificateAsASN1)
 		certificate, pk, err := client.GetSigningCertificate(entity2)
 		assert.EqualError(t, err, "unable to retrieve private key for certificate: [foobar2|sign]: could not open entry [foobar2|sign] with filename temp/TestCrypto_GetSigningCertificate/Zm9vYmFyMg==_sign_private.pem: entry not found")
 		assert.Nil(t, certificate)
@@ -1013,8 +1064,8 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	})
 
 	t.Run("error - signing certificate is not a CA certificate", func(t *testing.T) {
-		// Certificate created by GenerateCertificateEx is not a CA certificate
-		caCertificate := test.GenerateCertificateEx(time.Now(), 1, caPrivateKey)
+		// Certificate created by GenerateCertificate is not a CA certificate
+		caCertificate := test.GenerateCertificate(time.Now(), 1, caPrivateKey)
 		err := client.Storage.SaveCertificate(ca, caCertificate)
 		if !assert.NoError(t, err) {
 			return
@@ -1267,7 +1318,6 @@ func TestCrypto_Configure(t *testing.T) {
 		err := e.Configure()
 		assert.NoError(t, err)
 		// Assert server-mode services aren't initialized in client mode
-		assert.Nil(t, e.trustStore)
 		assert.Nil(t, e.Storage)
 	})
 	t.Run("error - keySize is too small", func(t *testing.T) {
@@ -1352,9 +1402,11 @@ func defaultBackend(name string) *Crypto {
 	if err := core.NutsConfig().Load(&cobra.Command{}); err != nil {
 		panic(err)
 	}
+	trustStore := poolCertVerifier{}
 	backend := Crypto{
-		Storage: createTempStorage(name),
-		Config:  DefaultCryptoConfig(),
+		Storage:    createTempStorage(name),
+		Config:     DefaultCryptoConfig(),
+		trustStore: &trustStore,
 	}
 
 	return &backend

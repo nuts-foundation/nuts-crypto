@@ -254,12 +254,25 @@ func IsCA() CertificateValidator {
 }
 
 func ValidateCertificate(certificate *x509.Certificate, validators ...CertificateValidator) error {
+	if certificate == nil {
+		return errors.New("certificate is nil")
+	}
 	for _, validator := range validators {
 		if err := validator(certificate); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// MeantForSigning validates whether the certificate is meant for signing (key usage includes digitalSignature and/or contentCommitment)
+func MeantForSigning() CertificateValidator {
+	return func(certificate *x509.Certificate) error {
+		if certificate.KeyUsage&x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature && certificate.KeyUsage&x509.KeyUsageContentCommitment != x509.KeyUsageContentCommitment {
+			return errors.New("certificate is not meant for signing (keyUsage = digitalSignature | contentCommitment)")
+		}
+		return nil
+	}
 }
 
 func unmarshalX509CertChain(chain []string) ([]*x509.Certificate, error) {

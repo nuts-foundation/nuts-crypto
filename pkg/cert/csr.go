@@ -11,9 +11,9 @@ import (
 
 
 var OIDSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
-var oidNuts = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54851}
-var OIDNutsVendor = asn12.OIDAppend(oidNuts, 4)
-var oidNutsDomain = asn12.OIDAppend(oidNuts, 3)
+var OIDNuts = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54851}
+var OIDNutsVendor = asn12.OIDAppend(OIDNuts, 4)
+var OIDNutsDomain = asn12.OIDAppend(OIDNuts, 3)
 
 // VendorCertificateRequest creates a CertificateRequest template for issuing a vendor certificate.
 //   vendorID:      URN-OID-encoded ID of the vendor
@@ -45,7 +45,7 @@ func VendorCertificateRequest(vendorID string, vendorName string, qualifier stri
 	if err != nil {
 		return nil, err
 	}
-	extensions = append(extensions, pkix.Extension{Id: oidNutsDomain, Critical: false, Value: domainData})
+	extensions = append(extensions, pkix.Extension{Id: OIDNutsDomain, Critical: false, Value: domainData})
 
 	commonName := vendorName
 	if qualifier != "" {

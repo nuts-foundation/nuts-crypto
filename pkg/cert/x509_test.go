@@ -43,7 +43,7 @@ func TestGetActiveCertificates(t *testing.T) {
 		assert.Empty(t, certificates)
 	})
 	t.Run("single entry", func(t *testing.T) {
-		certBytes := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+		certBytes := test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 2, rsaKey)
 		cert, err := x509.ParseCertificate(certBytes)
 		if !assert.NoError(t, err) {
 			return
@@ -59,10 +59,10 @@ func TestGetActiveCertificates(t *testing.T) {
 		// cert3 is valid, and longer than cert2
 		// cert4 is not valid yet
 		// Expected result: cert3, cert2
-		cert1, _ := x509.ParseCertificate(test.GenerateCertificateEx(time.Now().AddDate(0, 0, -5), 1, rsaKey))
-		cert2, _ := x509.ParseCertificate(test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 3, rsaKey))
-		cert3, _ := x509.ParseCertificate(test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 4, rsaKey))
-		cert4, _ := x509.ParseCertificate(test.GenerateCertificateEx(time.Now().AddDate(0, 0, 1), 1, rsaKey))
+		cert1, _ := x509.ParseCertificate(test.GenerateCertificate(time.Now().AddDate(0, 0, -5), 1, rsaKey))
+		cert2, _ := x509.ParseCertificate(test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 3, rsaKey))
+		cert3, _ := x509.ParseCertificate(test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 4, rsaKey))
+		cert4, _ := x509.ParseCertificate(test.GenerateCertificate(time.Now().AddDate(0, 0, 1), 1, rsaKey))
 		key1, _ := jwk.New(rsaKey)
 		key1.Set(jwk.X509CertChainKey, base64.StdEncoding.EncodeToString(cert1.Raw))
 		key2, _ := jwk.New(rsaKey)

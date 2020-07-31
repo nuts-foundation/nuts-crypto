@@ -214,17 +214,20 @@ func TestMapToX509CertChain(t *testing.T) {
 func TestValidateCertificate(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		rsaKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-		asn1 := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+		asn1 := test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 2, rsaKey)
 		certificate, _ := x509.ParseCertificate(asn1)
 		assert.NoError(t, ValidateCertificate(certificate, ValidAt(time.Now())))
 		assert.Error(t, ValidateCertificate(certificate, ValidAt(time.Now().AddDate(1, 0, 0))))
+	})
+	t.Run("error - certificate is nil", func(t *testing.T) {
+		assert.Error(t, ValidateCertificate(nil))
 	})
 }
 
 func TestCopySANs(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		rsaKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-		asn1 := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+		asn1 := test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 2, rsaKey)
 		certificate, _ := x509.ParseCertificate(asn1)
 		sans := CopySANs(certificate)
 		assert.Len(t, sans, 1)
@@ -285,7 +288,7 @@ func TestValidateJWK(t *testing.T) {
 
 func TestCertificateToPEM(t *testing.T) {
 	rsaKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-	asn1 := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+	asn1 := test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 2, rsaKey)
 	certificate, _ := x509.ParseCertificate(asn1)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
@@ -299,7 +302,7 @@ func TestCertificateToPEM(t *testing.T) {
 
 func TestPemToX509(t *testing.T) {
 	rsaKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-	asn1 := test.GenerateCertificateEx(time.Now().AddDate(0, 0, -1), 2, rsaKey)
+	asn1 := test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 2, rsaKey)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: asn1,
@@ -381,5 +384,27 @@ func TestIsCA(t *testing.T) {
 		cert, _ := x509.ParseCertificate(certASN1)
 		err := IsCA()(cert)
 		assert.Error(t, err)
+	})
+}
+
+func TestMeantForSigning(t *testing.T) {
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
+	t.Run("invalid", func(t *testing.T) {
+		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageCertSign)
+		certificate, _ := x509.ParseCertificate(certAsASN1)
+		err := MeantForSigning()(certificate)
+		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage = digitalSignature | contentCommitment)")
+	})
+	t.Run("valid (keyUsage = contentCommitment)", func(t *testing.T) {
+		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageContentCommitment | x509.KeyUsageKeyAgreement)
+		certificate, _ := x509.ParseCertificate(certAsASN1)
+		err := MeantForSigning()(certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("valid (keyUsage = digitalSignature)", func(t *testing.T) {
+		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageDigitalSignature | x509.KeyUsageCRLSign)
+		certificate, _ := x509.ParseCertificate(certAsASN1)
+		err := MeantForSigning()(certificate)
+		assert.NoError(t, err)
 	})
 }

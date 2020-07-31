@@ -99,8 +99,8 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
-const tlsCertificateQualifier = "tls"
-const signingCertificateQualifier = "sign"
+const TLSCertificateQualifier = "tls"
+const SigningCertificateQualifier = "sign"
 
 type CryptoConfig struct {
 	Mode          string
@@ -255,24 +255,24 @@ func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 }
 
 func (client *Crypto) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	key := types.KeyForEntity(entity).WithQualifier(signingCertificateQualifier)
+	key := types.KeyForEntity(entity).WithQualifier(SigningCertificateQualifier)
 	return client.getCertificateAndKey(key)
 }
 
 func (client *Crypto) RenewSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.issueSubCertificate(entity, signingCertificateQualifier, CertificateProfile{
+	return client.issueSubCertificate(entity, SigningCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
 		NumDaysValid: SigningCertificateValidityInDays,
 	})
 }
 
 func (client *Crypto) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	key := types.KeyForEntity(entity).WithQualifier(tlsCertificateQualifier)
+	key := types.KeyForEntity(entity).WithQualifier(TLSCertificateQualifier)
 	return client.getCertificateAndKey(key)
 }
 
 func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
-	return client.issueSubCertificate(entity, tlsCertificateQualifier, CertificateProfile{
+	return client.issueSubCertificate(entity, TLSCertificateQualifier, CertificateProfile{
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		NumDaysValid: TLSCertificateValidityInDays,
@@ -701,6 +701,23 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 	return token.SignedString(rsaPrivateKey)
 }
 
+func (client Crypto) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error) {
+	certificate, privateKey, err := client.getCertificateAndKey(key)
+	if err != nil {
+		return nil, errors2.Wrapf(err, "error while retrieving signing certificate and key (%s)", key)
+	}
+	if certificate == nil || privateKey == nil {
+		return nil, fmt.Errorf("signing certificate and/or private not present: %s", key)
+	}
+	if err := cert.ValidateCertificate(certificate, cert.MeantForSigning()); err != nil {
+		return nil, err
+	}
+	headers := jws.StandardHeaders{
+		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
+	}
+	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(&headers))
+}
+
 func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
 	// Generate ephemeral key and certificate
 	entityPrivateKey, err := client.generateKeyPair()
@@ -763,8 +780,8 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing
-	if signingCert.KeyUsage&x509.KeyUsageDigitalSignature != x509.KeyUsageDigitalSignature {
-		return nil, errors.New("certificate is not meant for signing (keyUsage != digitalSignature)")
+	if err := cert.ValidateCertificate(signingCert, cert.MeantForSigning()); err != nil {
+		return nil, err
 	}
 	// TODO: CRL checking
 	return jws.Verify(signature, sig.ProtectedHeaders().Algorithm(), signingCert.PublicKey)

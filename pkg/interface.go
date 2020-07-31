@@ -76,6 +76,11 @@ type Client interface {
 	GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error)
 	// SignJWT creates a signed JWT using the given key and map of claims (private key must be present).
 	SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error)
+	// SignJWS signs payload according to the JWS spec with the specified key. There must be both a private key and
+	// corresponding certificate be present for the given key, and the certificate must be meant for signing. If any of
+	// these preconditions fail, an error is returned.
+	// The certificate is included in the x509chain field of the resulting JWS.
+	SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error)
 	// SignJWSEphemeral signs payload according to the JWS spec with a temporary key and certificate which are generated just for this operation.
 	// In other words, the key and certificate are not stored and cannot be used for any other cryptographic operation.
 	// The certificate's validity is as short as possible, just spanning the instant of signing.
@@ -84,6 +89,8 @@ type Client interface {
 	//  csr:         Certificate Signing Request which is used for issuing the X.509 certificate which is included in the JWS.
 	//               The CSR indicates which entity (e.g. vendor, organization, etc) is signing the payload.
 	//  signingTime: instant which is checked later when verifying the signature. The certificate will just span this instant.
+	//
+	// Deprecated: we're moving away from ephemeral keys for JWS signing, so use SigJWS instead.
 	SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error)
 	// VerifyJWS verifies a JWS ("signature"): it parses the JWS, checks if it's been signed with the expected algorithm,
 	// if it's signed with a certificate supplied in the "x5c" field of the JWS, if the certificate is trusted according
