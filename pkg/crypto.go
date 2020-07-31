@@ -283,6 +283,7 @@ func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certi
 // certificate of the entity. This is useful for providing specialized certificates for specific use cases (TLS and signing).
 // The entity must have a (valid) CA certificate and its private key must be present.
 func (client *Crypto) issueSubCertificate(entity types.LegalEntity, qualifier string, profile CertificateProfile) (*x509.Certificate, crypto.PrivateKey, error) {
+	log.Logger().Infof("Renewing '%s' certificate for entity: %s", qualifier, entity)
 	if qualifier == "" {
 		return nil, nil, errors.New("missing qualifier")
 	}
