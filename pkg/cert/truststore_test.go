@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"github.com/nuts-foundation/nuts-crypto/test"
 	"os"
 	"sync"
 	"testing"
@@ -52,7 +53,7 @@ func TestNewTrustStore(t *testing.T) {
 		}
 		ts := trustStore.(*fileTrustStore)
 		assert.Len(t, ts.certs, 0)
-		err = trustStore.AddCertificate(generateSelfSignedsCertificate("Test", time.Now(), 1, generateKeyPair()))
+		err = trustStore.AddCertificate(generateSelfSignedsCertificate("Test", time.Now(), 1, test.GenerateRSAKey()))
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -82,7 +83,7 @@ func TestNewTrustStore(t *testing.T) {
 
 func Test_fileTrustStore_AddCertificate(t *testing.T) {
 	const file = "../../test/addcert.pem"
-	privateKey := generateKeyPair()
+	privateKey := test.GenerateRSAKey()
 	t.Run("ok", func(t *testing.T) {
 		os.Remove(file)
 		defer os.Remove(file)
@@ -197,7 +198,7 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 
 	t.Run("with an added certificate, intermediate and root", func(t *testing.T) {
 		const file = "../../test/addcert.pem"
-		rootKey := generateKeyPair()
+		rootKey := test.GenerateRSAKey()
 
 		// add a new root and a certificate
 		os.Remove(file)
@@ -212,7 +213,7 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 			return
 		}
 
-		caKey := generateKeyPair()
+		caKey := test.GenerateRSAKey()
 		ca := generateCertificateCA(t.Name(), time.Now(), 1, root, &caKey.PublicKey, rootKey)
 		err = trustStore.AddCertificate(ca)
 		if !assert.NoError(t, err) {
@@ -220,7 +221,7 @@ func Test_fileTrustStore_GetCertificates(t *testing.T) {
 		}
 		chains := [][]*x509.Certificate{{ca, root}}
 
-		certKey := generateKeyPair()
+		certKey := test.GenerateRSAKey()
 		err = trustStore.AddCertificate(generateCertificate(t.Name(), time.Now(), 1, root, &certKey.PublicKey, caKey))
 		if !assert.NoError(t, err) {
 			return
@@ -297,11 +298,6 @@ func Test_fileTrustStore_load(t *testing.T) {
 		err := (&fileTrustStore{}).load("non-existent")
 		assert.EqualError(t, err, "unable to read truststore file: non-existent: open non-existent: no such file or directory")
 	})
-}
-
-func generateKeyPair() *rsa.PrivateKey {
-	keyPair, _ := rsa.GenerateKey(rand.Reader, 2048)
-	return keyPair
 }
 
 func generateSelfSignedsCertificate(commonName string, notBefore time.Time, validityInDays int, privKey *rsa.PrivateKey) *x509.Certificate {
