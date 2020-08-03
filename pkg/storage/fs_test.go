@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -100,7 +98,7 @@ func Test_fs_GetPublicKey(t *testing.T) {
 		assert.Nil(t, key)
 	})
 	t.Run("ok", func(t *testing.T) {
-		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
+		pk := test.GenerateRSAKey()
 		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
 			return
@@ -135,7 +133,7 @@ func Test_fs_GetPrivateKey(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		pk, _ := rsa.GenerateKey(rand.Reader, 2048)
+		pk := test.GenerateRSAKey()
 		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
 			return
@@ -157,7 +155,7 @@ func Test_fs_KeyExistsFor(t *testing.T) {
 		assert.False(t, storage.PrivateKeyExists(key))
 	})
 	t.Run("existing entry", func(t *testing.T) {
-		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey := test.GenerateRSAKey()
 		storage.SavePrivateKey(key, privateKey)
 		assert.True(t, storage.PrivateKeyExists(key))
 	})
@@ -192,7 +190,7 @@ func Test_fs_GetExpiringCertificates(t *testing.T) {
 	defer emptyTemp(t.Name())
 
 	// expires in 8 days
-	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	rsaKey := test.GenerateRSAKey()
 	storage.SaveCertificate(key, test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 9, rsaKey))
 
 	t.Run("Expiring certificate is found within correct period", func(t *testing.T) {

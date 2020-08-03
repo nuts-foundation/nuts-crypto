@@ -429,8 +429,8 @@ func (client *Crypto) Configure() error {
 }
 
 func (client *Crypto) doConfigure() error {
-	if client.Config.Keysize < MinKeySize {
-		return ErrInvalidKeySize
+	if err := client.verifyKeySize(client.Config.Keysize); err != nil {
+		return err
 	}
 	if client.Config.Storage != "fs" && client.Config.Storage != "" {
 		return errors.New("only fs backend available for now")
@@ -772,9 +772,10 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	}
 	signingCert := certChain[0]
 	// Check key strength. Cast should be safe since we checked the algorithm.
-	signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey)
-	if !ok || signingPubKey.Size()*8 < MinKeySize {
-		return nil, ErrInvalidKeySize
+	if signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey); !ok {
+		return nil, errors.New("invalid key type, expected *rsa.PublicKey")
+	} else if err := client.verifyKeySize(signingPubKey.Size()*8); err != nil {
+		return nil, err
 	}
 	// Check certificate is trusted
 	if err := certVerifier.Verify(signingCert, signingTime); err != nil {
@@ -854,4 +855,11 @@ func decryptWithSymmetricKey(cipherText []byte, key cipher.AEAD, nonce []byte) (
 		return nil, err
 	}
 	return plaintext, nil
+}
+
+func (client *Crypto) verifyKeySize(keySize int) error {
+	if keySize < MinKeySize && core.NutsConfig().InStrictMode() {
+		return ErrInvalidKeySize
+	}
+	return nil
 }

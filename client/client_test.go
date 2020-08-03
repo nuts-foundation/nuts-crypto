@@ -6,6 +6,7 @@ import (
 	core "github.com/nuts-foundation/nuts-go-core"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
@@ -23,6 +24,11 @@ func TestConfigureCryptoClient(t *testing.T) {
 		assert.IsType(t, api.HttpClient{}, client)
 	})
 	t.Run("error - panics for illegal config", func(t *testing.T) {
+		// Switch to strict mode just for this test
+		os.Setenv("NUTS_STRICTMODE", "true")
+		core.NutsConfig().Load(&cobra.Command{})
+		defer core.NutsConfig().Load(&cobra.Command{})
+		defer os.Unsetenv("NUTS_STRICTMODE")
 		instance := &pkg.Crypto{Config: pkg.DefaultCryptoConfig()}
 		instance.Config.Keysize = 1
 		assert.Panics(t, func() {

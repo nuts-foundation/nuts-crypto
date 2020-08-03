@@ -175,6 +175,8 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 
 func TestApiWrapper_Encrypt(t *testing.T) {
 	client := apiWrapper()
+	crypto := client.C.(*pkg.Crypto)
+	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
 	defer emptyTemp()
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key)
@@ -440,6 +442,8 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 
 func TestApiWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper()
+	crypto := client.C.(*pkg.Crypto)
+	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
 	defer emptyTemp()
 
 	plaintext := "for your eyes only"
@@ -1307,6 +1311,7 @@ func apiWrapper() *ApiWrapper {
 		Storage: createTempStorage(),
 		Config:  pkg.DefaultCryptoConfig(),
 	}
+	backend.Config.Keysize = 1024
 
 	return &ApiWrapper{C: &backend}
 }

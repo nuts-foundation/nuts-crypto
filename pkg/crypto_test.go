@@ -110,6 +110,7 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	defer emptyTemp(t.Name())
 	client := defaultBackend(t.Name())
+	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		key := types.KeyForEntity(types.LegalEntity{URI: "test"})
@@ -118,20 +119,15 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 		client.GenerateKeyPair(key)
 
 		cipherText, err := client.encryptPlainTextFor([]byte(plaintext), key)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
+		if !assert.NoError(t, err) {
+			return
 		}
 
 		decryptedText, err := client.decryptCipherTextFor(cipherText, key)
-
-		if err != nil {
-			t.Errorf("Expected no error, Got %s", err.Error())
+		if !assert.NoError(t, err) {
+			return
 		}
-
-		if string(decryptedText) != plaintext {
-			t.Errorf("Expected decrypted text to match [%s], Got [%s]", plaintext, decryptedText)
-		}
+		assert.Equal(t, plaintext, string(decryptedText))
 	})
 
 	t.Run("decryption for unknown legalEntity gives error", func(t *testing.T) {
@@ -175,6 +171,7 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := defaultBackend(t.Name())
+	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
 	defer emptyTemp(t.Name())
 	client.GenerateKeyPair(key)
 
@@ -495,7 +492,7 @@ func TestCrypto_SignJWS(t *testing.T) {
 	client := defaultBackend(t.Name())
 	defer emptyTemp(t.Name())
 	key := types.KeyForEntity(types.LegalEntity{URI: t.Name()})
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey := test.GenerateRSAKey()
 	_ = client.Storage.SavePrivateKey(key, privateKey)
 	t.Run("ok", func(t *testing.T) {
 		certAsASN1 := test.GenerateCertificateEx(time.Now(), privateKey, 1, false, x509.KeyUsageContentCommitment)
@@ -598,7 +595,7 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 		assert.Nil(t, payload)
 	})
 	t.Run("error - certificate not meant for signing", func(t *testing.T) {
-		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey := test.GenerateRSAKey()
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(key, 0)
 		verifier.pool.AddCert(certificate)
@@ -609,7 +606,7 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 		assert.Nil(t, payload)
 	})
 	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
-		privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey := test.GenerateRSAKey()
 		h := jws.StandardHeaders{}
 		certificate := selfSignCertificate(key, x509.KeyUsageDigitalSignature)
 		verifier.pool.AddCert(certificate)
@@ -639,7 +636,12 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 		assert.Nil(t, payload)
 	})
 	t.Run("error - key strength insufficient", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 1024)
+		// Switch to strict mode just for this test
+		os.Setenv("NUTS_STRICTMODE", "true")
+		core.NutsConfig().Load(&cobra.Command{})
+		defer core.NutsConfig().Load(&cobra.Command{})
+		defer os.Unsetenv("NUTS_STRICTMODE")
+		key := test.GenerateRSAKey()
 		certBytes := test.GenerateCertificate(time.Now(), 2, key)
 		certificate, _ := x509.ParseCertificate(certBytes)
 		headers := jws.StandardHeaders{
@@ -653,14 +655,14 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 		assert.Nil(t, payload)
 	})
 	t.Run("error - no X.509 chain", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		key := test.GenerateRSAKey()
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key)
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), "JWK doesn't contain X509 chain header (x5c) header")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - invalid X.509 chain", func(t *testing.T) {
-		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+		key := test.GenerateRSAKey()
 		h := jws.StandardHeaders{}
 		h.JWSx509CertChain = []string{"invalid-cert"}
 		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
@@ -1282,6 +1284,11 @@ func TestCrypto_doConfigure(t *testing.T) {
 		assert.EqualError(t, err, "error checking for existing truststore: stat crypto.go/truststore.pem: not a directory")
 	})
 	t.Run("error - keySize is too small", func(t *testing.T) {
+		// Switch to strict mode just for this test
+		os.Setenv("NUTS_STRICTMODE", "true")
+		core.NutsConfig().Load(&cobra.Command{})
+		defer core.NutsConfig().Load(&cobra.Command{})
+		defer os.Unsetenv("NUTS_STRICTMODE")
 		e := defaultBackend(t.Name())
 		e.Config.Keysize = 2047
 		err := e.doConfigure()
@@ -1367,11 +1374,11 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 
 	t.Run("incorrect public key returns error", func(t *testing.T) {
 		plainText := "Secret"
-		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		key := test.GenerateRSAKey()
 		pub := key.PublicKey
 		pub.E = 0
 
-		_, err = client.encryptPlainTextWith([]byte(plainText), &pub)
+		_, err := client.encryptPlainTextWith([]byte(plainText), &pub)
 
 		if err == nil {
 			t.Errorf("Expected error, Got nothing")
@@ -1408,6 +1415,7 @@ func defaultBackend(name string) *Crypto {
 		Config:     DefaultCryptoConfig(),
 		trustStore: &trustStore,
 	}
+	backend.Config.Keysize = 1024
 
 	return &backend
 }

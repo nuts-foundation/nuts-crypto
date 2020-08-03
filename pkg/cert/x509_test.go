@@ -1,8 +1,6 @@
 package cert
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
@@ -31,7 +29,7 @@ func Test_serialNumberUniqueness(t *testing.T) {
 }
 
 func TestGetActiveCertificates(t *testing.T) {
-	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	rsaKey := test.GenerateRSAKey()
 
 	t.Run("no keys", func(t *testing.T) {
 		certificates := GetActiveCertificates(make([]interface{}, 0), time.Now())
