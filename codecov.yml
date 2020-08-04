@@ -1,5 +1,6 @@
 ignore:
   - "api/generated.go" # ignore generated code
   - "test/*"
+  - "**/test.go"
   - "pkg/client.go" # codecov bug, ignore interface file
   - "doc/*"

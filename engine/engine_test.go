@@ -25,6 +25,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
 	"github.com/nuts-foundation/nuts-go-core/mock"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -69,16 +70,13 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 }
 
 func TestNewCryptoEngine_Cmd(t *testing.T) {
-	defer emptyTemp()
-
 	os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
 	defer os.Unsetenv("NUTS_IDENTITY")
 	core.NutsConfig().Load(&cobra.Command{})
 
 	e := NewCryptoEngine()
-	c := pkg.CryptoInstance()
-	c.Config.Fspath = "../temp"
-	c.Configure()
+	testDirectory := io.TestDirectory(t)
+	c := pkg.NewTestCryptoInstance(testDirectory)
 	c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
 	cmd := e.Cmd
 
@@ -121,7 +119,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		assert.Equal(t, "Error printing publicKey: could not open entry [legalEntityMissing|] with filename ../temp/bGVnYWxFbnRpdHlNaXNzaW5n_private.pem: entry not found", buf.String())
+		assert.Contains(t, buf.String(), "Error printing publicKey: could not open entry [legalEntityMissing|] with filename")
 	})
 
 	t.Run("Running publicKey returns pem", func(t *testing.T) {
@@ -199,12 +197,4 @@ func newRootCommand() *cobra.Command {
 	}
 
 	return testRootCommand
-}
-
-func emptyTemp() {
-	err := os.RemoveAll("../temp/")
-
-	if err != nil {
-		println(err.Error())
-	}
 }

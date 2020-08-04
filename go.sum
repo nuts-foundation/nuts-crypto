@@ -204,6 +204,10 @@ github.com/nuts-foundation/nuts-go-core v0.14.1-0.20200624084031-6308007d25dc h1
 github.com/nuts-foundation/nuts-go-core v0.14.1-0.20200624084031-6308007d25dc/go.mod h1:zn4htpIzJ9ap5HYF8l4enNsf75Bq83kK/+B1pd/kflU=
 github.com/nuts-foundation/nuts-go-core v0.14.1-0.20200624131634-75b5f59c0b8e h1:Ums7038f7Y0sOx/MnXIrLwFNbQPwpeGDU6K3feSXlSI=
 github.com/nuts-foundation/nuts-go-core v0.14.1-0.20200624131634-75b5f59c0b8e/go.mod h1:zn4htpIzJ9ap5HYF8l4enNsf75Bq83kK/+B1pd/kflU=
+github.com/nuts-foundation/nuts-go-test v0.0.0-20200804134805-ee013d73946d h1:nY2IUdRpJOY9+khqJ0/0S7s+OYj5eH1smYmvozLfoDE=
+github.com/nuts-foundation/nuts-go-test v0.0.0-20200804134805-ee013d73946d/go.mod h1:qPVb0UQ/J+TwlA5hJ8+jY+DYPEOA8YmmRt0a+CoeFTY=
+github.com/nuts-foundation/nuts-go-test v0.0.0-20200804135944-9e05711330e7 h1:VziZq58F/ofSJ0nf7dcT7xxyrYh5EsQELy/Fw8bQGrU=
+github.com/nuts-foundation/nuts-go-test v0.0.0-20200804135944-9e05711330e7/go.mod h1:qPVb0UQ/J+TwlA5hJ8+jY+DYPEOA8YmmRt0a+CoeFTY=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
