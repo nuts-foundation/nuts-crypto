@@ -3,13 +3,15 @@ package storage
 import (
 	"encoding/pem"
 	"fmt"
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,9 +38,7 @@ sA7xv2k51lnp+CmY20vz5FMXWlktmgQN3J9uKIMlBQ4=
 var key = types.KeyForEntity(types.LegalEntity{URI: "Some Entity"})
 
 func Test_fs_SaveThenLoadCertificate(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
+	storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 	t.Run("save certificate", func(t *testing.T) {
 		block, rest := pem.Decode([]byte(testCert))
 		if !assert.Len(t, rest, 0, "unable to decode cert") {
@@ -57,21 +57,21 @@ func Test_fs_SaveThenLoadCertificate(t *testing.T) {
 }
 
 func Test_fs_GetCertificate(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
 	t.Run("entry does not exist", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		certificate, err := storage.GetCertificate(types.KeyForEntity(types.LegalEntity{URI: "abc"}))
 		assert.Nil(t, certificate)
 		assert.Error(t, err)
 	})
 	t.Run("incorrect certificate", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		storage.SaveCertificate(key, []byte{1, 2, 3})
 		certificate, err := storage.GetCertificate(key)
 		assert.Nil(t, certificate)
 		assert.Error(t, err)
 	})
 	t.Run("trailing bytes", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		block, _ := pem.Decode([]byte(testCert))
 		err := storage.SaveCertificate(key, block.Bytes)
 		if !assert.NoError(t, err) {
@@ -90,14 +90,14 @@ func Test_fs_GetCertificate(t *testing.T) {
 }
 
 func Test_fs_GetPublicKey(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
 	t.Run("non-existing entry", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		key, err := storage.GetPublicKey(key)
-		assert.EqualError(t, err, "could not open entry [Some Entity|] with filename temp/Test_fs_GetPublicKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		assert.Contains(t, err.Error(), "could not open entry [Some Entity|] with filename")
 		assert.Nil(t, key)
 	})
 	t.Run("ok", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		pk := test.GenerateRSAKey()
 		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
@@ -113,15 +113,14 @@ func Test_fs_GetPublicKey(t *testing.T) {
 }
 
 func Test_fs_GetPrivateKey(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
 	t.Run("non-existing entry", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		key, err := storage.GetPrivateKey(key)
-		assert.EqualError(t, err, "could not open entry [Some Entity|] with filename temp/Test_fs_GetPrivateKey/U29tZSBFbnRpdHk=_private.pem: entry not found", "error")
+		assert.Contains(t, err.Error(), "could not open entry [Some Entity|] with filename")
 		assert.Nil(t, key)
 	})
 	t.Run("private key invalid", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		path := storage.getEntryPath(key, privateKeyEntry)
 		file, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 		_, err := file.WriteString("hello world")
@@ -133,6 +132,7 @@ func Test_fs_GetPrivateKey(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		pk := test.GenerateRSAKey()
 		err := storage.SavePrivateKey(key, pk)
 		if !assert.NoError(t, err) {
@@ -148,13 +148,12 @@ func Test_fs_GetPrivateKey(t *testing.T) {
 }
 
 func Test_fs_KeyExistsFor(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
 	t.Run("non-existing entry", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		assert.False(t, storage.PrivateKeyExists(key))
 	})
 	t.Run("existing entry", func(t *testing.T) {
+		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 		privateKey := test.GenerateRSAKey()
 		storage.SavePrivateKey(key, privateKey)
 		assert.True(t, storage.PrivateKeyExists(key))
@@ -162,9 +161,7 @@ func Test_fs_KeyExistsFor(t *testing.T) {
 }
 
 func Test_fs_CertificateExistsFor(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
+	storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 	t.Run("ok - non-existing entry", func(t *testing.T) {
 		assert.False(t, storage.CertificateExists(key))
 	})
@@ -186,11 +183,9 @@ func Test_fs_CertificateExistsFor(t *testing.T) {
 }
 
 func Test_fs_GetExpiringCertificates(t *testing.T) {
-	storage := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
 	// expires in 8 days
 	rsaKey := test.GenerateRSAKey()
+	storage, _ := NewFileSystemBackend(io.TestDirectory(t))
 	storage.SaveCertificate(key, test.GenerateCertificate(time.Now().AddDate(0, 0, -1), 9, rsaKey))
 
 	t.Run("Expiring certificate is found within correct period", func(t *testing.T) {
@@ -208,30 +203,11 @@ func Test_fs_GetExpiringCertificates(t *testing.T) {
 	})
 
 	t.Run("returns error when certificate with incorrect format is on the path", func(t *testing.T) {
-		storage := createTempStorage(t.Name())
-		defer emptyTemp(t.Name())
-
-		fileName := fmt.Sprintf("temp/%s/incorrect_%s", t.Name(), certificateEntry)
-		_ = os.MkdirAll(fmt.Sprintf("temp/%s", t.Name()), 0644)
-		_ = ioutil.WriteFile(fileName, []byte("this will return an error, this is not PEM encoded"), 0644)
+		testDirectory := io.TestDirectory(t)
+		storage, _ := NewFileSystemBackend(testDirectory)
+		_ = ioutil.WriteFile(path.Join(testDirectory, fmt.Sprintf("incorrect_%s", certificateEntry)), []byte("this will return an error, this is not PEM encoded"), 0644)
 
 		_, err := storage.GetExpiringCertificates(time.Now(), time.Now())
 		assert.Error(t, err)
 	})
-}
-
-func createTempStorage(name string) *fileSystemBackend {
-	b, _ := NewFileSystemBackend(fmt.Sprintf("temp/%s", name))
-	return b
-}
-
-func emptyTemp(name string) {
-	err := os.RemoveAll(fmt.Sprintf("temp/%s", name))
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove("temp")
-	if err != nil {
-		println(err.Error())
-	}
 }

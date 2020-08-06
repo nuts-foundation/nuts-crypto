@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/nuts-foundation/nuts-crypto/test"
 	"reflect"
 	"strings"
 	"testing"
@@ -32,7 +33,6 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
-	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/stretchr/testify/assert"
 )
 

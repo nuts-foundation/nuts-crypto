@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/http"
@@ -79,7 +80,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 		defer os.Unsetenv("NUTS_IDENTITY")
 		core.NutsConfig().Load(&cobra.Command{})
 
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -89,7 +90,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 		se.GenerateVendorCACSR(echo, GenerateVendorCACSRParams{Name: "foo"})
 	})
 	t.Run("error - vendor name is empty", func(t *testing.T) {
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -98,7 +99,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 		assert.EqualError(t, err, "code=400, message=name is invalid")
 	})
 	t.Run("error - vendor ID not set", func(t *testing.T) {
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -110,7 +111,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in PEM format", func(t *testing.T) {
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -122,7 +123,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in JWK format", func(t *testing.T) {
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -134,7 +135,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("GenerateKeyPairAPI returns error if generating the key gives an error", func(t *testing.T) {
-		se := apiWrapper()
+		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -174,10 +175,9 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 }
 
 func TestApiWrapper_Encrypt(t *testing.T) {
-	client := apiWrapper()
+	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
 	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
-	defer emptyTemp()
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key)
 	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
@@ -441,10 +441,9 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 }
 
 func TestApiWrapper_Decrypt(t *testing.T) {
-	client := apiWrapper()
+	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
 	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
-	defer emptyTemp()
 
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key)
@@ -650,8 +649,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 }
 
 func TestApiWrapper_ExternalIdFor(t *testing.T) {
-	client := apiWrapper()
-	defer emptyTemp()
+	client := apiWrapper(t)
 
 	subject := Identifier("test")
 	actor := Identifier("test")
@@ -833,8 +831,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Sign(t *testing.T) {
-	client := apiWrapper()
-	defer emptyTemp()
+	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key)
 
@@ -943,8 +940,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 }
 
 func TestApiWrapper_SignJwt(t *testing.T) {
-	client := apiWrapper()
-	defer emptyTemp()
+	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key)
 
@@ -1032,8 +1028,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 }
 
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
-	client := apiWrapper()
-	defer emptyTemp()
+	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key)
 
@@ -1135,8 +1130,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 
 	t.Run("All OK returns 200", func(t *testing.T) {
-		client := apiWrapper()
-		defer emptyTemp()
+		client := apiWrapper(t)
 
 		client.C.GenerateKeyPair(key)
 
@@ -1188,8 +1182,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 
 	t.Run("Broken key returns 400", func(t *testing.T) {
-		client := apiWrapper()
-		defer emptyTemp()
+		client := apiWrapper(t)
 
 		client.C.GenerateKeyPair(key)
 
@@ -1245,8 +1238,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 }
 
 func TestApiWrapper_PublicKey(t *testing.T) {
-	client := apiWrapper()
-	defer emptyTemp()
+	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key)
 
@@ -1306,31 +1298,15 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	})
 }
 
-func apiWrapper() *ApiWrapper {
-	backend := pkg.Crypto{
-		Storage: createTempStorage(),
+func apiWrapper(t *testing.T) *ApiWrapper {
+	backend, _ := storage.NewFileSystemBackend(io.TestDirectory(t))
+	crypto := pkg.Crypto{
+		Storage: backend,
 		Config:  pkg.DefaultCryptoConfig(),
 	}
-	backend.Config.Keysize = 1024
+	crypto.Config.Keysize = 1024
 
-	return &ApiWrapper{C: &backend}
-}
-
-func createTempStorage() storage.Storage {
-	b, _ := storage.NewFileSystemBackend("../../temp")
-	return b
-}
-
-func emptyTemp() {
-	err := os.RemoveAll("../../temp/")
-
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove("temp")
-	if err != nil {
-		println(err.Error())
-	}
+	return &ApiWrapper{C: &crypto}
 }
 
 type errorCloser struct{}

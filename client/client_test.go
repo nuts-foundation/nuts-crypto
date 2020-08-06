@@ -4,6 +4,7 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -14,12 +15,12 @@ func TestConfigureCryptoClient(t *testing.T) {
 	t.Run("ok - server mode", func(t *testing.T) {
 		globalConfig := core.NewNutsGlobalConfig()
 		globalConfig.Load(&cobra.Command{})
-		client := configureClient(pkg.CryptoInstance(), globalConfig)
+		client := configureClient(pkg.NewTestCryptoInstance(io.TestDirectory(t)), globalConfig)
 		assert.NotNil(t, client)
 		assert.IsType(t, &pkg.Crypto{}, client)
 	})
 	t.Run("ok - CLI mode", func(t *testing.T) {
-		client := configureClient(&pkg.Crypto{Config: pkg.DefaultCryptoConfig()}, testConfig{})
+		client := configureClient(&pkg.Crypto{Config: pkg.TestCryptoConfig(io.TestDirectory(t))}, testConfig{})
 		assert.NotNil(t, client)
 		assert.IsType(t, api.HttpClient{}, client)
 	})
@@ -29,7 +30,7 @@ func TestConfigureCryptoClient(t *testing.T) {
 		core.NutsConfig().Load(&cobra.Command{})
 		defer core.NutsConfig().Load(&cobra.Command{})
 		defer os.Unsetenv("NUTS_STRICTMODE")
-		instance := &pkg.Crypto{Config: pkg.DefaultCryptoConfig()}
+		instance := &pkg.Crypto{Config: pkg.TestCryptoConfig(io.TestDirectory(t))}
 		instance.Config.Keysize = 1
 		assert.Panics(t, func() {
 			configureClient(instance, core.NutsConfig())

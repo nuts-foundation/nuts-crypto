@@ -29,6 +29,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"os"
 	"reflect"
 	"strings"
@@ -38,15 +40,13 @@ import (
 	core "github.com/nuts-foundation/nuts-go-core"
 	"github.com/spf13/cobra"
 
+	"github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwe/aescbc"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
 	"github.com/lestrrat-go/jwx/jws/sign"
 	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
-	"github.com/nuts-foundation/nuts-crypto/test"
-
-	"github.com/dgrijalva/jwt-go"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -68,8 +68,9 @@ func TestCryptoBackend(t *testing.T) {
 }
 
 func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
-	defer emptyTemp(t.Name())
-	client := defaultBackend(t.Name())
+	createCrypto(t)
+
+	client := createCrypto(t)
 
 	t.Run("A new key pair is stored at config location", func(t *testing.T) {
 		_, err := client.GenerateKeyPair(key)
@@ -92,10 +93,8 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 	})
 
 	t.Run("A keySize too small generates an error", func(t *testing.T) {
-		client := Crypto{
-			Storage: createTempStorage(t.Name()),
-			Config:  CryptoConfig{Keysize: 1},
-		}
+		client := createCrypto(t)
+		client.Config.Keysize = 1
 
 		_, err := client.GenerateKeyPair(key)
 
@@ -108,8 +107,9 @@ func TestDefaultCryptoBackend_GenerateKeyPair(t *testing.T) {
 }
 
 func TestCrypto_DecryptCipherTextFor(t *testing.T) {
-	defer emptyTemp(t.Name())
-	client := defaultBackend(t.Name())
+	createCrypto(t)
+
+	client := createCrypto(t)
 	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
@@ -138,8 +138,9 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 }
 
 func TestCrypto_encryptPlainTextFor(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 
 	t.Run("encryption for unknown legalEntity gives error", func(t *testing.T) {
 		key := types.KeyForEntity(types.LegalEntity{URI: "testEncrypt"})
@@ -154,8 +155,9 @@ func TestCrypto_encryptPlainTextFor(t *testing.T) {
 }
 
 func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
-	defer emptyTemp(t.Name())
-	client := defaultBackend(t.Name())
+	createCrypto(t)
+
+	client := createCrypto(t)
 	t.Run("returns error for unsupported algorithm", func(t *testing.T) {
 		plaintext := "for your eyes only"
 
@@ -170,9 +172,10 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 }
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
-	client := defaultBackend(t.Name())
+	client := createCrypto(t)
 	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
@@ -273,9 +276,10 @@ func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 }
 
 func TestCrypto_SignFor(t *testing.T) {
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	t.Run("error - private key does not exist", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		sig, err := client.Sign([]byte{1, 2, 3}, key)
 		assert.Error(t, err)
 		assert.Nil(t, sig)
@@ -283,11 +287,13 @@ func TestCrypto_SignFor(t *testing.T) {
 }
 
 func TestCrypto_VerifyWith(t *testing.T) {
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	t.Run("A signed piece of data can be verified", func(t *testing.T) {
 		data := []byte("hello")
-		client := defaultBackend(t.Name())
-		defer emptyTemp(t.Name())
+		client := createCrypto(t)
+		createCrypto(t)
+
 		client.GenerateKeyPair(key)
 
 		sig, err := client.Sign(data, key)
@@ -313,8 +319,9 @@ func TestCrypto_VerifyWith(t *testing.T) {
 		}
 	})
 	t.Run("error - signature invalid", func(t *testing.T) {
-		client := defaultBackend(t.Name())
-		defer emptyTemp(t.Name())
+		client := createCrypto(t)
+		createCrypto(t)
+
 		client.GenerateKeyPair(key)
 		keyAsJWK, _ := client.GetPublicKeyAsJWK(key)
 		result, err := client.VerifyWith([]byte("hello"), []byte{1, 2, 3}, keyAsJWK)
@@ -324,8 +331,9 @@ func TestCrypto_VerifyWith(t *testing.T) {
 }
 
 func TestCrypto_ExternalIdFor(t *testing.T) {
-	defer emptyTemp(t.Name())
-	client := defaultBackend(t.Name())
+	createCrypto(t)
+
+	client := createCrypto(t)
 	client.GenerateKeyPair(key)
 
 	t.Run("ExternalId creates same Id for given identifier and key", func(t *testing.T) {
@@ -383,8 +391,9 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 }
 
 func TestCrypto_PublicKeyInPem(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
@@ -412,8 +421,9 @@ func TestCrypto_PublicKeyInPem(t *testing.T) {
 }
 
 func TestCrypto_PublicKeyInJWK(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 
 	t.Run("Public key is returned from storage", func(t *testing.T) {
@@ -434,8 +444,9 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 }
 
 func TestCrypto_SignJwtFor(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 
 	t.Run("creates valid JWT", func(t *testing.T) {
@@ -489,8 +500,9 @@ func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error
 }
 
 func TestCrypto_SignJWS(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	key := types.KeyForEntity(types.LegalEntity{URI: t.Name()})
 	privateKey := test.GenerateRSAKey()
 	_ = client.Storage.SavePrivateKey(key, privateKey)
@@ -524,8 +536,9 @@ func TestCrypto_SignJWS(t *testing.T) {
 
 // Tests both SignJWSEphemeral and VerifyJWS functions
 func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	selfSignCertificate := func(key types.KeyIdentifier, keyUsage x509.KeyUsage) *x509.Certificate {
 		client.GenerateKeyPair(key)
 		privateKey, _ := client.GetPrivateKey(key)
@@ -673,8 +686,9 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 }
 
 func TestCrypto_GenerateVendorCACSR(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 
 	t.Run("ok", func(t *testing.T) {
 		csrAsBytes, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
@@ -733,8 +747,9 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 }
 
 func TestCrypto_StoreVendorCACertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 
 	t.Run("ok - private key exists", func(t *testing.T) {
 		client.GenerateKeyPair(key)
@@ -745,8 +760,9 @@ func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	t.Run("error - private key does not exist", func(t *testing.T) {
-		client := defaultBackend(t.Name())
-		defer emptyTemp(t.Name())
+		client := createCrypto(t)
+		createCrypto(t)
+
 		privateKey, _ := client.generateKeyPair()
 		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
@@ -769,8 +785,9 @@ func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 }
 
 func TestCrypto_GetSigningCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
 		Country:      []string{"NL"},
@@ -819,15 +836,16 @@ func TestCrypto_GetSigningCertificate(t *testing.T) {
 		certificateAsASN1 := test.GenerateCertificate(time.Now(), 1, privateKey)
 		client.Storage.SaveCertificate(key2.WithQualifier(SigningCertificateQualifier), certificateAsASN1)
 		certificate, pk, err := client.GetSigningCertificate(entity2)
-		assert.EqualError(t, err, "unable to retrieve private key for certificate: [foobar2|sign]: could not open entry [foobar2|sign] with filename temp/TestCrypto_GetSigningCertificate/Zm9vYmFyMg==_sign_private.pem: entry not found")
+		assert.Contains(t, err.Error(), "unable to retrieve private key for certificate: [foobar2|sign]: could not open entry [foobar2|sign] with filename")
 		assert.Nil(t, certificate)
 		assert.Nil(t, pk)
 	})
 }
 
 func TestCrypto_RenewSigningCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
 		Country:      []string{"NL"},
@@ -849,8 +867,9 @@ func TestCrypto_RenewSigningCertificate(t *testing.T) {
 }
 
 func TestCrypto_issueSubCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
 		Country:      []string{"NL"},
@@ -884,7 +903,7 @@ func TestCrypto_issueSubCertificate(t *testing.T) {
 	})
 	t.Run("error - CA certificate not found", func(t *testing.T) {
 		certificate, privateKey, err := client.issueSubCertificate(types.LegalEntity{"foobar"}, "test", CertificateProfile{})
-		assert.EqualError(t, err, "unable to retrieve CA certificate [foobar|]: could not open entry [foobar|] with filename temp/TestCrypto_issueSubCertificate/Zm9vYmFy_certificate.pem: entry not found")
+		assert.Contains(t, err.Error(), "unable to retrieve CA certificate [foobar|]: could not open entry [foobar|] with filename")
 		assert.Nil(t, certificate)
 		assert.Nil(t, privateKey)
 	})
@@ -913,8 +932,9 @@ func TestCrypto_issueSubCertificate(t *testing.T) {
 }
 
 func TestCrypto_GetTLSCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
 		Country:      []string{"NL"},
@@ -948,8 +968,9 @@ func TestCrypto_GetTLSCertificate(t *testing.T) {
 }
 
 func TestCrypto_RenewTLSCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 	caCertificate, err := selfSignCACertificateEx(client, key, pkix.Name{
 		Country:      []string{"NL"},
@@ -988,8 +1009,9 @@ func TestCrypto_RenewTLSCertificate(t *testing.T) {
 }
 
 func TestCrypto_SignCertificate(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	ca := key
 	client.GenerateKeyPair(ca)
 	caPrivateKey, _ := client.GetPrivateKey(ca)
@@ -997,11 +1019,6 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	intermediateCaKey := types.KeyForEntity(types.LegalEntity{URI: "Intermediate CA"})
 
 	roots := x509.NewCertPool()
-
-	var emptyStore = func() {
-		emptyTemp(t.Name())
-		client = defaultBackend(t.Name())
-	}
 
 	t.Run("self-sign CSR", func(t *testing.T) {
 		certificate, err := selfSignCACertificate(client, ca)
@@ -1180,7 +1197,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("unknown CA: private key missing", func(t *testing.T) {
 		// Setup
-		emptyStore()
+		client := createCrypto(t)
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
 		}
@@ -1197,7 +1214,7 @@ func TestCrypto_SignCertificate(t *testing.T) {
 
 	t.Run("unknown CA: certificate missing", func(t *testing.T) {
 		// Setup
-		emptyStore()
+		client := createCrypto(t)
 		client.GenerateKeyPair(ca)
 		csrTemplate := x509.CertificateRequest{
 			Subject: pkix.Name{CommonName: endEntityKey.Owner()},
@@ -1217,8 +1234,9 @@ func TestCrypto_SignCertificate(t *testing.T) {
 }
 
 func TestCrypto_GetPrivateKey(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	t.Run("private key not found", func(t *testing.T) {
 		pk, err := client.GetPrivateKey(key)
 		assert.Nil(t, pk)
@@ -1243,8 +1261,9 @@ func TestCrypto_GetPrivateKey(t *testing.T) {
 }
 
 func TestCrypto_KeyExistsFor(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 	client.GenerateKeyPair(key)
 
 	t.Run("returns true for existing key", func(t *testing.T) {
@@ -1258,12 +1277,12 @@ func TestCrypto_KeyExistsFor(t *testing.T) {
 
 func TestCrypto_doConfigure(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		err := e.doConfigure()
 		assert.NoError(t, err)
 	})
 	t.Run("ok - default = fs backend", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		err := client.doConfigure()
 		if !assert.NoError(t, err) {
 			return
@@ -1272,13 +1291,13 @@ func TestCrypto_doConfigure(t *testing.T) {
 		assert.Equal(t, "*storage.fileSystemBackend", storageType)
 	})
 	t.Run("error - unknown backend", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		client.Config.Storage = "unknown"
 		err := client.doConfigure()
 		assert.EqualErrorf(t, err, "only fs backend available for now", "expected error")
 	})
 	t.Run("error - fs path invalid", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		client.Config.Fspath = "crypto.go"
 		err := client.doConfigure()
 		assert.EqualError(t, err, "error checking for existing truststore: stat crypto.go/truststore.pem: not a directory")
@@ -1289,7 +1308,7 @@ func TestCrypto_doConfigure(t *testing.T) {
 		core.NutsConfig().Load(&cobra.Command{})
 		defer core.NutsConfig().Load(&cobra.Command{})
 		defer os.Unsetenv("NUTS_STRICTMODE")
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		e.Config.Keysize = 2047
 		err := e.doConfigure()
 		assert.EqualError(t, err, ErrInvalidKeySize.Error())
@@ -1297,9 +1316,10 @@ func TestCrypto_doConfigure(t *testing.T) {
 }
 
 func TestCrypto_Configure(t *testing.T) {
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	t.Run("ok - configOnce", func(t *testing.T) {
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		assert.False(t, e.configDone)
 		err := e.Configure()
 		if !assert.NoError(t, err) {
@@ -1313,13 +1333,13 @@ func TestCrypto_Configure(t *testing.T) {
 		assert.True(t, e.configDone)
 	})
 	t.Run("ok - server mode", func(t *testing.T) {
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		e.Config.Keysize = 4096
 		err := e.Configure()
 		assert.NoError(t, err)
 	})
 	t.Run("ok - client mode", func(t *testing.T) {
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		e.Storage = nil
 		e.Config.Mode = core.ClientEngineMode
 		err := e.Configure()
@@ -1328,7 +1348,7 @@ func TestCrypto_Configure(t *testing.T) {
 		assert.Nil(t, e.Storage)
 	})
 	t.Run("error - keySize is too small", func(t *testing.T) {
-		e := defaultBackend(t.Name())
+		e := createCrypto(t)
 		assert.False(t, e.configDone)
 		err := e.Configure()
 		if !assert.NoError(t, err) {
@@ -1344,18 +1364,20 @@ func TestCrypto_Configure(t *testing.T) {
 }
 
 func TestCryptoConfig_TrustStore(t *testing.T) {
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	t.Run("ok", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		client.doConfigure()
 		assert.NotNil(t, client.TrustStore())
 	})
 }
 
 func TestCrypto_TrustStore(t *testing.T) {
-	defer emptyTemp(t.Name())
+	createCrypto(t)
+
 	t.Run("ok", func(t *testing.T) {
-		client := defaultBackend(t.Name())
+		client := createCrypto(t)
 		client.doConfigure()
 		assert.NotNil(t, client.TrustStore())
 	})
@@ -1369,8 +1391,9 @@ func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
 }
 
 func TestCrypto_encryptPlainTextWith(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 
 	t.Run("incorrect public key returns error", func(t *testing.T) {
 		plainText := "Secret"
@@ -1393,8 +1416,9 @@ func TestCrypto_encryptPlainTextWith(t *testing.T) {
 }
 
 func TestCrypto_Start(t *testing.T) {
-	client := defaultBackend(t.Name())
-	defer emptyTemp(t.Name())
+	client := createCrypto(t)
+	createCrypto(t)
+
 
 	t.Run("adds 3 certificate monitors", func(t *testing.T) {
 		client.Start()
@@ -1404,45 +1428,22 @@ func TestCrypto_Start(t *testing.T) {
 	})
 }
 
-func defaultBackend(name string) *Crypto {
+func createCrypto(t *testing.T) *Crypto {
 	os.Setenv("NUTS_IDENTITY", entity.URI)
 	if err := core.NutsConfig().Load(&cobra.Command{}); err != nil {
 		panic(err)
 	}
 	trustStore := poolCertVerifier{}
-	backend := Crypto{
-		Storage:    createTempStorage(name),
-		Config:     DefaultCryptoConfig(),
+	dir := io.TestDirectory(t)
+	backend, _ := storage.NewFileSystemBackend(dir)
+	crypto := Crypto{
+		Storage:    backend,
+		Config:     TestCryptoConfig(dir),
 		trustStore: &trustStore,
 	}
-	backend.Config.Keysize = 1024
+	crypto.Config.Keysize = 1024
 
-	return &backend
-}
-
-func createTempStorage(name string) storage.Storage {
-	b, _ := storage.NewFileSystemBackend(fmt.Sprintf("temp/%s", name))
-	return b
-}
-
-func emptyTemp(name string) {
-	err := os.RemoveAll(fmt.Sprintf("temp/%s", name))
-
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove(fmt.Sprintf("temp/%s", name))
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove("temp")
-	if err != nil {
-		println(err.Error())
-	}
-	err = os.Remove("truststore.pem")
-	if err != nil {
-		println(err.Error())
-	}
+	return &crypto
 }
 
 func selfSignCACertificate(client Client, key types.KeyIdentifier) (*x509.Certificate, error) {

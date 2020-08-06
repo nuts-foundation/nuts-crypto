@@ -407,11 +407,15 @@ var oneBackend sync.Once
 
 func CryptoInstance() *Crypto {
 	oneBackend.Do(func() {
-		instance = &Crypto{
-			Config: DefaultCryptoConfig(),
-		}
+		instance = NewCryptoInstance(DefaultCryptoConfig())
 	})
 	return instance
+}
+
+func NewCryptoInstance(config CryptoConfig) *Crypto {
+	return &Crypto{
+		Config: config,
+	}
 }
 
 // Configure loads the given configurations in the engine. Any wrong combination will return an error

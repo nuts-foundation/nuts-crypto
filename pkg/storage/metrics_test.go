@@ -19,19 +19,18 @@
 package storage
 
 import (
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"testing"
 	"time"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"github.com/nuts-foundation/nuts-crypto/test"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCertificateMonitor_Start(t *testing.T) {
-	fs := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
+	fs, _ := NewFileSystemBackend(io.TestDirectory(t))
 	t.Run("Starting a monitor twice returns an error", func(t *testing.T) {
 		m := CertificateMonitor{
 			period:      time.Hour,
@@ -74,8 +73,7 @@ func TestCertificateMonitor_Start(t *testing.T) {
 
 func TestCertificateMonitor_init(t *testing.T) {
 	metric = nil
-	fs := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
+	fs, _ := NewFileSystemBackend(io.TestDirectory(t))
 	m := CertificateMonitor{
 		period:      time.Hour,
 		periodLabel: "hour",
@@ -90,9 +88,7 @@ func TestCertificateMonitor_init(t *testing.T) {
 }
 
 func TestCertificateMonitor_checkExpiry(t *testing.T) {
-	fs := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
+	fs, _ := NewFileSystemBackend(io.TestDirectory(t))
 	m := CertificateMonitor{
 		period:      time.Hour * 48,
 		periodLabel: "within_2_days",
@@ -139,9 +135,7 @@ func TestCertificateMonitor_checkExpiry(t *testing.T) {
 }
 
 func TestDefaultCertificateMonitors(t *testing.T) {
-	fs := createTempStorage(t.Name())
-	defer emptyTemp(t.Name())
-
+	fs, _ := NewFileSystemBackend(io.TestDirectory(t))
 	t.Run("it returns three monitors", func(t *testing.T) {
 		certMonitors := DefaultCertificateMonitors(fs)
 

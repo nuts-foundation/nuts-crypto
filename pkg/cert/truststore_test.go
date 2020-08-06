@@ -6,7 +6,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -82,7 +84,7 @@ func TestNewTrustStore(t *testing.T) {
 }
 
 func Test_fileTrustStore_AddCertificate(t *testing.T) {
-	const file = "../../test/addcert.pem"
+	var file = path.Join(io.TestDirectory(t), "addcert.pem")
 	privateKey := test.GenerateRSAKey()
 	t.Run("ok", func(t *testing.T) {
 		os.Remove(file)
