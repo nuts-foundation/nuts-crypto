@@ -406,6 +406,9 @@ var instance *Crypto
 var oneBackend sync.Once
 
 func CryptoInstance() *Crypto {
+	if instance != nil {
+		return instance
+	}
 	oneBackend.Do(func() {
 		instance = NewCryptoInstance(DefaultCryptoConfig())
 	})

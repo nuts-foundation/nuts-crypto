@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 	"testing"
 )
@@ -74,11 +75,10 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 	defer os.Unsetenv("NUTS_IDENTITY")
 	core.NutsConfig().Load(&cobra.Command{})
 
-	e := NewCryptoEngine()
 	testDirectory := io.TestDirectory(t)
-	c := pkg.NewTestCryptoInstance(testDirectory)
-	c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
-	cmd := e.Cmd
+	cryptoInstance := pkg.NewTestCryptoInstance(testDirectory)
+	cryptoInstance.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
+	cmd := NewCryptoEngine().Cmd
 
 	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {
 		cmd.SetArgs([]string{"generateKeyPair"})
@@ -147,15 +147,31 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 	})
 
 	t.Run("Running generateVendorCACSR returns CSR", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		cmd.SetArgs([]string{"generate-vendor-csr", "foo"})
-		cmd.SetOut(buf)
-		err := cmd.Execute()
+		t.Run("write to console", func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"generate-vendor-csr", "foo"})
+			cmd.SetOut(buf)
+			err := cmd.Execute()
 
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.Contains(t, buf.String(), "BEGIN CERTIFICATE REQUEST")
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), "BEGIN CERTIFICATE REQUEST")
+		})
+		t.Run("write to file", func(t *testing.T) {
+			testDirectory := io.TestDirectory(t)
+			outputFile := path.Join(testDirectory, "csr.pem")
+			cmd.SetArgs([]string{"generate-vendor-csr", "foo", outputFile})
+			err := cmd.Execute()
+			if !assert.NoError(t, err) {
+				return
+			}
+			data, err := ioutil.ReadFile(outputFile)
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t, string(data), "BEGIN CERTIFICATE REQUEST")
+		})
 	})
 }
 
