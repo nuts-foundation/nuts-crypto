@@ -25,24 +25,17 @@ import (
 
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/sirupsen/logrus"
 )
 
 // NewCryptoClient creates a new local or remote client, depending on engine configuration.
 func NewCryptoClient() pkg.Client {
-	return configureClient(pkg.CryptoInstance(), core.NutsConfig())
-}
-
-func configureClient(cryptoClient *pkg.Crypto, globalConfig core.NutsConfigValues) pkg.Client {
-	if globalConfig.GetEngineMode(cryptoClient.Config.Mode) == core.ServerEngineMode {
-		if err := cryptoClient.Configure(); err != nil {
-			logrus.Panic(err)
-		}
-		return cryptoClient
+	instance := pkg.CryptoInstance()
+	if core.NutsConfig().GetEngineMode(instance.Config.Mode) == core.ServerEngineMode {
+		return instance
 	} else {
 		return api.HttpClient{
-			ServerAddress: cryptoClient.Config.Address,
-			Timeout:       time.Duration(cryptoClient.Config.ClientTimeout) * time.Second,
+			ServerAddress: instance.Config.Address,
+			Timeout:       time.Duration(instance.Config.ClientTimeout) * time.Second,
 		}
 	}
 }
