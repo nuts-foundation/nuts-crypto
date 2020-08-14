@@ -89,6 +89,14 @@ func Test_fs_GetCertificate(t *testing.T) {
 	})
 }
 
+func Test_NewFileSystemBackend(t *testing.T) {
+	t.Run("error - path is empty", func(t *testing.T) {
+		storage, err := NewFileSystemBackend("")
+		assert.EqualError(t, err, "filesystem path is empty")
+		assert.Nil(t, storage)
+	})
+}
+
 func Test_fs_GetPublicKey(t *testing.T) {
 	t.Run("non-existing entry", func(t *testing.T) {
 		storage, _ := NewFileSystemBackend(io.TestDirectory(t))
