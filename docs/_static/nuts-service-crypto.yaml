@@ -13,12 +13,18 @@ paths:
       tags:
         - crypto
       parameters:
-        - name:  legalEntity
+        - name: legalEntity
           in: query
           description: "URN identifying the legal entity"
           required: true
           schema:
             $ref: "#/components/schemas/Identifier"
+        - name: overwrite
+          in: query
+          description: "Overwrite key if it already exists"
+          required: false
+          schema:
+            type: boolean
       responses:
         '200':
           description: "OK response, body holds public key in PEM format when accept format is text/plain and JWK format if accept equals application/json"

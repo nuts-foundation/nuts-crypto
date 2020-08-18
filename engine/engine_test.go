@@ -75,102 +75,146 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 	defer os.Unsetenv("NUTS_IDENTITY")
 	core.NutsConfig().Load(&cobra.Command{})
 
-	testDirectory := io.TestDirectory(t)
-	cryptoInstance := pkg.NewTestCryptoInstance(testDirectory)
-	cryptoInstance.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}))
-	cmd := NewCryptoEngine().Cmd
+	createCmd := func(t *testing.T) (*cobra.Command, *pkg.Crypto) {
+		testDirectory := io.TestDirectory(t)
+		instance := pkg.NewTestCryptoInstance(testDirectory)
+		return NewCryptoEngine().Cmd, instance
+	}
 
-	t.Run("Running generateKeyPair with too few arguments gives error", func(t *testing.T) {
-		cmd.SetArgs([]string{"generateKeyPair"})
-		cmd.SetOut(ioutil.Discard)
-		err := cmd.Execute()
+	t.Run("generateKeyPair", func(t *testing.T) {
+		t.Run("error - too few arguments", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			cmd.SetArgs([]string{"generateKeyPair"})
+			cmd.SetOut(ioutil.Discard)
+			err := cmd.Execute()
 
-		if assert.Error(t, err) {
-			assert.Equal(t, "requires a URI argument", err.Error())
-		}
-	})
+			if assert.Error(t, err) {
+				assert.Equal(t, "requires a URI argument", err.Error())
+			}
+		})
 
-	t.Run("Running generateKeyPair returns 'keypair generated'", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		cmd.SetArgs([]string{"generateKeyPair", "legalEntity"})
-		cmd.SetOut(buf)
-		err := cmd.Execute()
-
-		if assert.NoError(t, err) {
-			assert.Equal(t, "KeyPair generated\n", buf.String())
-		}
-	})
-
-	t.Run("Running publicKey with too few arguments gives error", func(t *testing.T) {
-		cmd.SetArgs([]string{"publicKey"})
-		cmd.SetOut(ioutil.Discard)
-		err := cmd.Execute()
-
-		if assert.Error(t, err) {
-			assert.Equal(t, "requires a URI argument", err.Error())
-		}
-	})
-
-	t.Run("Running publicKey returns error if public key does not exist", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		cmd.SetArgs([]string{"publicKey", "legalEntityMissing"})
-		cmd.SetOut(buf)
-		err := cmd.Execute()
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.Contains(t, buf.String(), "Error printing publicKey: could not open entry [legalEntityMissing|] with filename")
-	})
-
-	t.Run("Running publicKey returns pem", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		cmd.SetArgs([]string{"publicKey", "legalEntity"})
-		cmd.SetOut(buf)
-		err := cmd.Execute()
-
-		if assert.NoError(t, err) {
-			assert.Contains(t, buf.String(), "Public key in PEM:")
-			assert.Contains(t, buf.String(), "-----BEGIN PUBLIC KEY-----")
-		}
-	})
-
-	t.Run("Running publicKey returns JWK", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		cmd.SetArgs([]string{"publicKey", "legalEntity"})
-		cmd.SetOut(buf)
-		err := cmd.Execute()
-
-		if assert.NoError(t, err) {
-			assert.Contains(t, buf.String(), "Public key in JWK:")
-			assert.Contains(t, buf.String(), "kty")
-		}
-	})
-
-	t.Run("Running generateVendorCACSR returns CSR", func(t *testing.T) {
-		t.Run("write to console", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			cmd, _ := createCmd(t)
 			buf := new(bytes.Buffer)
-			cmd.SetArgs([]string{"generate-vendor-csr", "foo"})
+			cmd.SetArgs([]string{"generateKeyPair", "legalEntity"})
 			cmd.SetOut(buf)
 			err := cmd.Execute()
 
-			if !assert.NoError(t, err) {
-				return
+			if assert.NoError(t, err) {
+				assert.Contains(t, buf.String(), "KeyPair generated")
 			}
-			assert.Contains(t, buf.String(), "BEGIN CERTIFICATE REQUEST")
 		})
-		t.Run("write to file", func(t *testing.T) {
-			testDirectory := io.TestDirectory(t)
-			outputFile := path.Join(testDirectory, "csr.pem")
-			cmd.SetArgs([]string{"generate-vendor-csr", "foo", outputFile})
+
+		t.Run("ok - overwrite existing", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			cmd.SetArgs([]string{"generateKeyPair", "legalEntity"})
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
 			err := cmd.Execute()
 			if !assert.NoError(t, err) {
 				return
 			}
-			data, err := ioutil.ReadFile(outputFile)
+			assert.Contains(t,  buf.String(), "KeyPair generated")
+			cmd.SetArgs([]string{"generateKeyPair", "legalEntity", "-f"})
+			buf = new(bytes.Buffer)
+			cmd.SetOut(buf)
+			err = cmd.Execute()
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t, string(data), "BEGIN CERTIFICATE REQUEST")
+			assert.Contains(t,  buf.String(), "KeyPair generated")
+		})
+
+		t.Run("error - already exists", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			cmd.SetArgs([]string{"generateKeyPair", "legalEntity"})
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
+			err := cmd.Execute()
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t,  buf.String(), "KeyPair generated")
+			buf = new(bytes.Buffer)
+			cmd.SetOut(buf)
+			err = cmd.Execute()
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t,  buf.String(), "it already exists and overwrite=false")
+		})
+
+	})
+
+	t.Run("publicKey", func(t *testing.T) {
+		t.Run("error - too few arguments", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			cmd.SetArgs([]string{"publicKey"})
+			cmd.SetOut(ioutil.Discard)
+			err := cmd.Execute()
+
+			if assert.Error(t, err) {
+				assert.Equal(t, "requires a URI argument", err.Error())
+			}
+		})
+
+		t.Run("error - public key does not exist", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"publicKey", "legalEntityMissing"})
+			cmd.SetOut(buf)
+			err := cmd.Execute()
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), "Error printing publicKey: could not open entry [legalEntityMissing|] with filename")
+		})
+
+		t.Run("ok", func(t *testing.T) {
+			cmd, c := createCmd(t)
+			c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "legalEntity"}), false)
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"publicKey", "legalEntity"})
+			cmd.SetOut(buf)
+			err := cmd.Execute()
+
+			if assert.NoError(t, err) {
+				assert.Contains(t, buf.String(), "Public key in PEM:")
+				assert.Contains(t, buf.String(), "-----BEGIN PUBLIC KEY-----")
+				assert.Contains(t, buf.String(), "Public key in JWK:")
+				assert.Contains(t, buf.String(), "kty")
+			}
+		})
+	})
+
+	t.Run("generateVendorCSR", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			t.Run("write to console", func(t *testing.T) {
+				buf := new(bytes.Buffer)
+				cmd.SetArgs([]string{"generate-vendor-csr", "foo"})
+				cmd.SetOut(buf)
+				err := cmd.Execute()
+
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Contains(t, buf.String(), "BEGIN CERTIFICATE REQUEST")
+			})
+			t.Run("write to file", func(t *testing.T) {
+				testDirectory := io.TestDirectory(t)
+				outputFile := path.Join(testDirectory, "csr.pem")
+				cmd.SetArgs([]string{"generate-vendor-csr", "foo", outputFile})
+				err := cmd.Execute()
+				if !assert.NoError(t, err) {
+					return
+				}
+				data, err := ioutil.ReadFile(outputFile)
+				if !assert.NoError(t, err) {
+					return
+				}
+				assert.Contains(t, string(data), "BEGIN CERTIFICATE REQUEST")
+			})
 		})
 	})
 }

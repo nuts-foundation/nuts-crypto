@@ -183,6 +183,9 @@ type GenerateKeyPairParams struct {
 
 	// URN identifying the legal entity
 	LegalEntity Identifier `json:"legalEntity"`
+
+	// Overwrite key if it already exists
+	Overwrite *bool `json:"overwrite,omitempty"`
 }
 
 // SignJSONBody defines parameters for Sign.
@@ -792,6 +795,22 @@ func NewGenerateKeyPairRequest(server string, params *GenerateKeyPairParams) (*h
 				queryValues.Add(k, v2)
 			}
 		}
+	}
+
+	if params.Overwrite != nil {
+
+		if queryFrag, err := runtime.StyleParam("form", true, "overwrite", *params.Overwrite); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
 	}
 
 	queryUrl.RawQuery = queryValues.Encode()
@@ -1603,6 +1622,13 @@ func (w *ServerInterfaceWrapper) GenerateKeyPair(ctx echo.Context) error {
 	err = runtime.BindQueryParameter("form", true, true, "legalEntity", ctx.QueryParams(), &params.LegalEntity)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter legalEntity: %s", err))
+	}
+
+	// ------------- Optional query parameter "overwrite" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "overwrite", ctx.QueryParams(), &params.Overwrite)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter overwrite: %s", err))
 	}
 
 	// Invoke the callback with all the unmarshalled arguments

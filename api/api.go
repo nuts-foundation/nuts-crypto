@@ -48,7 +48,11 @@ type ApiWrapper struct {
 // It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
 func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
 	key := types.KeyForEntity(types.LegalEntity{URI: string(params.LegalEntity)})
-	if _, err := w.C.GenerateKeyPair(key); err != nil {
+	overwrite := false
+	if params.Overwrite != nil {
+		overwrite = *params.Overwrite
+	}
+	if _, err := w.C.GenerateKeyPair(key, overwrite); err != nil {
 		return err
 	}
 

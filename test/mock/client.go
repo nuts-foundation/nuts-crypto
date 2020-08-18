@@ -114,18 +114,18 @@ func (mr *MockClientMockRecorder) StoreVendorCACertificate(certificate interface
 }
 
 // GenerateKeyPair mocks base method
-func (m *MockClient) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
+func (m *MockClient) GenerateKeyPair(key types.KeyIdentifier, overwrite bool) (crypto.PublicKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateKeyPair", key)
+	ret := m.ctrl.Call(m, "GenerateKeyPair", key, overwrite)
 	ret0, _ := ret[0].(crypto.PublicKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateKeyPair indicates an expected call of GenerateKeyPair
-func (mr *MockClientMockRecorder) GenerateKeyPair(key interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GenerateKeyPair(key, overwrite interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateKeyPair", reflect.TypeOf((*MockClient)(nil).GenerateKeyPair), key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateKeyPair", reflect.TypeOf((*MockClient)(nil).GenerateKeyPair), key, overwrite)
 }
 
 // Sign mocks base method

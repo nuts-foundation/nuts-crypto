@@ -122,6 +122,19 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
 	})
 
+	t.Run("GenerateKeyPairAPI call returns 200 with overwrite=true", func(t *testing.T) {
+		se := apiWrapper(t)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Request().Return(&http.Request{})
+		echo.EXPECT().String(http.StatusOK, pubKeyMatcher{})
+
+		overwrite := true
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test", Overwrite: &overwrite})
+	})
+
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in JWK format", func(t *testing.T) {
 		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
@@ -163,7 +176,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().Request().Return(&http.Request{})
 
 		// key generation is ok
-		cl.EXPECT().GenerateKeyPair(key).Return(nil, nil).AnyTimes()
+		cl.EXPECT().GenerateKeyPair(key, false).Return(nil, nil).AnyTimes()
 
 		// getting pub key goes boom!
 		cl.EXPECT().GetPublicKeyAsPEM(key).Return("", errors.New("boom"))
@@ -179,7 +192,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	crypto := client.C.(*pkg.Crypto)
 	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
 	plaintext := "for your eyes only"
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
 
 	t.Run("Missing body gives 400", func(t *testing.T) {
@@ -446,7 +459,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
 
 	plaintext := "for your eyes only"
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 	pubKey, _ := client.C.GetPublicKeyAsJWK(key)
 	encRecord, _ := client.C.EncryptKeyAndPlainText([]byte(plaintext), []jwk.Key{pubKey})
 
@@ -653,7 +666,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 
 	subject := Identifier("test")
 	actor := Identifier("test")
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 
 	t.Run("ExternalId API call returns 200 with new externalId", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -833,7 +846,7 @@ func TestApiWrapper_ExternalIdFor(t *testing.T) {
 func TestDefaultCryptoEngine_Sign(t *testing.T) {
 	client := apiWrapper(t)
 
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 
 	t.Run("Missing plainText returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -942,7 +955,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 func TestApiWrapper_SignJwt(t *testing.T) {
 	client := apiWrapper(t)
 
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 
 	t.Run("Missing claims returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -1030,7 +1043,7 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	client := apiWrapper(t)
 
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 
 	pemPubKey, _ := client.C.GetPublicKeyAsPEM(key)
 	jwk, _ := client.C.GetPublicKeyAsJWK(key)
@@ -1132,7 +1145,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	t.Run("All OK returns 200", func(t *testing.T) {
 		client := apiWrapper(t)
 
-		client.C.GenerateKeyPair(key)
+		client.C.GenerateKeyPair(key, false)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -1184,7 +1197,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	t.Run("Broken key returns 400", func(t *testing.T) {
 		client := apiWrapper(t)
 
-		client.C.GenerateKeyPair(key)
+		client.C.GenerateKeyPair(key, false)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -1240,7 +1253,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 func TestApiWrapper_PublicKey(t *testing.T) {
 	client := apiWrapper(t)
 
-	client.C.GenerateKeyPair(key)
+	client.C.GenerateKeyPair(key, false)
 
 	t.Run("PublicKey API call returns 200", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
