@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -164,10 +165,12 @@ func cmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "generate-vendor-csr [name]",
+		Use:   "generate-vendor-csr [name] [OPTIONAL output-file]",
 		Short: "Generates a CSR for the current vendor with the given name.",
-		Args:  cobra.ExactArgs(1),
+		Long: "Generates a CSR for the current vendor with the given name. If output-file is specified, the resulting PKCS#10 is written to that location in PEM format.",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Logger().Infof("Generating Vendor CA CSR for '%s'", args[0])
 			cc := client.NewCryptoClient()
 			csr, err := cc.GenerateVendorCACSR(args[0])
 			if err != nil {
@@ -178,7 +181,13 @@ func cmd() *cobra.Command {
 				Type:  "CERTIFICATE REQUEST",
 				Bytes: csr,
 			})
-			cmd.Println(string(csrAsPEM))
+			if len(args) == 1 {
+				cmd.Println(string(csrAsPEM))
+			} else {
+				outputFile := args[1]
+				cmd.Println(fmt.Sprintf("Writing CSR to %s", outputFile))
+				return ioutil.WriteFile(outputFile, csrAsPEM, 0777)
+			}
 			return nil
 		},
 	})
