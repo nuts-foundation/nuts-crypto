@@ -84,7 +84,7 @@ func (hb HttpClient) GenerateVendorCACSR(name string) ([]byte, error) {
 	return block.Bytes, nil
 }
 
-func (hb HttpClient) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
+func (hb HttpClient) GenerateKeyPair(key types.KeyIdentifier, overwrite bool) (crypto.PublicKey, error) {
 	if key.Qualifier() != "" {
 		// API doesn't define 'qualifier' parameter so make sure the caller isn't providing one which would lead
 		// to unexpected results (e.g. overwriting wrong key).
@@ -92,7 +92,7 @@ func (hb HttpClient) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), hb.Timeout)
 	defer cancel()
-	response, err := hb.client().GenerateKeyPair(ctx, &GenerateKeyPairParams{LegalEntity: Identifier(key.Owner())})
+	response, err := hb.client().GenerateKeyPair(ctx, &GenerateKeyPairParams{LegalEntity: Identifier(key.Owner()), Overwrite: &overwrite})
 	if err != nil {
 		return nil, err
 	}

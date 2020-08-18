@@ -96,26 +96,32 @@ func cmd() *cobra.Command {
 		},
 	})
 
-	cmd.AddCommand(&cobra.Command{
-		Use:   "generateKeyPair [legalEntityURI]",
-		Short: "generate a new keyPair for a legalEntity",
+	{
+		var overwrite *bool
+		generateKeyPairCmd := cobra.Command{
+			Use:   "generateKeyPair [legalEntityURI]",
+			Short: "generate a new keyPair for a legalEntity",
+			Args: func(cmd *cobra.Command, args []string) error {
+				if len(args) < 1 {
+					return errors.New("requires a URI argument")
+				}
 
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return errors.New("requires a URI argument")
-			}
-
-			return nil
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			cc := client.NewCryptoClient()
-			if _, err := cc.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: args[0]})); err != nil {
-				cmd.Printf("Error generating keyPair: %v\n", err)
-			} else {
-				cmd.Println("KeyPair generated")
-			}
-		},
-	})
+				return nil
+			},
+			Run: func(cmd *cobra.Command, args []string) {
+				cc := client.NewCryptoClient()
+				if _, err := cc.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: args[0]}), *overwrite); err != nil {
+					cmd.Printf("Error generating keyPair: %v\n", err)
+				} else {
+					cmd.Println("KeyPair generated")
+				}
+			},
+		}
+		flagSet := pflag.NewFlagSet(generateKeyPairCmd.Name(), pflag.ContinueOnError)
+		overwrite = flagSet.BoolP("force", "f", false, "overwrite if the given key already exists")
+		generateKeyPairCmd.Flags().AddFlagSet(flagSet)
+		cmd.AddCommand(&generateKeyPairCmd)
+	}
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "publicKey [legalEntityURI]",

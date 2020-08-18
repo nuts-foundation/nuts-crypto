@@ -233,7 +233,7 @@ func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 	key := types.KeyForEntity(types.LegalEntity{URI: identity})
 	if !client.Storage.PrivateKeyExists(key) {
 		log.Logger().Infof("No private key for %s generating.", identity)
-		_, err := client.GenerateKeyPair(key)
+		_, err := client.GenerateKeyPair(key, false)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +301,7 @@ func (client *Crypto) issueSubCertificate(entity types.LegalEntity, qualifier st
 	certKey := caKey.WithQualifier(qualifier)
 	var certificate *x509.Certificate
 	var privateKey *rsa.PrivateKey
-	if privateKey, err = client.generateAndStoreKeyPair(certKey); err != nil {
+	if privateKey, err = client.generateAndStoreKeyPair(certKey, true); err != nil {
 		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate (%s)", certKey.Qualifier(), certKey)
 	}
 	csr := x509.CertificateRequest{
@@ -453,18 +453,20 @@ func (client *Crypto) doConfigure() error {
 }
 
 // GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
-func (client *Crypto) GenerateKeyPair(key types.KeyIdentifier) (crypto.PublicKey, error) {
-	privateKey, err := client.generateAndStoreKeyPair(key)
+func (client *Crypto) GenerateKeyPair(key types.KeyIdentifier, overwrite bool) (crypto.PublicKey, error) {
+	privateKey, err := client.generateAndStoreKeyPair(key, overwrite)
 	if err != nil {
 		return nil, err
 	}
 	return privateKey.Public(), nil
 }
 
-// GenerateKeyPair generates a new key pair. If a key pair with the same identifier already exists, it is overwritten.
-func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier) (*rsa.PrivateKey, error) {
+func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier, overwrite bool) (*rsa.PrivateKey, error) {
 	if key == nil || key.Owner() == "" {
 		return nil, ErrInvalidKeyIdentifier
+	}
+	if !overwrite && client.PrivateKeyExists(key) {
+		return nil, fmt.Errorf("unable to generate new key pair for %s: it already exists and overwrite=false", key)
 	}
 	if keyPair, err := client.generateKeyPair(); err != nil {
 		return nil, err

@@ -85,7 +85,7 @@ func TestHttpClient_GenerateKeyPair(t *testing.T) {
 		csrBytes, _ := ioutil.ReadFile("../test/publickey.pem")
 		s := httptest.NewServer(handler{statusCode: http.StatusOK, responseData: csrBytes})
 		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
-		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}))
+		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}), false)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -93,7 +93,7 @@ func TestHttpClient_GenerateKeyPair(t *testing.T) {
 	})
 	t.Run("error - qualifier specified", func(t *testing.T) {
 		c := HttpClient{ServerAddress: "foo", Timeout: time.Second}
-		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}).WithQualifier("unexpected"))
+		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}).WithQualifier("unexpected"), false)
 		assert.EqualError(t, err, "API only support GenerateKeyPair() without qualifier")
 		assert.Nil(t, res)
 	})
@@ -101,14 +101,14 @@ func TestHttpClient_GenerateKeyPair(t *testing.T) {
 		csrBytes, _ := ioutil.ReadFile("../test/truststore.pem")
 		s := httptest.NewServer(handler{statusCode: http.StatusOK, responseData: csrBytes})
 		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
-		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}))
+		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}), false)
 		assert.EqualError(t, err, "failed to decode PEM block containing public key, key is of the wrong type")
 		assert.Nil(t, res)
 	})
 	t.Run("error - response not HTTP OK", func(t *testing.T) {
 		s := httptest.NewServer(handler{statusCode: http.StatusInternalServerError, responseData: genericError})
 		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
-		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}))
+		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}), false)
 		assert.EqualError(t, err, "server returned HTTP 500 (expected: 200), response: failed")
 		assert.Nil(t, res)
 	})
@@ -116,7 +116,7 @@ func TestHttpClient_GenerateKeyPair(t *testing.T) {
 		s := httptest.NewServer(handler{statusCode: http.StatusOK})
 		s.Close()
 		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
-		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}))
+		res, err := c.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: "foo"}), false)
 		assert.Contains(t, err.Error(), "connection refused")
 		assert.Nil(t, res)
 	})
