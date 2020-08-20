@@ -110,6 +110,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 }
 
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
+	legalEntity := Identifier("test")
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in PEM format", func(t *testing.T) {
 		se := apiWrapper(t)
 		ctrl := gomock.NewController(t)
@@ -119,7 +120,19 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().Request().Return(&http.Request{})
 		echo.EXPECT().String(http.StatusOK, pubKeyMatcher{})
 
-		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: legalEntity})
+	})
+
+	t.Run("GenerateKeyPairAPI call returns 409 with overwrite=false", func(t *testing.T) {
+		se := apiWrapper(t)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+		se.C.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: string(legalEntity)}), false)
+		echo.EXPECT().String(http.StatusConflict, gomock.Any())
+
+		overwrite := false
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: legalEntity, Overwrite: &overwrite})
 	})
 
 	t.Run("GenerateKeyPairAPI call returns 200 with overwrite=true", func(t *testing.T) {
@@ -132,7 +145,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().String(http.StatusOK, pubKeyMatcher{})
 
 		overwrite := true
-		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test", Overwrite: &overwrite})
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: legalEntity, Overwrite: &overwrite})
 	})
 
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in JWK format", func(t *testing.T) {
@@ -144,7 +157,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		echo.EXPECT().Request().Return(&http.Request{Header: http.Header{"Accept": []string{"application/json"}}})
 		echo.EXPECT().JSON(http.StatusOK, jwkMatcher{})
 
-		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
+		se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: legalEntity})
 	})
 
 	t.Run("GenerateKeyPairAPI returns error if generating the key gives an error", func(t *testing.T) {
@@ -181,7 +194,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		// getting pub key goes boom!
 		cl.EXPECT().GetPublicKeyAsPEM(key).Return("", errors.New("boom"))
 
-		err := se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: "test"})
+		err := se.GenerateKeyPair(echo, GenerateKeyPairParams{LegalEntity: legalEntity})
 
 		assert.NotNil(t, err)
 	})

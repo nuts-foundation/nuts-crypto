@@ -53,6 +53,9 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 		overwrite = *params.Overwrite
 	}
 	if _, err := w.C.GenerateKeyPair(key, overwrite); err != nil {
+		if errors.Is(err, pkg.ErrKeyAlreadyExists) {
+			return ctx.String(http.StatusConflict, err.Error())
+		}
 		return err
 	}
 

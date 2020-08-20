@@ -45,6 +45,13 @@ paths:
               example: "Invalid legalEntity URN"
               schema:
                 type: string
+        '409':
+          description: "Conflicting request: key already exists"
+          content:
+            text/plain:
+              example: "Key already exists"
+              schema:
+                type: string
   /crypto/public_key/{urn}:
     get:
       summary: "get the public key for a given organization. It returns the key in PEM or JWK form. This depends on the accept header used (text/plain vs application/json)"
