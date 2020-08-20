@@ -1298,7 +1298,7 @@ func TestCrypto_GenerateKeyPair(t *testing.T) {
 		publicKey, _ := client.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: t.Name()}), false)
 		assert.NotNil(t, publicKey)
 		publicKey2, err := client.GenerateKeyPair(types.KeyForEntity(types.LegalEntity{URI: t.Name()}), false)
-		assert.EqualError(t, err, "unable to generate new key pair for [TestCrypto_GenerateKeyPair/error_-_already_exists|]: it already exists and overwrite=false")
+		assert.EqualError(t, err, "key already exists")
 		assert.Nil(t, publicKey2)
 	})
 }

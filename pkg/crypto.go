@@ -32,6 +32,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"path"
 	"reflect"
@@ -89,6 +90,9 @@ var ErrInvalidCertChain = errors.New("X.509 certificate chain is invalid")
 // ErrCertificateNotTrusted indicates that the X.509 certificate is not trusted
 // noinspection GoErrorStringFormat
 var ErrCertificateNotTrusted = errors.New("X.509 certificate not trusted")
+
+// ErrKeyAlreadyExists indicates that the key already exists.
+var ErrKeyAlreadyExists = errors.New("key already exists")
 
 // jwsAlgorithm holds the supported (required) JWS signing algorithm
 const jwsAlgorithm = jwa.RS256
@@ -466,7 +470,8 @@ func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier, overwrite
 		return nil, ErrInvalidKeyIdentifier
 	}
 	if !overwrite && client.PrivateKeyExists(key) {
-		return nil, fmt.Errorf("unable to generate new key pair for %s: it already exists and overwrite=false", key)
+		logrus.Warnf("Unable to generate new key pair for %s: it already exists and overwrite=false", key)
+		return nil, ErrKeyAlreadyExists
 	}
 	if keyPair, err := client.generateKeyPair(); err != nil {
 		return nil, err

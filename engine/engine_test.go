@@ -141,7 +141,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t,  buf.String(), "it already exists and overwrite=false")
+			assert.Contains(t,  buf.String(), "Error generating keyPair: key already exists")
 		})
 
 	})
