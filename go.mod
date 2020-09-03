@@ -9,7 +9,7 @@ require (
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/labstack/echo/v4 v4.1.17
 	github.com/lestrrat-go/jwx v0.9.2
-	github.com/magiconair/properties v1.8.1
+	github.com/magiconair/properties v1.8.2
 	github.com/nuts-foundation/nuts-go-core v0.14.1-0.20200624131634-75b5f59c0b8e
 	github.com/nuts-foundation/nuts-go-test v0.0.0-20200804135944-9e05711330e7
 	github.com/pkg/errors v0.9.1
