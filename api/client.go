@@ -63,6 +63,27 @@ func (hb HttpClient) client() ClientInterface {
 	return hb.clientWithRequestEditor(nil)
 }
 
+func (hb HttpClient) SelfSignVendorCACertificate(name string) (*x509.Certificate, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), hb.Timeout)
+	defer cancel()
+	response, err := hb.client().SelfSignVendorCACertificate(ctx, &SelfSignVendorCACertificateParams{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	if err := testResponseCode(http.StatusOK, response); err != nil {
+		return nil, err
+	}
+	responseData, err := readResponse(response)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(responseData)
+	if block.Type != "CERTIFICATE" {
+		return nil, errors.New("returned PEM is not a CERTIFICATE")
+	}
+	return x509.ParseCertificate(block.Bytes)
+}
+
 func (hb HttpClient) GenerateVendorCACSR(name string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hb.Timeout)
 	defer cancel()

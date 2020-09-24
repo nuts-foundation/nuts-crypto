@@ -99,6 +99,21 @@ func (mr *MockClientMockRecorder) GenerateVendorCACSR(name interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateVendorCACSR", reflect.TypeOf((*MockClient)(nil).GenerateVendorCACSR), name)
 }
 
+// SelfSignVendorCACertificate mocks base method
+func (m *MockClient) SelfSignVendorCACertificate(name string) (*x509.Certificate, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SelfSignVendorCACertificate", name)
+	ret0, _ := ret[0].(*x509.Certificate)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SelfSignVendorCACertificate indicates an expected call of SelfSignVendorCACertificate
+func (mr *MockClientMockRecorder) SelfSignVendorCACertificate(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelfSignVendorCACertificate", reflect.TypeOf((*MockClient)(nil).SelfSignVendorCACertificate), name)
+}
+
 // StoreVendorCACertificate mocks base method
 func (m *MockClient) StoreVendorCACertificate(certificate *x509.Certificate) error {
 	m.ctrl.T.Helper()

@@ -80,6 +80,42 @@ func TestHttpClient_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
+func TestHttpClient_SelfSignVendorCACertificate(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		csrBytes, _ := ioutil.ReadFile("../test/certificate.pem")
+		s := httptest.NewServer(handler{statusCode: http.StatusOK, responseData: csrBytes})
+		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
+		res, err := c.SelfSignVendorCACertificate("Vendor")
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, res)
+	})
+	t.Run("error - server returned non-certificate PEM", func(t *testing.T) {
+		csrBytes, _ := ioutil.ReadFile("../test/publickey.pem")
+		s := httptest.NewServer(handler{statusCode: http.StatusOK, responseData: csrBytes})
+		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
+		res, err := c.SelfSignVendorCACertificate("Vendor")
+		assert.EqualError(t, err, "returned PEM is not a CERTIFICATE")
+		assert.Nil(t, res)
+	})
+	t.Run("error - response not HTTP OK", func(t *testing.T) {
+		s := httptest.NewServer(handler{statusCode: http.StatusInternalServerError, responseData: genericError})
+		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
+		res, err := c.SelfSignVendorCACertificate("Vendor")
+		assert.EqualError(t, err, "server returned HTTP 500 (expected: 200), response: failed")
+		assert.Nil(t, res)
+	})
+	t.Run("error - server not running", func(t *testing.T) {
+		s := httptest.NewServer(handler{statusCode: http.StatusOK})
+		s.Close()
+		c := HttpClient{ServerAddress: s.URL, Timeout: time.Second}
+		res, err := c.SelfSignVendorCACertificate("Vendor")
+		assert.Contains(t, err.Error(), "connection refused")
+		assert.Nil(t, res)
+	})
+}
+
 func TestHttpClient_GenerateKeyPair(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		csrBytes, _ := ioutil.ReadFile("../test/publickey.pem")

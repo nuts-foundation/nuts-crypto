@@ -57,6 +57,7 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 		echo := mock.NewMockEchoRouter(ctrl)
 
 		echo.EXPECT().POST("/crypto/csr/vendorca", gomock.Any())
+		echo.EXPECT().POST("/crypto/certificate/vendorca", gomock.Any())
 		echo.EXPECT().POST("/crypto/sign", gomock.Any())
 		echo.EXPECT().POST("/crypto/verify", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
@@ -114,7 +115,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t,  buf.String(), "KeyPair generated")
+			assert.Contains(t, buf.String(), "KeyPair generated")
 			cmd.SetArgs([]string{"generateKeyPair", "legalEntity", "-f"})
 			buf = new(bytes.Buffer)
 			cmd.SetOut(buf)
@@ -122,7 +123,7 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t,  buf.String(), "KeyPair generated")
+			assert.Contains(t, buf.String(), "KeyPair generated")
 		})
 
 		t.Run("error - already exists", func(t *testing.T) {
@@ -134,14 +135,14 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t,  buf.String(), "KeyPair generated")
+			assert.Contains(t, buf.String(), "KeyPair generated")
 			buf = new(bytes.Buffer)
 			cmd.SetOut(buf)
 			err = cmd.Execute()
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t,  buf.String(), "Error generating keyPair: key already exists")
+			assert.Contains(t, buf.String(), "Error generating keyPair: key already exists")
 		})
 
 	})
@@ -215,6 +216,21 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 				}
 				assert.Contains(t, string(data), "BEGIN CERTIFICATE REQUEST")
 			})
+		})
+	})
+
+	t.Run("generateVendorCSR", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			cmd, _ := createCmd(t)
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"selfsign-vendor-cert", "foo"})
+			cmd.SetOut(buf)
+			err := cmd.Execute()
+
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), "BEGIN CERTIFICATE")
 		})
 	})
 }

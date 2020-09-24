@@ -162,6 +162,13 @@ type VerifyResponse struct {
 	Outcome bool `json:"outcome"`
 }
 
+// SelfSignVendorCACertificateParams defines parameters for SelfSignVendorCACertificate.
+type SelfSignVendorCACertificateParams struct {
+
+	// Name of the vendor
+	Name string `json:"name"`
+}
+
 // GenerateVendorCACSRParams defines parameters for GenerateVendorCACSR.
 type GenerateVendorCACSRParams struct {
 
@@ -339,6 +346,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// SelfSignVendorCACertificate request
+	SelfSignVendorCACertificate(ctx context.Context, params *SelfSignVendorCACertificateParams) (*http.Response, error)
+
 	// GenerateVendorCACSR request
 	GenerateVendorCACSR(ctx context.Context, params *GenerateVendorCACSRParams) (*http.Response, error)
 
@@ -377,6 +387,21 @@ type ClientInterface interface {
 	VerifyWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
 
 	Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.Response, error)
+}
+
+func (c *Client) SelfSignVendorCACertificate(ctx context.Context, params *SelfSignVendorCACertificateParams) (*http.Response, error) {
+	req, err := NewSelfSignVendorCACertificateRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GenerateVendorCACSR(ctx context.Context, params *GenerateVendorCACSRParams) (*http.Response, error) {
@@ -602,6 +627,49 @@ func (c *Client) Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.
 		}
 	}
 	return c.Client.Do(req)
+}
+
+// NewSelfSignVendorCACertificateRequest generates requests for SelfSignVendorCACertificate
+func NewSelfSignVendorCACertificateRequest(server string, params *SelfSignVendorCACertificateParams) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/certificate/vendorca")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryUrl.Query()
+
+	if queryFrag, err := runtime.StyleParam("form", true, "name", params.Name); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryUrl.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("POST", queryUrl.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGenerateVendorCACSRRequest generates requests for GenerateVendorCACSR
@@ -1001,6 +1069,27 @@ func WithBaseURL(baseURL string) ClientOption {
 	}
 }
 
+type selfSignVendorCACertificateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r selfSignVendorCACertificateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r selfSignVendorCACertificateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type generateVendorCACSRResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1195,6 +1284,15 @@ func (r verifyResponse) StatusCode() int {
 	return 0
 }
 
+// SelfSignVendorCACertificateWithResponse request returning *SelfSignVendorCACertificateResponse
+func (c *ClientWithResponses) SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*selfSignVendorCACertificateResponse, error) {
+	rsp, err := c.SelfSignVendorCACertificate(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSelfSignVendorCACertificateResponse(rsp)
+}
+
 // GenerateVendorCACSRWithResponse request returning *GenerateVendorCACSRResponse
 func (c *ClientWithResponses) GenerateVendorCACSRWithResponse(ctx context.Context, params *GenerateVendorCACSRParams) (*generateVendorCACSRResponse, error) {
 	rsp, err := c.GenerateVendorCACSR(ctx, params)
@@ -1322,6 +1420,25 @@ func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body Verif
 		return nil, err
 	}
 	return ParseVerifyResponse(rsp)
+}
+
+// ParseSelfSignVendorCACertificateResponse parses an HTTP response from a SelfSignVendorCACertificateWithResponse call
+func ParseSelfSignVendorCACertificateResponse(rsp *http.Response) (*selfSignVendorCACertificateResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &selfSignVendorCACertificateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
 }
 
 // ParseGenerateVendorCACSRResponse parses an HTTP response from a GenerateVendorCACSRWithResponse call
@@ -1532,6 +1649,9 @@ func ParseVerifyResponse(rsp *http.Response) (*verifyResponse, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Self-sign a vendor CA certificate.
+	// (POST /crypto/certificate/vendorca)
+	SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error
 	// Generate a CSR for requesting a vendor CA certificate.
 	// (POST /crypto/csr/vendorca)
 	GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error
@@ -1564,6 +1684,24 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// SelfSignVendorCACertificate converts echo context to params.
+func (w *ServerInterfaceWrapper) SelfSignVendorCACertificate(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SelfSignVendorCACertificateParams
+	// ------------- Required query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, true, "name", ctx.QueryParams(), &params.Name)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter name: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.SelfSignVendorCACertificate(ctx, params)
+	return err
 }
 
 // GenerateVendorCACSR converts echo context to params.
@@ -1701,6 +1839,7 @@ func RegisterHandlers(router EchoRouter, si ServerInterface) {
 		Handler: si,
 	}
 
+	router.POST("/crypto/certificate/vendorca", wrapper.SelfSignVendorCACertificate)
 	router.POST("/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
 	router.POST("/crypto/decrypt", wrapper.Decrypt)
 	router.POST("/crypto/encrypt", wrapper.Encrypt)
