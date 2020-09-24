@@ -173,7 +173,7 @@ func cmd() *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "generate-vendor-csr [name] [OPTIONAL output-file]",
 		Short: "Generates a CSR for the current vendor with the given name.",
-		Long: "Generates a CSR for the current vendor with the given name. If output-file is specified, the resulting PKCS#10 is written to that location in PEM format.",
+		Long:  "Generates a CSR for the current vendor with the given name. If output-file is specified, the resulting PKCS#10 is written to that location in PEM format.",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Logger().Infof("Generating Vendor CA CSR for '%s'", args[0])
@@ -181,6 +181,37 @@ func cmd() *cobra.Command {
 			csr, err := cc.GenerateVendorCACSR(args[0])
 			if err != nil {
 				log.Logger().Errorf("Error while generating CSR: %v", err)
+				return err
+			}
+			csrAsPEM := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE REQUEST",
+				Bytes: csr,
+			})
+			if len(args) == 1 {
+				cmd.Println(string(csrAsPEM))
+			} else {
+				outputFile := args[1]
+				cmd.Println(fmt.Sprintf("Writing CSR to %s", outputFile))
+				return ioutil.WriteFile(outputFile, csrAsPEM, 0777)
+			}
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "selfsign-vendor-cert [name]",
+		Short: "Self-signs a X.509 certificate for the current vendor with the given name.",
+		Long: "Self-signs a X.509 certificate for the current vendor with the given name. " +
+			"This is the self-signed variant of the 'generate-vendor-csr' command. " +
+			"If there is an existing key pair for the vendor that one is reused, otherwise a new key pair is generated. " +
+			"The certificate is printed in PEM encoded form.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Logger().Infof("Self-signing Vendor CA certificate for '%s'", args[0])
+			cc := client.NewCryptoClient()
+			csr, err := cc.GenerateVendorCACSR(args[0])
+			if err != nil {
+				log.Logger().Errorf("Error while self-signing : %v", err)
 				return err
 			}
 			csrAsPEM := pem.EncodeToMemory(&pem.Block{

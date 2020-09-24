@@ -235,6 +235,32 @@ paths:
             text/plain:
               example:
                 "unknown legalEntity"
+  /crypto/certificate/vendorca:
+    post:
+      summary: "Self-sign a vendor CA certificate."
+      operationId: selfSignVendorCACertificate
+      tags:
+        - crypto
+      parameters:
+        - name: name
+          in: query
+          description: "Name of the vendor"
+          required: true
+          schema:
+            type: string
+      responses:
+        '400':
+          description: "incorrect data"
+          content:
+            text/plain:
+              example:
+                "invalid name"
+        '200':
+          description: "OK response, body holds certificate as PEM-encoded X.509 certificate"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
   /crypto/csr/vendorca:
     post:
       summary: "Generate a CSR for requesting a vendor CA certificate."

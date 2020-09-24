@@ -103,6 +103,9 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
+// vendorCACertificateDaysValid holds the number of days self-signed Vendor CA certificates are valid
+const vendorCACertificateDaysValid = 1095
+
 const TLSCertificateQualifier = "tls"
 const SigningCertificateQualifier = "sign"
 
@@ -227,35 +230,76 @@ func (client *Crypto) StoreVendorCACertificate(certificate *x509.Certificate) er
 	return client.Storage.SaveCertificate(key, certificate.Raw)
 }
 
+func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificate, error) {
+	identity := core.NutsConfig().Identity()
+	var csr *x509.CertificateRequest
+	csrAsASN1, privateKey, err := client.generateVendorCACSR(name, identity);
+	if err != nil {
+		return nil, err
+	} else {
+		if csr, err = x509.ParseCertificateRequest(csrAsASN1); err != nil {
+			return nil,  errors2.Wrap(err, "unable to parse CSR")
+		}
+	}
+	serialNumber, err := cert.SerialNumber()
+	if err != nil {
+		return nil, errors2.Wrap(err, "unable to generate certificate serial number")
+	}
+	template := &x509.Certificate{
+		PublicKey:                   csr.PublicKey,
+		SerialNumber:                serialNumber,
+		Issuer:                      csr.Subject,
+		Subject:                     csr.Subject,
+		NotBefore:                   time.Now(),
+		NotAfter:                    time.Now().AddDate(0, 0, vendorCACertificateDaysValid),
+		KeyUsage:                    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtraExtensions:             csr.Extensions,
+		BasicConstraintsValid:       true,
+		IsCA:                        true,
+	}
+	if certificate, err := x509.CreateCertificate(rand.Reader, template, template, template.PublicKey, privateKey); err != nil {
+		return nil, errors2.Wrap(err, "unable to create certificate")
+	} else {
+		return x509.ParseCertificate(certificate)
+	}
+}
+
 func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 	identity := core.NutsConfig().Identity()
 	log.Logger().Infof("Generating CSR for Vendor CA certificate (for current vendor: %s, name: %s)", identity, name)
-	if strings.TrimSpace(name) == "" {
-		return nil, errors.New("invalid name")
+	if pkcs10, _, err := client.generateVendorCACSR(name, identity); err != nil {
+		return nil, err
+	} else {
+		return pkcs10, nil
 	}
+}
 
+func (client *Crypto) generateVendorCACSR(name string, identity string) ([]byte, crypto.PrivateKey, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, nil, errors.New("invalid name")
+	}
 	key := types.KeyForEntity(types.LegalEntity{URI: identity})
 	if !client.Storage.PrivateKeyExists(key) {
 		log.Logger().Infof("No private key for %s generating.", identity)
 		_, err := client.GenerateKeyPair(key, false)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	privateKey, err := client.GetPrivateKey(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	csr, err := cert.VendorCertificateRequest(identity, name, "CA", "healthcare") // TODO: Domain is now hardcoded
 	if err != nil {
-		return nil, errors2.Wrap(err, "unable to create CSR template")
+		return nil, nil, errors2.Wrap(err, "unable to create CSR template")
 	}
 	csr.PublicKey = privateKey.Public()
 	pkcs10, err := x509.CreateCertificateRequest(rand.Reader, csr, privateKey)
 	if err != nil {
-		return nil, errors2.Wrap(err, "unable to create CSR")
+		return nil, nil, errors2.Wrap(err, "unable to create CSR")
 	}
-	return pkcs10, nil
+	return pkcs10, privateKey, nil
 }
 
 func (client *Crypto) GetSigningCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {

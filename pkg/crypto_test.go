@@ -746,6 +746,32 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
+func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
+	client := createCrypto(t)
+	createCrypto(t)
+	t.Run("ok", func(t *testing.T) {
+		certificate, err := client.SelfSignVendorCACertificate("BecauseWeCare B.V.")
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, certificate)
+		t.Run("verify subject & issuer", func(t *testing.T) {
+			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", certificate.Subject.String())
+			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", certificate.Issuer.String())
+		})
+		t.Run("verify VendorID SAN", func(t *testing.T) {
+			extension, err := getUniqueExtension("2.5.29.17", certificate.Extensions)
+			assert.NoError(t, err)
+			assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, extension.Value)
+		})
+		t.Run("verify Domain extension", func(t *testing.T) {
+			extension, err := getUniqueExtension("1.3.6.1.4.1.54851.3", certificate.Extensions)
+			assert.NoError(t, err)
+			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
+		})
+	})
+}
+
 func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	client := createCrypto(t)
 	createCrypto(t)
@@ -1522,17 +1548,22 @@ func Test_symmetricKeyToBlockCipher(t *testing.T) {
 type CertificateRequest x509.CertificateRequest
 
 func (csr CertificateRequest) getUniqueExtension(oid string) (*pkix.Extension, error) {
+	extensions := csr.Extensions
+	return getUniqueExtension(oid, extensions)
+}
+
+func getUniqueExtension(oid string, extensions []pkix.Extension) (*pkix.Extension, error) {
 	var result pkix.Extension
-	for _, ext := range csr.Extensions {
+	for _, ext := range extensions {
 		if ext.Id.String() == oid {
 			if result.Id.String() != "" {
-				return nil, fmt.Errorf("multiple extensions in certificate with OID: %s", oid)
+				return nil, fmt.Errorf("multiple extensions with OID: %s", oid)
 			}
 			result = ext
 		}
 	}
 	if result.Id.String() == "" {
-		return nil, fmt.Errorf("no extensions in certificate with OID: %s", oid)
+		return nil, fmt.Errorf("no extensions with OID: %s", oid)
 	}
 	return &result, nil
 }

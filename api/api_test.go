@@ -109,6 +109,41 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
+func TestApiWrapper_SelfSignVendorCACertificate(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
+		defer os.Unsetenv("NUTS_IDENTITY")
+		core.NutsConfig().Load(&cobra.Command{})
+
+		se := apiWrapper(t)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		echo.EXPECT().Blob(http.StatusOK, "application/x-pem-file", gomock.Any())
+
+		se.SelfSignVendorCACertificate(echo, SelfSignVendorCACertificateParams{Name: "foo"})
+	})
+	t.Run("error - vendor name is empty", func(t *testing.T) {
+		se := apiWrapper(t)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		err := se.SelfSignVendorCACertificate(echo, SelfSignVendorCACertificateParams{Name: "  "})
+		assert.EqualError(t, err, "code=400, message=name is invalid")
+	})
+	t.Run("error - vendor ID not set", func(t *testing.T) {
+		se := apiWrapper(t)
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		err := se.SelfSignVendorCACertificate(echo, SelfSignVendorCACertificateParams{Name: "foo"})
+		assert.EqualError(t, err, "code=500, message=invalid key identifier")
+	})
+}
+
 func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	legalEntity := Identifier("test")
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in PEM format", func(t *testing.T) {

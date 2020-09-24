@@ -35,6 +35,10 @@ type testServerInterface struct {
 	err error
 }
 
+func (t *testServerInterface) SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error {
+	return t.err
+}
+
 func (t *testServerInterface) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error {
 	return t.err
 }
@@ -246,6 +250,7 @@ func TestRegisterHandlers(t *testing.T) {
 		echo := mock.NewMockEchoRouter(ctrl)
 
 		echo.EXPECT().POST("/crypto/csr/vendorca", gomock.Any())
+		echo.EXPECT().POST("/crypto/certificate/vendorca", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/external_id", gomock.Any())

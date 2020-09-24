@@ -80,6 +80,22 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	return ctx.String(http.StatusOK, pub)
 }
 
+func (w *ApiWrapper) SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error {
+	if strings.TrimSpace(params.Name) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "name is invalid")
+	}
+	certificate, err := w.C.SelfSignVendorCACertificate(params.Name)
+	if err != nil {
+		log.Logger().Errorf("Unable to self-sign vendor CA certificate: %v", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	certificateAsPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certificate.Raw,
+	})
+	return ctx.Blob(http.StatusOK, "application/x-pem-file", certificateAsPEM)
+}
+
 func (w *ApiWrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error {
 	if strings.TrimSpace(params.Name) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name is invalid")
