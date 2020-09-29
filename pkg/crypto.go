@@ -257,6 +257,7 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 		BasicConstraintsValid:       true,
 		IsCA:                        true,
 	}
+	log.Logger().Infof("Self-signing Vendor CA certificate for vendor: %s", name)
 	if certificate, err := x509.CreateCertificate(rand.Reader, template, template, template.PublicKey, privateKey); err != nil {
 		return nil, errors2.Wrap(err, "unable to create certificate")
 	} else {

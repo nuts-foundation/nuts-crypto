@@ -20,6 +20,7 @@ package engine
 
 import (
 	"bytes"
+	"encoding/pem"
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -219,8 +220,9 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		})
 	})
 
-	t.Run("generateVendorCSR", func(t *testing.T) {
-		t.Run("ok", func(t *testing.T) {
+	t.Run("selfSignVendorCertificate", func(t *testing.T) {
+		const certificateHeader = "-----BEGIN CERTIFICATE-----"
+		t.Run("ok - write certificate to stdout", func(t *testing.T) {
 			cmd, _ := createCmd(t)
 			buf := new(bytes.Buffer)
 			cmd.SetArgs([]string{"selfsign-vendor-cert", "foo"})
@@ -230,7 +232,29 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			assert.Contains(t, buf.String(), "BEGIN CERTIFICATE")
+			assert.Contains(t, buf.String(), certificateHeader)
+		})
+		t.Run("ok - write certificate to file", func(t *testing.T) {
+			certFile := path.Join(io.TestDirectory(t), "certificate.pem")
+			cmd, _ := createCmd(t)
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"selfsign-vendor-cert", "foo", certFile})
+			cmd.SetOut(buf)
+			err := cmd.Execute()
+
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.NotContains(t, buf.String(), certificateHeader)
+			certData, err := ioutil.ReadFile(certFile)
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.Contains(t, string(certData), certificateHeader) {
+				return
+			}
+			_, rest := pem.Decode(certData)
+			assert.Empty(t, rest)
 		})
 	})
 }
