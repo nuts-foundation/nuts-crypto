@@ -411,6 +411,13 @@ func TestMeantForSigning(t *testing.T) {
 }
 
 func TestPemToSigner(t *testing.T) {
+	t.Run("Convert ED25519 key", func(t *testing.T) {
+		pem, _ := ioutil.ReadFile("../../test/ed25519.sk")
+		signer, err := PemToSigner(pem)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+	})
+
 	t.Run("Convert EC key", func(t *testing.T) {
 		pem, _ := ioutil.ReadFile("../../test/ec.sk")
 		signer, err := PemToSigner(pem)
