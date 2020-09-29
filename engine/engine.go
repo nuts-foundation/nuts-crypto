@@ -199,31 +199,31 @@ func cmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "selfsign-vendor-cert [name]",
+		Use:   "selfsign-vendor-cert [name] [OPTIONAL output-file]",
 		Short: "Self-signs a X.509 certificate for the current vendor with the given name.",
 		Long: "Self-signs a X.509 certificate for the current vendor with the given name. " +
 			"This is the self-signed variant of the 'generate-vendor-csr' command. " +
 			"If there is an existing key pair for the vendor that one is reused, otherwise a new key pair is generated. " +
 			"The certificate is printed in PEM encoded form.",
-		Args: cobra.ExactArgs(1),
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Logger().Infof("Self-signing Vendor CA certificate for '%s'", args[0])
 			cc := client.NewCryptoClient()
-			csr, err := cc.GenerateVendorCACSR(args[0])
+			certificate, err := cc.SelfSignVendorCACertificate(args[0])
 			if err != nil {
 				log.Logger().Errorf("Error while self-signing : %v", err)
 				return err
 			}
-			csrAsPEM := pem.EncodeToMemory(&pem.Block{
-				Type:  "CERTIFICATE REQUEST",
-				Bytes: csr,
+			certificateAsPEM := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: certificate.Raw,
 			})
 			if len(args) == 1 {
-				cmd.Println(string(csrAsPEM))
+				cmd.Println(string(certificateAsPEM))
 			} else {
 				outputFile := args[1]
-				cmd.Println(fmt.Sprintf("Writing CSR to %s", outputFile))
-				return ioutil.WriteFile(outputFile, csrAsPEM, 0777)
+				cmd.Println(fmt.Sprintf("Writing certificate to %s", outputFile))
+				return ioutil.WriteFile(outputFile, certificateAsPEM, 0777)
 			}
 			return nil
 		},
