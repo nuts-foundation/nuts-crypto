@@ -3,7 +3,7 @@ module github.com/nuts-foundation/nuts-crypto
 go 1.14
 
 require (
-	github.com/deepmap/oapi-codegen v1.3.7
+	github.com/deepmap/oapi-codegen v1.3.13
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.4.4
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
@@ -18,6 +18,5 @@ require (
 	github.com/spf13/cobra v0.0.7
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	gopkg.in/yaml.v2 v2.3.0 // indirect
 	rsc.io/quote/v3 v3.1.0 // indirect
 )
