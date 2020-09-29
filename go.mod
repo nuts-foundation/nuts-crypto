@@ -22,6 +22,7 @@ require (
 	golang.org/x/net v0.0.0-20200927032502-5d4f70055728 // indirect
 	golang.org/x/sys v0.0.0-20200928205150-006507a75852 // indirect
 	golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab // indirect
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	rsc.io/quote/v3 v3.1.0 // indirect
 )

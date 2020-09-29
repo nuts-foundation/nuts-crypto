@@ -24,11 +24,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"github.com/nuts-foundation/nuts-crypto/test"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/test"
 
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -405,5 +407,35 @@ func TestMeantForSigning(t *testing.T) {
 		certificate, _ := x509.ParseCertificate(certAsASN1)
 		err := MeantForSigning()(certificate)
 		assert.NoError(t, err)
+	})
+}
+
+func TestPemToSigner(t *testing.T) {
+	t.Run("Convert EC key", func(t *testing.T) {
+		pem, _ := ioutil.ReadFile("../../test/ec.sk")
+		signer, err := PemToSigner(pem)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+	})
+
+	t.Run("Convert RSA key", func(t *testing.T) {
+		pem, _ := ioutil.ReadFile("../../test/rsa.sk")
+		signer, err := PemToSigner(pem)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+	})
+
+	t.Run("Convert PKIX key", func(t *testing.T) {
+		pem, _ := ioutil.ReadFile("../../test/sk.pem")
+		signer, err := PemToSigner(pem)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+	})
+
+	t.Run("Convert garbage", func(t *testing.T) {
+		_, err := PemToSigner([]byte{})
+		if assert.Error(t, err) {
+			assert.Equal(t, ErrWrongPrivateKey, err)
+		}
 	})
 }
