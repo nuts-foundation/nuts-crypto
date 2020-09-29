@@ -25,13 +25,14 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/nuts-foundation/nuts-crypto/log"
-	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"io/ioutil"
 	"mime"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/nuts-foundation/nuts-crypto/log"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -154,7 +155,8 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 			err error
 		)
 		if e.Jwk != nil {
-			if j, err = cert.MapToJwk(e.Jwk.AdditionalProperties); err != nil {
+			var props map[string]interface{} = *e.Jwk
+			if j, err = cert.MapToJwk(props); err != nil {
 				return echo.NewHTTPError(http.StatusBadRequest, "invalid key in encryptRequestSubjects")
 			}
 		}
@@ -226,9 +228,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
-	decryptResponse := DecryptResponse{
-		PlainText: base64.StdEncoding.EncodeToString(plainTextBytes),
-	}
+	decryptResponse := PlainText(base64.StdEncoding.EncodeToString(plainTextBytes))
 
 	return ctx.JSON(http.StatusOK, decryptResponse)
 }
@@ -269,9 +269,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 
 	sha := hex.EncodeToString(shaBytes)
 
-	externalIdResponse := ExternalIdResponse{
-		ExternalId: sha,
-	}
+	externalIdResponse := ExternalId(sha)
 
 	return ctx.JSON(http.StatusOK, externalIdResponse)
 }
@@ -313,9 +311,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	signResponse := SignResponse{
-		Signature: hex.EncodeToString(sig),
-	}
+	signResponse := Signature(hex.EncodeToString(sig))
 
 	return ctx.JSON(http.StatusOK, signResponse)
 }
@@ -395,7 +391,8 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 
 	var j jwk.Key
 	if verifyRequest.Jwk != nil {
-		if j, err = cert.MapToJwk(verifyRequest.Jwk.AdditionalProperties); err != nil {
+		var props map[string]interface{} = *verifyRequest.Jwk
+		if j, err = cert.MapToJwk(props); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid JWK in verifyRequest")
 		}
 	}
@@ -412,7 +409,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 		return err
 	}
 
-	verifyResponse := VerifyResponse{
+	verifyResponse := Verification{
 		Outcome: valid,
 	}
 
@@ -495,7 +492,7 @@ func decryptRequestToDect(gen DecryptRequest) (types.DoubleEncryptedCipherText, 
 	return dect, nil
 }
 
-func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []Identifier) EncryptResponse {
+func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities []Identifier) EncryptedData {
 
 	var encryptResponseEntries []EncryptResponseEntry
 
@@ -506,7 +503,7 @@ func dectToEncryptResponse(dect types.DoubleEncryptedCipherText, legalIdentities
 		})
 	}
 
-	return EncryptResponse{
+	return EncryptedData{
 		CipherText:             base64.StdEncoding.EncodeToString(dect.CipherText),
 		EncryptResponseEntries: encryptResponseEntries,
 		Nonce:                  base64.StdEncoding.EncodeToString(dect.Nonce),

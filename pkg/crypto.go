@@ -233,12 +233,12 @@ func (client *Crypto) StoreVendorCACertificate(certificate *x509.Certificate) er
 func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificate, error) {
 	identity := core.NutsConfig().Identity()
 	var csr *x509.CertificateRequest
-	csrAsASN1, privateKey, err := client.generateVendorCACSR(name, identity);
+	csrAsASN1, privateKey, err := client.generateVendorCACSR(name, identity)
 	if err != nil {
 		return nil, err
 	} else {
 		if csr, err = x509.ParseCertificateRequest(csrAsASN1); err != nil {
-			return nil,  errors2.Wrap(err, "unable to parse CSR")
+			return nil, errors2.Wrap(err, "unable to parse CSR")
 		}
 	}
 	serialNumber, err := cert.SerialNumber()
@@ -246,16 +246,16 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 		return nil, errors2.Wrap(err, "unable to generate certificate serial number")
 	}
 	template := &x509.Certificate{
-		PublicKey:                   csr.PublicKey,
-		SerialNumber:                serialNumber,
-		Issuer:                      csr.Subject,
-		Subject:                     csr.Subject,
-		NotBefore:                   time.Now(),
-		NotAfter:                    time.Now().AddDate(0, 0, vendorCACertificateDaysValid),
-		KeyUsage:                    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		ExtraExtensions:             csr.Extensions,
-		BasicConstraintsValid:       true,
-		IsCA:                        true,
+		PublicKey:             csr.PublicKey,
+		SerialNumber:          serialNumber,
+		Issuer:                csr.Subject,
+		Subject:               csr.Subject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(0, 0, vendorCACertificateDaysValid),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtraExtensions:       csr.Extensions,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
 	}
 	if certificate, err := x509.CreateCertificate(rand.Reader, template, template, template.PublicKey, privateKey); err != nil {
 		return nil, errors2.Wrap(err, "unable to create certificate")
@@ -832,7 +832,7 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	// Check key strength. Cast should be safe since we checked the algorithm.
 	if signingPubKey, ok := signingCert.PublicKey.(*rsa.PublicKey); !ok {
 		return nil, errors.New("invalid key type, expected *rsa.PublicKey")
-	} else if err := client.verifyKeySize(signingPubKey.Size()*8); err != nil {
+	} else if err := client.verifyKeySize(signingPubKey.Size() * 8); err != nil {
 		return nil, err
 	}
 	// Check certificate is trusted
