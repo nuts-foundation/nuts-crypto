@@ -20,6 +20,7 @@ package cert
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -32,10 +33,14 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	core "github.com/nuts-foundation/nuts-go-core"
 	errors2 "github.com/pkg/errors"
+	"golang.org/x/crypto/ed25519"
 )
 
 // ErrWrongPublicKey indicates a wrong public key format
 var ErrWrongPublicKey = core.NewError("failed to decode PEM block containing public key, key is of the wrong type", false)
+
+// ErrWrongPrivateKey indicates a wrong private key format
+var ErrWrongPrivateKey = core.NewError("failed to decode PEM block containing private key", false)
 
 // ErrRsaPubKeyConversion indicates a public key could not be converted to an RSA public key
 var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA public key", false)
@@ -77,6 +82,34 @@ func PublicKeyToPem(pub crypto.PublicKey) (string, error) {
 	})
 
 	return string(pubBytes), err
+}
+
+// PemToSigner converts a PEM encoded private key to a Signer interface. It supports EC, RSA and PKIX PEM encoded strings
+func PemToSigner(bytes []byte) (signer crypto.Signer, err error) {
+	block, _ := pem.Decode(bytes)
+	if block == nil {
+		err = ErrWrongPrivateKey
+		return
+	}
+
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		signer, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+	case "EC PRIVATE KEY":
+		signer, err = x509.ParseECPrivateKey(block.Bytes)
+	case "PRIVATE KEY":
+		var key interface{}
+		key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+		switch key.(type) {
+		case *rsa.PrivateKey:
+			signer = key.(*rsa.PrivateKey)
+		case *ecdsa.PrivateKey:
+			signer = key.(*ecdsa.PrivateKey)
+		case ed25519.PrivateKey:
+			signer = key.(ed25519.PrivateKey)
+		}
+	}
+	return
 }
 
 // MapToJwk transforms a Jwk in map structure to a Jwk Key. The map structure is a typical result from json deserialization.
