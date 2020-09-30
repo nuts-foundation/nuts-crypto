@@ -24,14 +24,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	core "github.com/nuts-foundation/nuts-go-core"
-	"github.com/nuts-foundation/nuts-go-test/io"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+
+	core "github.com/nuts-foundation/nuts-go-core"
+	"github.com/nuts-foundation/nuts-go-test/io"
+	"github.com/spf13/cobra"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	mock2 "github.com/nuts-foundation/nuts-crypto/test/mock"
@@ -452,7 +453,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			EncryptRequestSubjects: []EncryptRequestSubject{
 				{
 					LegalEntity: Identifier("UNKNOWN"),
-					Jwk:         &JWK{AdditionalProperties: map[string]interface{}{}},
+					Jwk:         &JWK{},
 				},
 			},
 			PlainText: base64.StdEncoding.EncodeToString([]byte(plaintext)),
@@ -1222,9 +1223,10 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 
 		t.Run("using jwk", func(t *testing.T) {
 			pk, _ := cert.JwkToMap(jwk)
+			jwk := JWK(pk)
 			jsonRequest := VerifyRequest{
 				Signature: hexSignature,
-				Jwk:       &JWK{AdditionalProperties: pk},
+				Jwk:       &jwk,
 				PlainText: base64PlainText,
 			}
 
@@ -1276,9 +1278,10 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 		t.Run("using jwk", func(t *testing.T) {
 			pk, _ := cert.JwkToMap(jwk)
 			pk["kty"] = "unknown"
+			jwk := JWK(pk)
 			jsonRequest := VerifyRequest{
 				Signature: hexSignature,
-				Jwk:       &JWK{AdditionalProperties: pk},
+				Jwk:       &jwk,
 				PlainText: base64PlainText,
 			}
 

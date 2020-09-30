@@ -8,14 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/deepmap/oapi-codegen/pkg/runtime"
-	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/deepmap/oapi-codegen/pkg/runtime"
+	"github.com/labstack/echo/v4"
 )
 
 // DecryptRequest defines model for DecryptRequest.
@@ -32,13 +32,6 @@ type DecryptRequest struct {
 
 	// base64 encoded nonce
 	Nonce string `json:"nonce"`
-}
-
-// DecryptResponse defines model for DecryptResponse.
-type DecryptResponse struct {
-
-	// Base64 encoded plain text
-	PlainText string `json:"plainText"`
 }
 
 // EncryptRequest defines model for EncryptRequest.
@@ -62,17 +55,6 @@ type EncryptRequestSubject struct {
 	PublicKey *PublicKey `json:"publicKey,omitempty"`
 }
 
-// EncryptResponse defines model for EncryptResponse.
-type EncryptResponse struct {
-
-	// Base64 encoded encrypted text
-	CipherText             string                 `json:"cipherText"`
-	EncryptResponseEntries []EncryptResponseEntry `json:"encryptResponseEntries"`
-
-	// Base64 encoded nonce
-	Nonce string `json:"nonce"`
-}
-
 // EncryptResponseEntry defines model for EncryptResponseEntry.
 type EncryptResponseEntry struct {
 
@@ -82,6 +64,20 @@ type EncryptResponseEntry struct {
 	// Generic identifier used for representing BSN, agbcode, etc. It's always constructed as an URN followed by a double colon (:) and then the identifying value of the given URN
 	LegalEntity Identifier `json:"legalEntity"`
 }
+
+// EncryptedData defines model for EncryptedData.
+type EncryptedData struct {
+
+	// Base64 encoded encrypted text
+	CipherText             string                 `json:"cipherText"`
+	EncryptResponseEntries []EncryptResponseEntry `json:"encryptResponseEntries"`
+
+	// Base64 encoded nonce
+	Nonce string `json:"nonce"`
+}
+
+// ExternalId defines model for ExternalId.
+type ExternalId string
 
 // ExternalIdRequest defines model for ExternalIdRequest.
 type ExternalIdRequest struct {
@@ -96,20 +92,14 @@ type ExternalIdRequest struct {
 	Subject Identifier `json:"subject"`
 }
 
-// ExternalIdResponse defines model for ExternalIdResponse.
-type ExternalIdResponse struct {
-
-	// hex encoded identifier
-	ExternalId string `json:"externalId"`
-}
-
 // Identifier defines model for Identifier.
 type Identifier string
 
 // JWK defines model for JWK.
-type JWK struct {
-	AdditionalProperties map[string]interface{} `json:"-"`
-}
+type JWK map[string]interface{}
+
+// PlainText defines model for PlainText.
+type PlainText string
 
 // PublicKey defines model for PublicKey.
 type PublicKey string
@@ -132,11 +122,14 @@ type SignRequest struct {
 	PlainText string `json:"plainText"`
 }
 
-// SignResponse defines model for SignResponse.
-type SignResponse struct {
+// Signature defines model for Signature.
+type Signature string
 
-	// hex encoded signature
-	Signature string `json:"signature"`
+// Verification defines model for Verification.
+type Verification struct {
+
+	// true or false
+	Outcome bool `json:"outcome"`
 }
 
 // VerifyRequest defines model for VerifyRequest.
@@ -153,13 +146,6 @@ type VerifyRequest struct {
 
 	// hex encoded signature
 	Signature string `json:"signature"`
-}
-
-// VerifyResponse defines model for VerifyResponse.
-type VerifyResponse struct {
-
-	// true or false
-	Outcome bool `json:"outcome"`
 }
 
 // SelfSignVendorCACertificateParams defines parameters for SelfSignVendorCACertificate.
@@ -221,59 +207,6 @@ type SignJwtJSONRequestBody SignJwtJSONBody
 
 // VerifyRequestBody defines body for Verify for application/json ContentType.
 type VerifyJSONRequestBody VerifyJSONBody
-
-// Getter for additional properties for JWK. Returns the specified
-// element and whether it was found
-func (a JWK) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for JWK
-func (a *JWK) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for JWK to handle AdditionalProperties
-func (a *JWK) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("error unmarshaling field %s", fieldName))
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for JWK to handle AdditionalProperties
-func (a JWK) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("error marshaling '%s'", fieldName))
-		}
-	}
-	return json.Marshal(object)
-}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1069,13 +1002,58 @@ func WithBaseURL(baseURL string) ClientOption {
 	}
 }
 
-type selfSignVendorCACertificateResponse struct {
+// ClientWithResponsesInterface is the interface specification for the client with responses above.
+type ClientWithResponsesInterface interface {
+	// SelfSignVendorCACertificate request
+	SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*SelfSignVendorCACertificateResponse, error)
+
+	// GenerateVendorCACSR request
+	GenerateVendorCACSRWithResponse(ctx context.Context, params *GenerateVendorCACSRParams) (*GenerateVendorCACSRResponse, error)
+
+	// Decrypt request  with any body
+	DecryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*DecryptResponse, error)
+
+	DecryptWithResponse(ctx context.Context, body DecryptJSONRequestBody) (*DecryptResponse, error)
+
+	// Encrypt request  with any body
+	EncryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*EncryptResponse, error)
+
+	EncryptWithResponse(ctx context.Context, body EncryptJSONRequestBody) (*EncryptResponse, error)
+
+	// ExternalId request  with any body
+	ExternalIdWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*ExternalIdResponse, error)
+
+	ExternalIdWithResponse(ctx context.Context, body ExternalIdJSONRequestBody) (*ExternalIdResponse, error)
+
+	// GenerateKeyPair request
+	GenerateKeyPairWithResponse(ctx context.Context, params *GenerateKeyPairParams) (*GenerateKeyPairResponse, error)
+
+	// PublicKey request
+	PublicKeyWithResponse(ctx context.Context, urn string) (*PublicKeyResponse, error)
+
+	// Sign request  with any body
+	SignWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignResponse, error)
+
+	SignWithResponse(ctx context.Context, body SignJSONRequestBody) (*SignResponse, error)
+
+	// SignJwt request  with any body
+	SignJwtWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignJwtResponse, error)
+
+	SignJwtWithResponse(ctx context.Context, body SignJwtJSONRequestBody) (*SignJwtResponse, error)
+
+	// Verify request  with any body
+	VerifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*VerifyResponse, error)
+
+	VerifyWithResponse(ctx context.Context, body VerifyJSONRequestBody) (*VerifyResponse, error)
+}
+
+type SelfSignVendorCACertificateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r selfSignVendorCACertificateResponse) Status() string {
+func (r SelfSignVendorCACertificateResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1083,20 +1061,20 @@ func (r selfSignVendorCACertificateResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r selfSignVendorCACertificateResponse) StatusCode() int {
+func (r SelfSignVendorCACertificateResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type generateVendorCACSRResponse struct {
+type GenerateVendorCACSRResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r generateVendorCACSRResponse) Status() string {
+func (r GenerateVendorCACSRResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1104,21 +1082,21 @@ func (r generateVendorCACSRResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r generateVendorCACSRResponse) StatusCode() int {
+func (r GenerateVendorCACSRResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type decryptResponse struct {
+type DecryptResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *DecryptResponse
+	JSON200      *PlainText
 }
 
 // Status returns HTTPResponse.Status
-func (r decryptResponse) Status() string {
+func (r DecryptResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1126,21 +1104,21 @@ func (r decryptResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r decryptResponse) StatusCode() int {
+func (r DecryptResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type encryptResponse struct {
+type EncryptResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *EncryptResponse
+	JSON200      *EncryptedData
 }
 
 // Status returns HTTPResponse.Status
-func (r encryptResponse) Status() string {
+func (r EncryptResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1148,21 +1126,21 @@ func (r encryptResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r encryptResponse) StatusCode() int {
+func (r EncryptResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type externalIdResponse struct {
+type ExternalIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ExternalIdResponse
+	JSON200      *ExternalId
 }
 
 // Status returns HTTPResponse.Status
-func (r externalIdResponse) Status() string {
+func (r ExternalIdResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1170,20 +1148,20 @@ func (r externalIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r externalIdResponse) StatusCode() int {
+func (r ExternalIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type generateKeyPairResponse struct {
+type GenerateKeyPairResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r generateKeyPairResponse) Status() string {
+func (r GenerateKeyPairResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1191,20 +1169,20 @@ func (r generateKeyPairResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r generateKeyPairResponse) StatusCode() int {
+func (r GenerateKeyPairResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type publicKeyResponse struct {
+type PublicKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r publicKeyResponse) Status() string {
+func (r PublicKeyResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1212,21 +1190,21 @@ func (r publicKeyResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r publicKeyResponse) StatusCode() int {
+func (r PublicKeyResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type signResponse struct {
+type SignResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *SignResponse
+	JSON200      *Signature
 }
 
 // Status returns HTTPResponse.Status
-func (r signResponse) Status() string {
+func (r SignResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1234,20 +1212,20 @@ func (r signResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r signResponse) StatusCode() int {
+func (r SignResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type signJwtResponse struct {
+type SignJwtResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r signJwtResponse) Status() string {
+func (r SignJwtResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1255,21 +1233,21 @@ func (r signJwtResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r signJwtResponse) StatusCode() int {
+func (r SignJwtResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type verifyResponse struct {
+type VerifyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *VerifyResponse
+	JSON200      *Verification
 }
 
 // Status returns HTTPResponse.Status
-func (r verifyResponse) Status() string {
+func (r VerifyResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1277,7 +1255,7 @@ func (r verifyResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r verifyResponse) StatusCode() int {
+func (r VerifyResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1285,7 +1263,7 @@ func (r verifyResponse) StatusCode() int {
 }
 
 // SelfSignVendorCACertificateWithResponse request returning *SelfSignVendorCACertificateResponse
-func (c *ClientWithResponses) SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*selfSignVendorCACertificateResponse, error) {
+func (c *ClientWithResponses) SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*SelfSignVendorCACertificateResponse, error) {
 	rsp, err := c.SelfSignVendorCACertificate(ctx, params)
 	if err != nil {
 		return nil, err
@@ -1294,7 +1272,7 @@ func (c *ClientWithResponses) SelfSignVendorCACertificateWithResponse(ctx contex
 }
 
 // GenerateVendorCACSRWithResponse request returning *GenerateVendorCACSRResponse
-func (c *ClientWithResponses) GenerateVendorCACSRWithResponse(ctx context.Context, params *GenerateVendorCACSRParams) (*generateVendorCACSRResponse, error) {
+func (c *ClientWithResponses) GenerateVendorCACSRWithResponse(ctx context.Context, params *GenerateVendorCACSRParams) (*GenerateVendorCACSRResponse, error) {
 	rsp, err := c.GenerateVendorCACSR(ctx, params)
 	if err != nil {
 		return nil, err
@@ -1303,7 +1281,7 @@ func (c *ClientWithResponses) GenerateVendorCACSRWithResponse(ctx context.Contex
 }
 
 // DecryptWithBodyWithResponse request with arbitrary body returning *DecryptResponse
-func (c *ClientWithResponses) DecryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*decryptResponse, error) {
+func (c *ClientWithResponses) DecryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*DecryptResponse, error) {
 	rsp, err := c.DecryptWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1311,7 +1289,7 @@ func (c *ClientWithResponses) DecryptWithBodyWithResponse(ctx context.Context, c
 	return ParseDecryptResponse(rsp)
 }
 
-func (c *ClientWithResponses) DecryptWithResponse(ctx context.Context, body DecryptJSONRequestBody) (*decryptResponse, error) {
+func (c *ClientWithResponses) DecryptWithResponse(ctx context.Context, body DecryptJSONRequestBody) (*DecryptResponse, error) {
 	rsp, err := c.Decrypt(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1320,7 +1298,7 @@ func (c *ClientWithResponses) DecryptWithResponse(ctx context.Context, body Decr
 }
 
 // EncryptWithBodyWithResponse request with arbitrary body returning *EncryptResponse
-func (c *ClientWithResponses) EncryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*encryptResponse, error) {
+func (c *ClientWithResponses) EncryptWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*EncryptResponse, error) {
 	rsp, err := c.EncryptWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1328,7 +1306,7 @@ func (c *ClientWithResponses) EncryptWithBodyWithResponse(ctx context.Context, c
 	return ParseEncryptResponse(rsp)
 }
 
-func (c *ClientWithResponses) EncryptWithResponse(ctx context.Context, body EncryptJSONRequestBody) (*encryptResponse, error) {
+func (c *ClientWithResponses) EncryptWithResponse(ctx context.Context, body EncryptJSONRequestBody) (*EncryptResponse, error) {
 	rsp, err := c.Encrypt(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1337,7 +1315,7 @@ func (c *ClientWithResponses) EncryptWithResponse(ctx context.Context, body Encr
 }
 
 // ExternalIdWithBodyWithResponse request with arbitrary body returning *ExternalIdResponse
-func (c *ClientWithResponses) ExternalIdWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*externalIdResponse, error) {
+func (c *ClientWithResponses) ExternalIdWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*ExternalIdResponse, error) {
 	rsp, err := c.ExternalIdWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1345,7 +1323,7 @@ func (c *ClientWithResponses) ExternalIdWithBodyWithResponse(ctx context.Context
 	return ParseExternalIdResponse(rsp)
 }
 
-func (c *ClientWithResponses) ExternalIdWithResponse(ctx context.Context, body ExternalIdJSONRequestBody) (*externalIdResponse, error) {
+func (c *ClientWithResponses) ExternalIdWithResponse(ctx context.Context, body ExternalIdJSONRequestBody) (*ExternalIdResponse, error) {
 	rsp, err := c.ExternalId(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1354,7 +1332,7 @@ func (c *ClientWithResponses) ExternalIdWithResponse(ctx context.Context, body E
 }
 
 // GenerateKeyPairWithResponse request returning *GenerateKeyPairResponse
-func (c *ClientWithResponses) GenerateKeyPairWithResponse(ctx context.Context, params *GenerateKeyPairParams) (*generateKeyPairResponse, error) {
+func (c *ClientWithResponses) GenerateKeyPairWithResponse(ctx context.Context, params *GenerateKeyPairParams) (*GenerateKeyPairResponse, error) {
 	rsp, err := c.GenerateKeyPair(ctx, params)
 	if err != nil {
 		return nil, err
@@ -1363,7 +1341,7 @@ func (c *ClientWithResponses) GenerateKeyPairWithResponse(ctx context.Context, p
 }
 
 // PublicKeyWithResponse request returning *PublicKeyResponse
-func (c *ClientWithResponses) PublicKeyWithResponse(ctx context.Context, urn string) (*publicKeyResponse, error) {
+func (c *ClientWithResponses) PublicKeyWithResponse(ctx context.Context, urn string) (*PublicKeyResponse, error) {
 	rsp, err := c.PublicKey(ctx, urn)
 	if err != nil {
 		return nil, err
@@ -1372,7 +1350,7 @@ func (c *ClientWithResponses) PublicKeyWithResponse(ctx context.Context, urn str
 }
 
 // SignWithBodyWithResponse request with arbitrary body returning *SignResponse
-func (c *ClientWithResponses) SignWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*signResponse, error) {
+func (c *ClientWithResponses) SignWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignResponse, error) {
 	rsp, err := c.SignWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1380,7 +1358,7 @@ func (c *ClientWithResponses) SignWithBodyWithResponse(ctx context.Context, cont
 	return ParseSignResponse(rsp)
 }
 
-func (c *ClientWithResponses) SignWithResponse(ctx context.Context, body SignJSONRequestBody) (*signResponse, error) {
+func (c *ClientWithResponses) SignWithResponse(ctx context.Context, body SignJSONRequestBody) (*SignResponse, error) {
 	rsp, err := c.Sign(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1389,7 +1367,7 @@ func (c *ClientWithResponses) SignWithResponse(ctx context.Context, body SignJSO
 }
 
 // SignJwtWithBodyWithResponse request with arbitrary body returning *SignJwtResponse
-func (c *ClientWithResponses) SignJwtWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*signJwtResponse, error) {
+func (c *ClientWithResponses) SignJwtWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignJwtResponse, error) {
 	rsp, err := c.SignJwtWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1397,7 +1375,7 @@ func (c *ClientWithResponses) SignJwtWithBodyWithResponse(ctx context.Context, c
 	return ParseSignJwtResponse(rsp)
 }
 
-func (c *ClientWithResponses) SignJwtWithResponse(ctx context.Context, body SignJwtJSONRequestBody) (*signJwtResponse, error) {
+func (c *ClientWithResponses) SignJwtWithResponse(ctx context.Context, body SignJwtJSONRequestBody) (*SignJwtResponse, error) {
 	rsp, err := c.SignJwt(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1406,7 +1384,7 @@ func (c *ClientWithResponses) SignJwtWithResponse(ctx context.Context, body Sign
 }
 
 // VerifyWithBodyWithResponse request with arbitrary body returning *VerifyResponse
-func (c *ClientWithResponses) VerifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*verifyResponse, error) {
+func (c *ClientWithResponses) VerifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*VerifyResponse, error) {
 	rsp, err := c.VerifyWithBody(ctx, contentType, body)
 	if err != nil {
 		return nil, err
@@ -1414,7 +1392,7 @@ func (c *ClientWithResponses) VerifyWithBodyWithResponse(ctx context.Context, co
 	return ParseVerifyResponse(rsp)
 }
 
-func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body VerifyJSONRequestBody) (*verifyResponse, error) {
+func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body VerifyJSONRequestBody) (*VerifyResponse, error) {
 	rsp, err := c.Verify(ctx, body)
 	if err != nil {
 		return nil, err
@@ -1423,14 +1401,14 @@ func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body Verif
 }
 
 // ParseSelfSignVendorCACertificateResponse parses an HTTP response from a SelfSignVendorCACertificateWithResponse call
-func ParseSelfSignVendorCACertificateResponse(rsp *http.Response) (*selfSignVendorCACertificateResponse, error) {
+func ParseSelfSignVendorCACertificateResponse(rsp *http.Response) (*SelfSignVendorCACertificateResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &selfSignVendorCACertificateResponse{
+	response := &SelfSignVendorCACertificateResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1442,14 +1420,14 @@ func ParseSelfSignVendorCACertificateResponse(rsp *http.Response) (*selfSignVend
 }
 
 // ParseGenerateVendorCACSRResponse parses an HTTP response from a GenerateVendorCACSRWithResponse call
-func ParseGenerateVendorCACSRResponse(rsp *http.Response) (*generateVendorCACSRResponse, error) {
+func ParseGenerateVendorCACSRResponse(rsp *http.Response) (*GenerateVendorCACSRResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &generateVendorCACSRResponse{
+	response := &GenerateVendorCACSRResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1461,21 +1439,21 @@ func ParseGenerateVendorCACSRResponse(rsp *http.Response) (*generateVendorCACSRR
 }
 
 // ParseDecryptResponse parses an HTTP response from a DecryptWithResponse call
-func ParseDecryptResponse(rsp *http.Response) (*decryptResponse, error) {
+func ParseDecryptResponse(rsp *http.Response) (*DecryptResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &decryptResponse{
+	response := &DecryptResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest DecryptResponse
+		var dest PlainText
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1487,21 +1465,21 @@ func ParseDecryptResponse(rsp *http.Response) (*decryptResponse, error) {
 }
 
 // ParseEncryptResponse parses an HTTP response from a EncryptWithResponse call
-func ParseEncryptResponse(rsp *http.Response) (*encryptResponse, error) {
+func ParseEncryptResponse(rsp *http.Response) (*EncryptResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &encryptResponse{
+	response := &EncryptResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest EncryptResponse
+		var dest EncryptedData
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1513,21 +1491,21 @@ func ParseEncryptResponse(rsp *http.Response) (*encryptResponse, error) {
 }
 
 // ParseExternalIdResponse parses an HTTP response from a ExternalIdWithResponse call
-func ParseExternalIdResponse(rsp *http.Response) (*externalIdResponse, error) {
+func ParseExternalIdResponse(rsp *http.Response) (*ExternalIdResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &externalIdResponse{
+	response := &ExternalIdResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ExternalIdResponse
+		var dest ExternalId
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1539,14 +1517,14 @@ func ParseExternalIdResponse(rsp *http.Response) (*externalIdResponse, error) {
 }
 
 // ParseGenerateKeyPairResponse parses an HTTP response from a GenerateKeyPairWithResponse call
-func ParseGenerateKeyPairResponse(rsp *http.Response) (*generateKeyPairResponse, error) {
+func ParseGenerateKeyPairResponse(rsp *http.Response) (*GenerateKeyPairResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &generateKeyPairResponse{
+	response := &GenerateKeyPairResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1558,14 +1536,14 @@ func ParseGenerateKeyPairResponse(rsp *http.Response) (*generateKeyPairResponse,
 }
 
 // ParsePublicKeyResponse parses an HTTP response from a PublicKeyWithResponse call
-func ParsePublicKeyResponse(rsp *http.Response) (*publicKeyResponse, error) {
+func ParsePublicKeyResponse(rsp *http.Response) (*PublicKeyResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &publicKeyResponse{
+	response := &PublicKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1577,21 +1555,21 @@ func ParsePublicKeyResponse(rsp *http.Response) (*publicKeyResponse, error) {
 }
 
 // ParseSignResponse parses an HTTP response from a SignWithResponse call
-func ParseSignResponse(rsp *http.Response) (*signResponse, error) {
+func ParseSignResponse(rsp *http.Response) (*SignResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &signResponse{
+	response := &SignResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SignResponse
+		var dest Signature
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1603,14 +1581,14 @@ func ParseSignResponse(rsp *http.Response) (*signResponse, error) {
 }
 
 // ParseSignJwtResponse parses an HTTP response from a SignJwtWithResponse call
-func ParseSignJwtResponse(rsp *http.Response) (*signJwtResponse, error) {
+func ParseSignJwtResponse(rsp *http.Response) (*SignJwtResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &signJwtResponse{
+	response := &SignJwtResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1622,21 +1600,21 @@ func ParseSignJwtResponse(rsp *http.Response) (*signJwtResponse, error) {
 }
 
 // ParseVerifyResponse parses an HTTP response from a VerifyWithResponse call
-func ParseVerifyResponse(rsp *http.Response) (*verifyResponse, error) {
+func ParseVerifyResponse(rsp *http.Response) (*VerifyResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer rsp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &verifyResponse{
+	response := &VerifyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest VerifyResponse
+		var dest Verification
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

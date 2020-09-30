@@ -103,7 +103,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EncryptResponse'
+                $ref: '#/components/schemas/EncryptedData'
         '400':
           description: incorrect data
           content:
@@ -128,7 +128,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DecryptResponse'
+                $ref: '#/components/schemas/PlainText'
         '400':
           description: incorrect data
           content:
@@ -153,7 +153,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExternalIdResponse'
+                $ref: '#/components/schemas/ExternalId'
         '400':
           description: incorrect data
           content:
@@ -178,7 +178,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SignResponse'
+                $ref: '#/components/schemas/Signature'
         '400':
           description: "incorrect data"
           content:
@@ -203,7 +203,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerifyResponse'
+                $ref: '#/components/schemas/Verification'
         '400':
           description: "incorrect data"
           content:
@@ -313,7 +313,7 @@ components:
           $ref: "#/components/schemas/PublicKey"
         jwk:
           $ref: '#/components/schemas/JWK'
-    EncryptResponse:
+    EncryptedData:
       required:
         - cipherText
         - nonce
@@ -357,13 +357,9 @@ components:
         nonce:
           type: string
           description: "base64 encoded nonce"
-    DecryptResponse:
-      required:
-        - plainText
-      properties:
-        plainText:
-          type: string
-          description: "Base64 encoded plain text"
+    PlainText:
+      type: string
+      description: "Base64 encoded plain text"
     ExternalIdRequest:
       required:
         - legalEntity
@@ -376,13 +372,9 @@ components:
           $ref: "#/components/schemas/Identifier"
         actor:
           $ref: "#/components/schemas/Identifier"
-    ExternalIdResponse:
-      required:
-        - externalId
-      properties:
-        externalId:
-          type: string
-          description: "hex encoded identifier"
+    ExternalId:
+      type: string
+      description: "hex encoded identifier"
     SignRequest:
       required:
         - plainText
@@ -402,13 +394,9 @@ components:
           $ref: "#/components/schemas/Identifier"
         claims:
           type: object
-    SignResponse:
-      required:
-        - signature
-      properties:
-        signature:
-          type: string
-          description: "hex encoded signature"
+    Signature:
+      type: string
+      description: "hex encoded signature"
     VerifyRequest:
       required:
         - plainText
@@ -424,7 +412,7 @@ components:
         signature:
           type: string
           description: "hex encoded signature"
-    VerifyResponse:
+    Verification:
       required:
         - outcome
       properties:
