@@ -27,9 +27,10 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+// ErrUnsupportedSigningKey is returned when an unsupported private key is used to sign. Currently only ecdsa and rsa keys are supported
 var ErrUnsupportedSigningKey = errors.New("signing key algorithm not supported")
 
-// move to crypto
+// SignJWT signs claims with the signer and returns the compacted token.
 func SignJWT(signer crypto.Signer, claims map[string]interface{}) (sig string, err error) {
 	c := jwt.MapClaims{}
 	for k, v := range claims {
