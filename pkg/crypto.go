@@ -32,7 +32,6 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
 	"path"
 	"reflect"
@@ -41,16 +40,16 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
-	errors2 "github.com/pkg/errors"
-
-	"github.com/dgrijalva/jwt-go"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jws"
 	"github.com/nuts-foundation/nuts-crypto/log"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	"github.com/nuts-foundation/nuts-crypto/pkg/jwx"
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	core "github.com/nuts-foundation/nuts-go-core"
+	errors2 "github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // MinKeySize defines the minimum (RSA) key size
@@ -745,20 +744,15 @@ func (client *Crypto) GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error
 }
 
 // SignJwtFor creates a signed JWT given a legalEntity and map of claims
-func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error) {
+func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (token string, err error) {
 	rsaPrivateKey, err := client.Storage.GetPrivateKey(key)
 
 	if err != nil {
 		return "", err
 	}
 
-	c := jwt.MapClaims{}
-	for k, v := range claims {
-		c[k] = v
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	return token.SignedString(rsaPrivateKey)
+	token, err = jwx.SignJWT(rsaPrivateKey, claims)
+	return
 }
 
 func (client Crypto) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error) {
