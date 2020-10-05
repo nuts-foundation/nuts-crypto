@@ -5,10 +5,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	asn12 "github.com/nuts-foundation/nuts-crypto/pkg/asn1"
-	"strings"
-)
 
+	asn12 "github.com/nuts-foundation/nuts-crypto/pkg/asn1"
+	core "github.com/nuts-foundation/nuts-go-core"
+)
 
 var OIDSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
 var OIDNuts = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 54851}
@@ -20,8 +20,8 @@ var OIDNutsDomain = asn12.OIDAppend(OIDNuts, 3)
 //   vendorName:    Name of the vendor
 //   qualifier:     (optional) Qualifier for the certificate, which will be postfixed to Subject.CommonName
 //   domain:        Domain the vendor operates in, e.g. "healthcare"
-func VendorCertificateRequest(vendorID string, vendorName string, qualifier string, domain string) (*x509.CertificateRequest, error) {
-	if vendorID == "" {
+func VendorCertificateRequest(vendorID core.PartyID, vendorName string, qualifier string, domain string) (*x509.CertificateRequest, error) {
+	if vendorID.IsZero() {
 		return nil, errors.New("missing vendor identifier")
 	}
 	if vendorName == "" {
@@ -32,8 +32,7 @@ func VendorCertificateRequest(vendorID string, vendorName string, qualifier stri
 	}
 	// The supplied vendorID is prefixed with the type (URN+OID), which is also specified in the ASN.1 structure.
 	// Thus we should just take the value part (everything after the last colon) from the vendorID.
-	vendorIDParts := strings.Split(vendorID, ":")
-	subjectAltName, err := MarshalOtherSubjectAltName(OIDNutsVendor, vendorIDParts[len(vendorIDParts) - 1])
+	subjectAltName, err := MarshalOtherSubjectAltName(OIDNutsVendor, vendorID.Value())
 	if err != nil {
 		return nil, err
 	}
