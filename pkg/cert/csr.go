@@ -5,6 +5,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
+	"strings"
 
 	asn12 "github.com/nuts-foundation/nuts-crypto/pkg/asn1"
 	core "github.com/nuts-foundation/nuts-go-core"
@@ -56,6 +58,41 @@ func VendorCertificateRequest(vendorID core.PartyID, vendorName string, qualifie
 			Organization: []string{vendorName},
 			CommonName:   commonName,
 		},
+		ExtraExtensions: extensions,
+	}, nil
+}
+
+// CSRFromVendorCA generates a CSR based upon the VendorCA. It copies any extensions needed as well as the O and C
+// The common name is appended with the qualifier.
+func CSRFromVendorCA(ca *x509.Certificate, qualifier string, publicKey interface{}) (*x509.CertificateRequest, error) {
+	if ca == nil {
+		return nil, errors.New("missing vendor CA")
+	}
+
+	if strings.TrimSpace(qualifier) == "" {
+		return nil, errors.New("missing qualifier")
+	}
+
+	if publicKey == nil {
+		return nil, errors.New("missing public key")
+	}
+
+	// extract SAN and Domain extensions
+	extensions := []pkix.Extension{}
+
+	for _, e := range ca.Extensions {
+		if e.Id.Equal(OIDNutsDomain) || e.Id.Equal(OIDSubjectAltName) {
+			extensions = append(extensions, e)
+		}
+	}
+
+	return &x509.CertificateRequest{
+		Subject: pkix.Name{
+			Country:      ca.Subject.Country,
+			Organization: ca.Subject.Organization,
+			CommonName:   fmt.Sprintf("%s %s", ca.Subject.CommonName, qualifier),
+		},
+		PublicKey:       publicKey,
 		ExtraExtensions: extensions,
 	}, nil
 }

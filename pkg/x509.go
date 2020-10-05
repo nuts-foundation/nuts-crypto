@@ -20,6 +20,7 @@ package pkg
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
@@ -57,6 +58,15 @@ const TLSCertificateValidityInDays = 365
 
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
+
+// Certificate validity in days according to Nuts RFC003
+const RFC003ValidityInDays = 4
+
+// RFC003CertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
+var RFC003CertificateProfile = CertificateProfile{
+	KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
+	NumDaysValid: RFC003ValidityInDays,
+}
 
 // vendorCACertificateDaysValid holds the number of days self-signed Vendor CA certificates are valid
 const vendorCACertificateDaysValid = 1095
@@ -198,6 +208,42 @@ func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certi
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		NumDaysValid: TLSCertificateValidityInDays,
 	})
+}
+
+func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.PrivateKey, error) {
+	entity := vendorEntity()
+	log.Logger().Debugf("Generating '%s' certificate for entity: %s", SigningCertificateQualifier, entity)
+
+	caKey := types.KeyForEntity(entity)
+	caCertificate, err := client.Storage.GetCertificate(caKey)
+	if err != nil || caCertificate == nil {
+		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s: %v", caKey, err)
+	}
+	if len(caCertificate.Subject.Organization) == 0 {
+		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'O' component", caKey)
+	}
+	if len(caCertificate.Subject.Country) == 0 {
+		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
+	}
+
+	var certificate *x509.Certificate
+	var privateKey *ecdsa.PrivateKey
+	if privateKey, err = generateECKeyPair(); err != nil {
+		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", SigningCertificateQualifier)
+	}
+	csr, err := cert.CSRFromVendorCA(caCertificate, SigningCertificateQualifier, &privateKey.PublicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to construct CSR: %w", err)
+	}
+	certificateAsBytes, err := client.signCertificate(csr, caKey, RFC003CertificateProfile, false)
+	if err != nil {
+		return nil, nil, errors2.Wrapf(err, "unable to generate %s certificate %s", SigningCertificateQualifier, caKey)
+	}
+	certificate, err = x509.ParseCertificate(certificateAsBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return certificate, privateKey, nil
 }
 
 func (client *Crypto) getCertificateAndKey(certKey types.KeyIdentifier) (*x509.Certificate, crypto.PrivateKey, error) {

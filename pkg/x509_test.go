@@ -66,7 +66,6 @@ func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error
 
 func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 	client := createCrypto(t)
-	createCrypto(t)
 
 	t.Run("ok", func(t *testing.T) {
 		csrAsBytes, err := client.GenerateVendorCACSR("BecauseWeCare B.V.")
@@ -416,7 +415,6 @@ func TestCrypto_RenewTLSCertificate(t *testing.T) {
 
 func TestCrypto_SignCertificate(t *testing.T) {
 	client := createCrypto(t)
-	createCrypto(t)
 
 	ca := key
 	client.GenerateKeyPair(ca, false)
@@ -636,6 +634,31 @@ func TestCrypto_SignCertificate(t *testing.T) {
 			assert.Contains(t, err.Error(), ErrUnknownCA.Error())
 		}
 		assert.Nil(t, certificate)
+	})
+}
+
+func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
+	client := createCrypto(t)
+	client.SelfSignVendorCACertificate("test")
+	ca := key
+	client.GenerateKeyPair(ca, false)
+
+	certificate, err := client.SelfSignVendorCACertificate("test")
+	if !assert.NoError(t, err) {
+		return
+	}
+	err = client.StoreVendorCACertificate(certificate)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	t.Run("does not fail for correct CA", func(t *testing.T) {
+		cert, sk, err := client.generateVendorEphemeralSigningCertificate()
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.NotNil(t, sk)
+		assert.NotNil(t, cert)
 	})
 }
 
