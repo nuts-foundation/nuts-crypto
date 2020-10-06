@@ -55,6 +55,8 @@ var ErrKeyAlreadyExists = errors.New("key already exists")
 
 const TLSCertificateQualifier = "tls"
 const SigningCertificateQualifier = "sign"
+const OAuthCertificateQualifier = "oauth"
+const CACertificateQualifier = "CA"
 
 type CryptoConfig struct {
 	Mode          string

@@ -125,7 +125,6 @@ func TestCrypto_GenerateVendorCACSR(t *testing.T) {
 
 func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
 	client := createCrypto(t)
-	createCrypto(t)
 	t.Run("ok", func(t *testing.T) {
 		certificate, err := client.SelfSignVendorCACertificate("BecauseWeCare B.V.")
 		if !assert.NoError(t, err) {
@@ -638,6 +637,38 @@ func TestCrypto_SignCertificate(t *testing.T) {
 }
 
 func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
+	client := createCrypto(t)
+	t.Run("ok", func(t *testing.T) {
+		ca, err := client.SelfSignVendorCACertificate("BecauseWeCare B.V.")
+		if !assert.NoError(t, err) {
+			return
+		}
+		_ = client.StoreVendorCACertificate(ca)
+		certificate, key, err := client.generateVendorEphemeralSigningCertificate()
+		t.Run("Key and certificate are returned", func(t *testing.T) {
+			assert.Nil(t, err)
+			assert.NotNil(t, certificate)
+			assert.NotNil(t, key)
+		})
+
+		t.Run("verify subject & issuer", func(t *testing.T) {
+			assert.Equal(t, "CN=BecauseWeCare B.V. oauth,O=BecauseWeCare B.V.,C=NL", certificate.Subject.String())
+			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", certificate.Issuer.String())
+		})
+		t.Run("verify VendorID SAN", func(t *testing.T) {
+			extension, err := getUniqueExtension("2.5.29.17", certificate.Extensions)
+			assert.NoError(t, err)
+			assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, extension.Value)
+		})
+		t.Run("verify Domain extension", func(t *testing.T) {
+			extension, err := getUniqueExtension("1.3.6.1.4.1.54851.3", certificate.Extensions)
+			assert.NoError(t, err)
+			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
+		})
+	})
+}
+
+func TestCrypto_generateVendorEphemeralSigningCertificate2(t *testing.T) {
 	client := createCrypto(t)
 	client.SelfSignVendorCACertificate("test")
 	ca := key

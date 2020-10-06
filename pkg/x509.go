@@ -173,7 +173,7 @@ func (client *Crypto) generateVendorCACSR(name string, identity core.PartyID) ([
 	if err != nil {
 		return nil, nil, err
 	}
-	csr, err := cert.VendorCertificateRequest(identity, name, "CA", "healthcare") // TODO: Domain is now hardcoded
+	csr, err := cert.VendorCertificateRequest(identity, name, CACertificateQualifier, "healthcare") // TODO: Domain is now hardcoded
 	if err != nil {
 		return nil, nil, errors2.Wrap(err, "unable to create CSR template")
 	}
@@ -212,7 +212,7 @@ func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certi
 
 func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.PrivateKey, error) {
 	entity := vendorEntity()
-	log.Logger().Debugf("Generating '%s' certificate for entity: %s", SigningCertificateQualifier, entity)
+	log.Logger().Debugf("Generating '%s' certificate for entity: %s", OAuthCertificateQualifier, entity)
 
 	caKey := types.KeyForEntity(entity)
 	caCertificate, err := client.Storage.GetCertificate(caKey)
@@ -229,15 +229,19 @@ func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certifi
 	var certificate *x509.Certificate
 	var privateKey *ecdsa.PrivateKey
 	if privateKey, err = generateECKeyPair(); err != nil {
-		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", SigningCertificateQualifier)
+		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", OAuthCertificateQualifier)
 	}
-	csr, err := cert.CSRFromVendorCA(caCertificate, SigningCertificateQualifier, &privateKey.PublicKey)
+	csr, err := cert.CSRFromVendorCA(caCertificate, OAuthCertificateQualifier, &privateKey.PublicKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to construct CSR: %w", err)
 	}
+
+	// in this case we don't serialize the CSR so the extra extensions need to be copied to the extensions
+	csr.Extensions = csr.ExtraExtensions
+
 	certificateAsBytes, err := client.signCertificate(csr, caKey, RFC003CertificateProfile, false)
 	if err != nil {
-		return nil, nil, errors2.Wrapf(err, "unable to generate %s certificate %s", SigningCertificateQualifier, caKey)
+		return nil, nil, errors2.Wrapf(err, "unable to generate %s certificate %s", OAuthCertificateQualifier, caKey)
 	}
 	certificate, err = x509.ParseCertificate(certificateAsBytes)
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	"fmt"
 	"strings"
 
 	asn12 "github.com/nuts-foundation/nuts-crypto/pkg/asn1"
@@ -90,7 +89,7 @@ func CSRFromVendorCA(ca *x509.Certificate, qualifier string, publicKey interface
 		Subject: pkix.Name{
 			Country:      ca.Subject.Country,
 			Organization: ca.Subject.Organization,
-			CommonName:   fmt.Sprintf("%s %s", ca.Subject.CommonName, qualifier),
+			CommonName:   strings.ReplaceAll(ca.Subject.CommonName, "CA", qualifier),
 		},
 		PublicKey:       publicKey,
 		ExtraExtensions: extensions,
