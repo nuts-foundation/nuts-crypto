@@ -107,7 +107,7 @@ func generateTestCA() *x509.Certificate {
 		Subject: pkix.Name{
 			Country:      []string{"NL"},
 			Organization: []string{"Test"},
-			CommonName:   "CN",
+			CommonName:   "CN CA",
 		},
 		PublicKey:             privKey.PublicKey,
 		NotBefore:             notBefore,
