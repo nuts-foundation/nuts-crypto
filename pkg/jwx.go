@@ -77,10 +77,6 @@ func (client *Crypto) SignJWTRFC003(claims map[string]interface{}) (token string
 		return
 	}
 
-	if err != nil {
-		return "", err
-	}
-
 	chain := cert.MarshalX509CertChain([]*x509.Certificate{certificate})
 	additionalHeaders := map[string]interface{}{
 		"x5c": chain,
@@ -214,7 +210,7 @@ func SignJWT(signer crypto.Signer, claims map[string]interface{}, headers map[st
 	// the current version of the used JWT lib doesn't support the crypto.Signer interface. The 4.0.0 version will.
 	switch signer.(type) {
 	case *rsa.PrivateKey:
-		token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
+		token := jwt.NewWithClaims(jwt.SigningMethodPS256, c)
 		addHeaders(token, headers)
 		sig, err = token.SignedString(signer.(*rsa.PrivateKey))
 	case *ecdsa.PrivateKey:
