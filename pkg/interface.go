@@ -21,10 +21,11 @@ package pkg
 import (
 	"crypto"
 	"crypto/x509"
+	"time"
+
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
-	"time"
 )
 
 // Client defines the functions than can be called by a Cmd, Direct or via rest call.
@@ -81,6 +82,8 @@ type Client interface {
 	GetPublicKeyAsJWK(key types.KeyIdentifier) (jwk.Key, error)
 	// SignJWT creates a signed JWT using the given key and map of claims (private key must be present).
 	SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error)
+	// SignJWTRFC003 creates a signed JWT according to RFC003 using an ephemeral Vendor signing key and map of claims.
+	SignJWTRFC003(claims map[string]interface{}) (string, error)
 	// SignJWS signs payload according to the JWS spec with the specified key. There must be both a private key and
 	// corresponding certificate be present for the given key, and the certificate must be meant for signing. If any of
 	// these preconditions fail, an error is returned.
