@@ -5,6 +5,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"strings"
 
 	asn12 "github.com/nuts-foundation/nuts-crypto/pkg/asn1"
@@ -63,13 +64,13 @@ func VendorCertificateRequest(vendorID core.PartyID, vendorName string, qualifie
 
 // CSRFromVendorCA generates a CSR based upon the VendorCA. It copies any extensions needed as well as the O and C
 // The common name is appended with the qualifier.
-func CSRFromVendorCA(ca *x509.Certificate, qualifier string, publicKey interface{}) (*x509.CertificateRequest, error) {
+func CSRFromVendorCA(ca *x509.Certificate, existingQualifier string, qualifierReplacement string, publicKey interface{}) (*x509.CertificateRequest, error) {
 	if ca == nil {
 		return nil, errors.New("missing vendor CA")
 	}
 
-	if strings.TrimSpace(qualifier) == "" {
-		return nil, errors.New("missing qualifier")
+	if strings.TrimSpace(qualifierReplacement) == "" {
+		return nil, errors.New("missing replacement qualifier")
 	}
 
 	if publicKey == nil {
@@ -85,13 +86,20 @@ func CSRFromVendorCA(ca *x509.Certificate, qualifier string, publicKey interface
 		}
 	}
 
-	return &x509.CertificateRequest{
-		Subject: pkix.Name{
-			Country:      ca.Subject.Country,
-			Organization: ca.Subject.Organization,
-			CommonName:   strings.ReplaceAll(ca.Subject.CommonName, "CA", qualifier),
-		},
+	req := x509.CertificateRequest{
+		Subject:         ca.Subject,
 		PublicKey:       publicKey,
 		ExtraExtensions: extensions,
-	}, nil
+	}
+
+	commonName := fmt.Sprintf("%s %s", ca.Subject.CommonName, qualifierReplacement)
+	if strings.TrimSpace(existingQualifier) != "" && strings.HasSuffix(ca.Subject.CommonName, existingQualifier) {
+		commonName = fmt.Sprintf("%s%s",
+			ca.Subject.CommonName[:strings.LastIndex(ca.Subject.CommonName, existingQualifier)],
+			qualifierReplacement,
+		)
+	}
+	req.Subject.CommonName = commonName
+
+	return &req, nil
 }

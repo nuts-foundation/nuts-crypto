@@ -51,33 +51,41 @@ func TestCSRFromVendorCA(t *testing.T) {
 	sk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	t.Run("fails for missing public key", func(t *testing.T) {
-		_, err := CSRFromVendorCA(ca, "qualifier", nil)
+		_, err := CSRFromVendorCA(ca, "qualifier", "qualifier", nil)
 
 		assert.Error(t, err)
 	})
 
 	t.Run("fails for missing CA", func(t *testing.T) {
-		_, err := CSRFromVendorCA(nil, "qualifier", sk.PublicKey)
+		_, err := CSRFromVendorCA(nil, "qualifier", "qualifier", sk.PublicKey)
 
 		assert.Error(t, err)
 	})
 
-	t.Run("fails for missing qualifier", func(t *testing.T) {
-		_, err := CSRFromVendorCA(ca, "", sk.PublicKey)
+	t.Run("fails for missing replacement qualifier", func(t *testing.T) {
+		_, err := CSRFromVendorCA(ca, "qualifier", "", sk.PublicKey)
 
 		assert.Error(t, err)
 	})
 
 	t.Run("sets the right common name", func(t *testing.T) {
-		csr, err := CSRFromVendorCA(ca, "qualifier", sk.PublicKey)
+		csr, err := CSRFromVendorCA(ca, "CA", "qualifier", sk.PublicKey)
 
 		if assert.NoError(t, err) {
 			assert.Equal(t, "CN qualifier", csr.Subject.CommonName)
 		}
 	})
 
+	t.Run("does not alter the common name", func(t *testing.T) {
+		csr, err := CSRFromVendorCA(ca, "", "qualifier", sk.PublicKey)
+
+		if assert.NoError(t, err) {
+			assert.Equal(t, "CN CA qualifier", csr.Subject.CommonName)
+		}
+	})
+
 	t.Run("sets the right extensions", func(t *testing.T) {
-		csr, err := CSRFromVendorCA(ca, "qualifier", sk.PublicKey)
+		csr, err := CSRFromVendorCA(ca, "", "qualifier", sk.PublicKey)
 
 		if assert.NoError(t, err) {
 			if assert.Len(t, csr.ExtraExtensions, 2) {

@@ -231,7 +231,7 @@ func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certifi
 	if privateKey, err = generateECKeyPair(); err != nil {
 		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", OAuthCertificateQualifier)
 	}
-	csr, err := cert.CSRFromVendorCA(caCertificate, OAuthCertificateQualifier, &privateKey.PublicKey)
+	csr, err := cert.CSRFromVendorCA(caCertificate, CACertificateQualifier, OAuthCertificateQualifier, &privateKey.PublicKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to construct CSR: %w", err)
 	}
