@@ -173,7 +173,7 @@ func TestCrypto_SignJWTRFC003(t *testing.T) {
 	client.StoreVendorCACertificate(c)
 
 	t.Run("creates valid JWT", func(t *testing.T) {
-		tokenString, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"}, key)
+		tokenString, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"})
 
 		if !assert.NoError(t, err) {
 			return
@@ -189,7 +189,7 @@ func TestCrypto_SignJWTRFC003(t *testing.T) {
 
 	t.Run("Returns error on missing CA", func(t *testing.T) {
 		client := createCrypto(t)
-		_, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"}, key)
+		_, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"})
 
 		assert.Error(t, err)
 	})

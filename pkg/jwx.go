@@ -67,8 +67,8 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 	return
 }
 
-// SignJWTRFC003 sign a JWT according to Nuts RFC003. This func is only for signing the bearer token of the oauth flow.
-func (client *Crypto) SignJWTRFC003(claims map[string]interface{}, key types.KeyIdentifier) (token string, err error) {
+// SignJWTRFC003 signs a JWT according to Nuts RFC003. This func is only for signing the bearer token of the oauth flow.
+func (client *Crypto) SignJWTRFC003(claims map[string]interface{}) (token string, err error) {
 	var (
 		certificate *x509.Certificate
 		privateKey  crypto.Signer
