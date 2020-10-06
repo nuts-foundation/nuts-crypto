@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestSignJWT(t *testing.T) {
 	claims := map[string]interface{}{"iss": "nuts"}
 	t.Run("creates valid JWT using rsa keys", func(t *testing.T) {
 		key, _ := rsa2.GenerateKey(rand.Reader, 2048)
-		tokenString, err := SignJWT(key, claims)
+		tokenString, err := SignJWT(key, claims, nil)
 
 		assert.Nil(t, err)
 
@@ -73,7 +74,7 @@ func TestSignJWT(t *testing.T) {
 		for _, key := range keys {
 			name := fmt.Sprintf("using %s", key.Params().Name)
 			t.Run(name, func(t *testing.T) {
-				tokenString, err := SignJWT(key, claims)
+				tokenString, err := SignJWT(key, claims, nil)
 
 				if assert.Nil(t, err) {
 					token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -89,16 +90,28 @@ func TestSignJWT(t *testing.T) {
 		}
 	})
 
+	t.Run("sets correct headers", func(t *testing.T) {
+		key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		raw, _ := SignJWT(key, claims, map[string]interface{}{"x5c": []string{"BASE64"}})
+		token, _ := jwt.Parse(raw, func(token *jwt.Token) (interface{}, error) {
+			return key.Public(), nil
+		})
+
+		assert.Equal(t, "JWT", token.Header["typ"])
+		assert.Equal(t, "ES256", token.Header["alg"])
+		assert.Equal(t, []interface{}{"BASE64"}, token.Header["x5c"])
+	})
+
 	t.Run("returns error on unknown curve", func(t *testing.T) {
 		key, _ := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
-		_, err := SignJWT(key, claims)
+		_, err := SignJWT(key, claims, nil)
 
 		assert.NotNil(t, err)
 	})
 
 	t.Run("returns error on unsupported crypto", func(t *testing.T) {
 		_, key, _ := ed25519.GenerateKey(rand.Reader)
-		_, err := SignJWT(key, claims)
+		_, err := SignJWT(key, claims, nil)
 
 		assert.NotNil(t, err)
 	})
@@ -127,7 +140,7 @@ func TestCrypto_PublicKeyInJWK(t *testing.T) {
 	})
 }
 
-func TestCrypto_SignJwtFor(t *testing.T) {
+func TestCrypto_SignJWT(t *testing.T) {
 	client := createCrypto(t)
 	createCrypto(t)
 
@@ -151,6 +164,34 @@ func TestCrypto_SignJwtFor(t *testing.T) {
 		_, err := client.SignJWT(map[string]interface{}{"iss": "nuts"}, key.WithQualifier("notfound"))
 
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+func TestCrypto_SignJWTRFC003(t *testing.T) {
+	client := createCrypto(t)
+	c, _ := client.SelfSignVendorCACertificate("test")
+	client.StoreVendorCACertificate(c)
+
+	t.Run("creates valid JWT", func(t *testing.T) {
+		tokenString, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"}, key)
+
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		actual, err := jws.Parse(strings.NewReader(tokenString))
+		if !assert.NoError(t, err) {
+			return
+		}
+		chain, err := cert.GetX509ChainFromHeaders(actual.Signatures()[0].ProtectedHeaders())
+		assert.Equal(t, "test oauth", chain[0].Subject.CommonName)
+	})
+
+	t.Run("Returns error on missing CA", func(t *testing.T) {
+		client := createCrypto(t)
+		_, err := client.SignJWTRFC003(map[string]interface{}{"iss": "nuts"}, key)
+
+		assert.Error(t, err)
 	})
 }
 

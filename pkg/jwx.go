@@ -63,7 +63,30 @@ func (client *Crypto) SignJWT(claims map[string]interface{}, key types.KeyIdenti
 		return "", err
 	}
 
-	token, err = SignJWT(rsaPrivateKey, claims)
+	token, err = SignJWT(rsaPrivateKey, claims, nil)
+	return
+}
+
+// SignJWTRFC003 sign a JWT according to Nuts RFC003. This func is only for signing the bearer token of the oauth flow.
+func (client *Crypto) SignJWTRFC003(claims map[string]interface{}, key types.KeyIdentifier) (token string, err error) {
+	var (
+		certificate *x509.Certificate
+		privateKey  crypto.Signer
+	)
+	if certificate, privateKey, err = client.generateVendorEphemeralSigningCertificate(); err != nil {
+		return
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	chain := cert.MarshalX509CertChain([]*x509.Certificate{certificate})
+	additionalHeaders := map[string]interface{}{
+		"x5c": chain,
+	}
+
+	token, err = SignJWT(privateKey, claims, additionalHeaders)
 	return
 }
 
@@ -181,8 +204,8 @@ func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, er
 	return false, ErrInvalidAlgorithm
 }
 
-// SignJWT signs claims with the signer and returns the compacted token.
-func SignJWT(signer crypto.Signer, claims map[string]interface{}) (sig string, err error) {
+// SignJWT signs claims with the signer and returns the compacted token. The headers param can be used to add additional headers
+func SignJWT(signer crypto.Signer, claims map[string]interface{}, headers map[string]interface{}) (sig string, err error) {
 	c := jwt.MapClaims{}
 	for k, v := range claims {
 		c[k] = v
@@ -192,6 +215,7 @@ func SignJWT(signer crypto.Signer, claims map[string]interface{}) (sig string, e
 	switch signer.(type) {
 	case *rsa.PrivateKey:
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
+		addHeaders(token, headers)
 		sig, err = token.SignedString(signer.(*rsa.PrivateKey))
 	case *ecdsa.PrivateKey:
 		key := signer.(*ecdsa.PrivateKey)
@@ -200,12 +224,23 @@ func SignJWT(signer crypto.Signer, claims map[string]interface{}) (sig string, e
 			return
 		}
 		token := jwt.NewWithClaims(method, c)
+		addHeaders(token, headers)
 		sig, err = token.SignedString(signer.(*ecdsa.PrivateKey))
 	default:
 		err = errors.New("unsupported signing private key")
 	}
 
 	return
+}
+
+func addHeaders(token *jwt.Token, headers map[string]interface{}) {
+	if headers == nil {
+		return
+	}
+
+	for k, v := range headers {
+		token.Header[k] = v
+	}
 }
 
 func ecSigningMethod(key *ecdsa.PrivateKey) (method *jwt.SigningMethodECDSA, err error) {
