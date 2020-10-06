@@ -20,6 +20,8 @@ package pkg
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -53,6 +55,8 @@ var ErrKeyAlreadyExists = errors.New("key already exists")
 
 const TLSCertificateQualifier = "tls"
 const SigningCertificateQualifier = "sign"
+const OAuthCertificateQualifier = "oauth"
+const CACertificateQualifier = "CA"
 
 type CryptoConfig struct {
 	Mode          string
@@ -220,6 +224,10 @@ func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier, overwrite
 
 func (client *Crypto) generateKeyPair() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, client.Config.Keysize)
+}
+
+func generateECKeyPair() (*ecdsa.PrivateKey, error) {
+	return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 }
 
 // SignFor signs a piece of data using the given key. It is expected that the plain data is given, and it uses the SHA256 hashing function.
