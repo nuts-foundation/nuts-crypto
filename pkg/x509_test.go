@@ -57,11 +57,15 @@ func (n poolCertVerifier) GetCertificates(i [][]*x509.Certificate, t time.Time, 
 }
 
 func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error {
-	if n.pool == nil {
-		return nil
-	}
-	_, err := cert.Verify(x509.VerifyOptions{Roots: n.pool, CurrentTime: moment})
+	_, err := n.VerifiedChain(cert, moment)
 	return err
+}
+
+func (n poolCertVerifier) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
+	if n.pool == nil {
+		return nil, nil
+	}
+	return cert.Verify(x509.VerifyOptions{Roots: n.pool, CurrentTime: moment})
 }
 
 func TestCrypto_GenerateVendorCACSR(t *testing.T) {
@@ -656,14 +660,14 @@ func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
 			assert.Equal(t, "CN=BecauseWeCare B.V. CA,O=BecauseWeCare B.V.,C=NL", certificate.Issuer.String())
 		})
 		t.Run("verify VendorID SAN", func(t *testing.T) {
-			extension, err := getUniqueExtension("2.5.29.17", certificate.Extensions)
+			vendorId, err := cert.VendorIDFromCertificate(certificate)
 			assert.NoError(t, err)
-			assert.Equal(t, []byte{0x30, 0x14, 0xa0, 0x12, 0x6, 0x9, 0x2b, 0x6, 0x1, 0x4, 0x1, 0x83, 0xac, 0x43, 0x4, 0xa0, 0x5, 0xc, 0x3, 0x31, 0x32, 0x33}, extension.Value)
+			assert.Equal(t, "123", vendorId)
 		})
 		t.Run("verify Domain extension", func(t *testing.T) {
-			extension, err := getUniqueExtension("1.3.6.1.4.1.54851.3", certificate.Extensions)
+			domain, err := cert.DomainFromCertificate(certificate)
 			assert.NoError(t, err)
-			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
+			assert.Equal(t, "healthcare", domain)
 		})
 	})
 }

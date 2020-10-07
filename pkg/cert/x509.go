@@ -111,3 +111,28 @@ func UnmarshalNutsDomain(data []byte) (string, error) {
 	}
 	return string(value.Bytes), nil
 }
+
+var ErrSANNotFound = errors.New("subject alternative name not found")
+
+// VendorIDFromCertificate returns the Nuts Vendor ID from a certificate.
+func VendorIDFromCertificate(certificate *x509.Certificate) (string, error) {
+	// extract SAN
+
+	for _, e := range certificate.Extensions {
+		if e.Id.Equal(OIDSubjectAltName) {
+			return UnmarshalOtherSubjectAltName(OIDNutsVendor, e.Value)
+		}
+	}
+	return "", ErrSANNotFound
+}
+
+// DomainFromCertificate finds the Nuts domain without the OID, just the value
+func DomainFromCertificate(certificate *x509.Certificate) (string, error) {
+	// extract SAN
+	for _, e := range certificate.Extensions {
+		if e.Id.Equal(OIDNutsDomain) {
+			return UnmarshalNutsDomain(e.Value)
+		}
+	}
+	return "", ErrSANNotFound
+}

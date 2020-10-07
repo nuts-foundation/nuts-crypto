@@ -17,6 +17,8 @@ import (
 type Verifier interface {
 	// Verify verifies the given certificate. The validity of the certificate is checked against the given moment in time.
 	Verify(*x509.Certificate, time.Time) error
+	// VerifiedChain verifies the certificate against the truststore and returns the chain of trust as result
+	VerifiedChain(*x509.Certificate, time.Time) ([][]*x509.Certificate, error)
 }
 
 type TrustStore interface {
@@ -199,6 +201,10 @@ func exists(file string) (bool, error) {
 func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
 	_, err := cert.Verify(x509.VerifyOptions{Roots: m.pool, CurrentTime: moment})
 	return err
+}
+
+func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
+	return cert.Verify(x509.VerifyOptions{Roots: m.pool, CurrentTime: moment})
 }
 
 func findBlocksInPEM(data []byte, blockType string) ([]*pem.Block, error) {
