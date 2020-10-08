@@ -18,6 +18,7 @@ type Verifier interface {
 	// Verify verifies the given certificate. The validity of the certificate is checked against the given moment in time.
 	Verify(*x509.Certificate, time.Time) error
 	// VerifiedChain verifies the certificate against the truststore and returns the chain of trust as result
+	// multiple chains can apply but this should only happen when the VendorCA was renewed (overlapping certs)
 	VerifiedChain(*x509.Certificate, time.Time) ([][]*x509.Certificate, error)
 }
 

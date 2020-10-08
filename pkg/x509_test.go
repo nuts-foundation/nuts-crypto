@@ -662,7 +662,8 @@ func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
 		t.Run("verify VendorID SAN", func(t *testing.T) {
 			vendorId, err := cert.VendorIDFromCertificate(certificate)
 			assert.NoError(t, err)
-			assert.Equal(t, "123", vendorId)
+			assert.Equal(t, "123", vendorId.Value())
+			assert.Equal(t, core.NutsVendorOID, vendorId.OID())
 		})
 		t.Run("verify Domain extension", func(t *testing.T) {
 			domain, err := cert.DomainFromCertificate(certificate)
@@ -674,7 +675,6 @@ func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
 
 func TestCrypto_generateVendorEphemeralSigningCertificate2(t *testing.T) {
 	client := createCrypto(t)
-	client.SelfSignVendorCACertificate("test")
 	ca := key
 	client.GenerateKeyPair(ca, false)
 
