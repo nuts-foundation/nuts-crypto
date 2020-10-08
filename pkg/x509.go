@@ -210,7 +210,7 @@ func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certi
 	})
 }
 
-func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.PrivateKey, error) {
+func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.Signer, error) {
 	entity := vendorEntity()
 	log.Logger().Debugf("Generating '%s' certificate for entity: %s", OAuthCertificateQualifier, entity)
 

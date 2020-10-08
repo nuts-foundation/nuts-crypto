@@ -312,6 +312,21 @@ func (mr *MockClientMockRecorder) SignJWT(claims, key interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWT", reflect.TypeOf((*MockClient)(nil).SignJWT), claims, key)
 }
 
+// SignJWTRFC003 mocks base method
+func (m *MockClient) SignJWTRFC003(claims map[string]interface{}) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SignJWTRFC003", claims)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SignJWTRFC003 indicates an expected call of SignJWTRFC003
+func (mr *MockClientMockRecorder) SignJWTRFC003(claims interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignJWTRFC003", reflect.TypeOf((*MockClient)(nil).SignJWTRFC003), claims)
+}
+
 // SignJWS mocks base method
 func (m *MockClient) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, error) {
 	m.ctrl.T.Helper()

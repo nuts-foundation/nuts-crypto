@@ -27,14 +27,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/nuts-foundation/nuts-crypto/pkg"
-	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
-	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/nuts-foundation/nuts-crypto/pkg"
+	"github.com/nuts-foundation/nuts-crypto/pkg/cert"
+	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
 // ErrNotImplemented indicates that this client API call is not implemented.
@@ -219,6 +220,10 @@ func (hb HttpClient) GetTLSCertificate(entity types.LegalEntity) (*x509.Certific
 }
 
 func (hb HttpClient) SignJWT(claims map[string]interface{}, key types.KeyIdentifier) (string, error) {
+	panic(ErrNotImplemented)
+}
+
+func (hb HttpClient) SignJWTRFC003(claims map[string]interface{}) (string, error) {
 	panic(ErrNotImplemented)
 }
 
