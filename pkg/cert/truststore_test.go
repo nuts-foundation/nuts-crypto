@@ -5,13 +5,14 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"github.com/nuts-foundation/nuts-crypto/test"
-	"github.com/nuts-foundation/nuts-go-test/io"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -166,6 +167,22 @@ func Test_fileTrustStore_Verify(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
 		err := trustStore.Verify((trustStore.(*fileTrustStore)).certs[0], time.Unix(2000, 0))
 		assert.Error(t, err)
+	})
+}
+
+func Test_fileTrustStore_VerifiedChain(t *testing.T) {
+	t.Run("ok - valid", func(t *testing.T) {
+		trustStore, _ := NewTrustStore("../../test/truststore.pem")
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).certs[0], time.Now())
+		assert.NoError(t, err)
+		assert.Len(t, chain, 1)
+		assert.Len(t, chain[0], 1)
+	})
+	t.Run("ok - not valid", func(t *testing.T) {
+		trustStore, _ := NewTrustStore("../../test/truststore.pem")
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).certs[0], time.Unix(2000, 0))
+		assert.Error(t, err)
+		assert.Nil(t, chain)
 	})
 }
 

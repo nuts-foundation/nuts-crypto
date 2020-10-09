@@ -197,7 +197,6 @@ func TestCrypto_SignJWTRFC003(t *testing.T) {
 
 func TestCrypto_SignJWS(t *testing.T) {
 	client := createCrypto(t)
-	createCrypto(t)
 
 	key := types.KeyForEntity(types.LegalEntity{URI: t.Name()})
 	privateKey := test.GenerateRSAKey()

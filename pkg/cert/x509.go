@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"sort"
 	"time"
+
+	core "github.com/nuts-foundation/nuts-go-core"
 )
 
 // SerialNumber generates a random serialNumber
@@ -110,4 +112,36 @@ func UnmarshalNutsDomain(data []byte) (string, error) {
 		return "", err
 	}
 	return string(value.Bytes), nil
+}
+
+var ErrSANNotFound = errors.New("subject alternative name not found")
+
+// VendorIDFromCertificate returns the Nuts Vendor ID from a certificate.
+func VendorIDFromCertificate(certificate *x509.Certificate) (core.PartyID, error) {
+	// extract SAN
+	var vendor string
+	for _, e := range certificate.Extensions {
+		if e.Id.Equal(OIDSubjectAltName) {
+			// for multiple SAN values, only return if the Nuts Vendor can be found
+			if vendor, _ = UnmarshalOtherSubjectAltName(OIDNutsVendor, e.Value); vendor != "" {
+				break
+			}
+		}
+	}
+	if vendor == "" {
+		return core.PartyID{}, ErrSANNotFound
+	}
+
+	return core.NewPartyID(core.NutsVendorOID, vendor)
+}
+
+// DomainFromCertificate finds the Nuts domain without the OID, just the value
+func DomainFromCertificate(certificate *x509.Certificate) (string, error) {
+	// extract SAN
+	for _, e := range certificate.Extensions {
+		if e.Id.Equal(OIDNutsDomain) {
+			return UnmarshalNutsDomain(e.Value)
+		}
+	}
+	return "", ErrSANNotFound
 }
