@@ -155,7 +155,8 @@ func cmd() *cobra.Command {
 			cmd.Println("")
 
 			// printout in PEM
-			if publicKey, err := jwk.Materialize(); err != nil {
+			var publicKey interface{}
+			if err := jwk.Raw(&publicKey); err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return
 			} else {

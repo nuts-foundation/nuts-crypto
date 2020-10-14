@@ -19,7 +19,6 @@
 package pkg
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -97,10 +96,9 @@ func (client Crypto) SignJWS(payload []byte, key types.KeyIdentifier) ([]byte, e
 	if err := cert.ValidateCertificate(certificate, cert.MeantForSigning()); err != nil {
 		return nil, err
 	}
-	headers := jws.StandardHeaders{
-		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
-	}
-	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(&headers))
+	headers := jws.NewHeaders()
+	headers.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
+	return jws.Sign(payload, jwsAlgorithm, privateKey, jws.WithHeaders(headers))
 }
 
 func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier, csr x509.CertificateRequest, signingTime time.Time) ([]byte, error) {
@@ -123,14 +121,13 @@ func (client Crypto) SignJWSEphemeral(payload []byte, caKey types.KeyIdentifier,
 		return nil, err
 	}
 	// Now sign
-	headers := jws.StandardHeaders{
-		JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
-	}
-	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(&headers))
+	headers := jws.NewHeaders()
+	headers.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
+	return jws.Sign(payload, jwsAlgorithm, entityPrivateKey, jws.WithHeaders(headers))
 }
 
 func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVerifier cert.Verifier) ([]byte, error) {
-	m, err := jws.Parse(bytes.NewReader(signature))
+	m, err := jws.ParseString(string(signature))
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to parse signature")
 	}
@@ -149,8 +146,9 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 	// Parse X509 certificate chain
 	certChain, err := cert.GetX509ChainFromHeaders(sig.ProtectedHeaders())
 	if err != nil {
-		return nil, errors2.Wrap(err, ErrInvalidCertChain.Error())
+		return nil, ErrInvalidCertChain
 	}
+
 	if len(certChain) == 0 {
 		return nil, fmt.Errorf("JWK doesn't contain X509 chain header (%s) header", jws.X509CertChainKey)
 	}
@@ -177,7 +175,8 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 func (client *Crypto) VerifyWith(data []byte, sig []byte, key jwk.Key) (bool, error) {
 	hashedData := sha256.Sum256(data)
 
-	mKey, err := key.Materialize()
+	var mKey interface{}
+	err := key.Raw(&mKey)
 	if err != nil {
 		return false, err
 	}

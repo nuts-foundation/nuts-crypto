@@ -304,22 +304,22 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 	})
 	t.Run("error - certificate not meant for signing", func(t *testing.T) {
 		privateKey := test.GenerateRSAKey()
-		h := jws.StandardHeaders{}
+		h := jws.NewHeaders()
 		certificate := selfSignCertificate(key, 0)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "certificate is not meant for signing (keyUsage = digitalSignature | contentCommitment)")
 		assert.Nil(t, payload)
 	})
 	t.Run("error - signature invalid (cert doesn't match signing key)", func(t *testing.T) {
 		privateKey := test.GenerateRSAKey()
-		h := jws.StandardHeaders{}
+		h := jws.NewHeaders()
 		certificate := selfSignCertificate(key, x509.KeyUsageDigitalSignature)
 		verifier.pool.AddCert(certificate)
 		h.Set(jws.X509CertChainKey, cert.MarshalX509CertChain([]*x509.Certificate{certificate}))
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(&h))
+		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, privateKey, jws.WithHeaders(h))
 		payload, err := client.VerifyJWS(sig, time.Now(), verifier)
 		assert.EqualError(t, err, "failed to verify message: crypto/rsa: verification error")
 		assert.Nil(t, payload)
@@ -352,10 +352,9 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 		key := test.GenerateRSAKey()
 		certBytes := test.GenerateCertificate(time.Now(), 2, key)
 		certificate, _ := x509.ParseCertificate(certBytes)
-		headers := jws.StandardHeaders{
-			JWSx509CertChain: cert.MarshalX509CertChain([]*x509.Certificate{certificate}),
-		}
-		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(&headers))
+		headers := jws.NewHeaders()
+		headers.Set(jws.X509CertChainKey,cert.MarshalX509CertChain([]*x509.Certificate{certificate}) )
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(headers))
 		pool := x509.NewCertPool()
 		pool.AddCert(certificate)
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
@@ -371,9 +370,9 @@ func TestCrypto_SignJWSEphemeralAndVerify(t *testing.T) {
 	})
 	t.Run("error - invalid X.509 chain", func(t *testing.T) {
 		key := test.GenerateRSAKey()
-		h := jws.StandardHeaders{}
-		h.JWSx509CertChain = []string{"invalid-cert"}
-		sig, _ := jws.Sign(dataToBeSigned, jwsAlgorithm, key, jws.WithHeaders(&h))
+		headers := jws.NewHeaders()
+		headers.Set(jws.X509CertChainKey,[]string{"invalid-cert"} )
+		sig, _ := jws.Sign(dataToBeSigned, jwa.RS256, key, jws.WithHeaders(headers))
 		payload, err := client.VerifyJWS(sig, time.Now(), poolCertVerifier{})
 		assert.Contains(t, err.Error(), ErrInvalidCertChain.Error())
 		assert.Nil(t, payload)

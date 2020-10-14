@@ -19,12 +19,14 @@
 package cert
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -123,14 +125,17 @@ func MapToJwk(jwkAsMap map[string]interface{}) (jwk.Key, error) {
 
 // MapsToJwkSet transforms JWKs in map structures to a JWK set, just like MapToJwk.
 func MapsToJwkSet(maps []map[string]interface{}) (*jwk.Set, error) {
-	set := &jwk.Set{}
-	var keys []interface{}
-	for _, m := range maps {
-		keys = append(keys, deepCopyMap(m))
-	}
-	root := map[string]interface{}{"keys": keys}
-	if err := set.ExtractMap(root); err != nil {
-		return set, err
+	set := &jwk.Set{Keys: make([]jwk.Key, len(maps))}
+	for i, m := range maps {
+		jwkBytes, err := json.Marshal(m)
+		if err != nil {
+			return nil, err
+		}
+		key, err := jwk.ParseKey(jwkBytes)
+		if err != nil {
+			return nil, err
+		}
+		set.Keys[i] = key
 	}
 	return set, nil
 }
@@ -168,10 +173,7 @@ func deepCopyMap(m map[string]interface{}) map[string]interface{} {
 
 // JwkToMap transforms a Jwk key to a map. Can be used for json serialization
 func JwkToMap(key jwk.Key) (map[string]interface{}, error) {
-	root := map[string]interface{}{}
-	// unreachable err
-	_ = key.PopulateMap(root)
-	return root, nil
+	return key.AsMap(context.Background())
 }
 
 // PemToJwk transforms pem to jwk for PublicKey
@@ -202,7 +204,7 @@ func MapToX509CertChain(jwkAsMap map[string]interface{}) ([]*x509.Certificate, e
 	if err != nil {
 		return nil, err
 	}
-	return GetX509ChainFromHeaders(key)
+	return key.X509CertChain(), nil
 }
 
 // GetX509ChainFromHeaders tries to retrieve the X.509 certificate chain ("x5c") from the JWK/JWS and parse it.
@@ -213,14 +215,16 @@ func GetX509ChainFromHeaders(headers jwkHeaderReader) ([]*x509.Certificate, erro
 	if chainInterf == nil {
 		return nil, nil
 	}
-	// For JWKs we don't need to do unmarshalling
-	chain, ok := chainInterf.([]*x509.Certificate)
-	if ok {
-		// No further parsing needed
-		return chain, nil
+	var chain []*x509.Certificate
+	for _, certStr := range chainInterf.([]string) {
+		rawCert, err := base64.StdEncoding.DecodeString(certStr)
+		cert, err := x509.ParseCertificate(rawCert)
+		if err != nil {
+			return nil, err
+		}
+		chain = append(chain, cert)
 	}
-	// For the case of JWS the returned header is either a string slice
-	return unmarshalX509CertChain(chainInterf.([]string))
+	return chain, nil
 }
 
 // PemToX509 decodes PEM data as bytes to a *x509.Certificate
