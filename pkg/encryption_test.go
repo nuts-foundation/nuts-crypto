@@ -26,13 +26,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lestrrat-go/jwx/jwe/aescbc"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/nuts-foundation/nuts-crypto/pkg/storage"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/nuts-foundation/nuts-crypto/test"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCrypto_DecryptCipherTextFor(t *testing.T) {
@@ -265,7 +265,7 @@ func TestCrypto_ExternalIdFor(t *testing.T) {
 
 func TestCrypto_decryptWithSymmetricKey(t *testing.T) {
 	t.Run("nonce empty", func(t *testing.T) {
-		_, err := decryptWithSymmetricKey(make([]byte, 0), aescbc.AesCbcHmac{}, make([]byte, 0))
+		_, err := decryptWithSymmetricKey(make([]byte, 0), nil, make([]byte, 0))
 		assert.EqualErrorf(t, err, ErrIllegalNonce.Error(), "error")
 	})
 }

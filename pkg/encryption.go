@@ -100,7 +100,8 @@ func (client *Crypto) EncryptKeyAndPlainText(plainText []byte, keys []jwk.Key) (
 	var cipherTextKeys [][]byte
 
 	for _, jwk := range keys {
-		pk, err := jwk.Materialize()
+		var pk interface{}
+		err := jwk.Raw(&pk)
 		if err != nil {
 			return types.DoubleEncryptedCipherText{}, err
 		}

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	core "github.com/nuts-foundation/nuts-go-core"
 )
 
@@ -61,7 +62,7 @@ func jwkMapToCertChain(keyAsMap interface{}) ([]*x509.Certificate, error) {
 		// JWK does not contain x5c component (X.509 certificate chain)
 		return nil, errors.New("JWK has no x5c field")
 	}
-	return chainInterf.([]*x509.Certificate), nil
+	return chainInterf.(jwk.CertificateChain).Get(), nil
 }
 
 // The structs below look funky, but are required to marshal SubjectAlternativeName.otherName the same way OpenSSL does.
