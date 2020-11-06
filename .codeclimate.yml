@@ -6,6 +6,13 @@ checks:
   # over nested if-statements. This however leads to many return statements which can't be avoided, so we'll disable the max. exit points check.
   return-statements:
     enabled: false
+plugins:
+  gofmt:
+    enabled: true
+  golint:
+    enabled: true
+  govet:
+    enabled: true
 exclude_patterns:
   - "docs/"
   - "**/*_test.go"
