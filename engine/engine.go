@@ -159,15 +159,15 @@ func cmd() *cobra.Command {
 			if err := jwk.Raw(&publicKey); err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return
-			} else {
-				publicKeyAsPEM, err := cert.PublicKeyToPem(publicKey.(crypto.PublicKey))
-				if err != nil {
-					cmd.Printf("Error printing publicKey: %v\n", err)
-					return
-				}
-				cmd.Println("Public key in PEM:")
-				cmd.Println(publicKeyAsPEM)
 			}
+
+			publicKeyAsPEM, err := cert.PublicKeyToPem(publicKey.(crypto.PublicKey))
+			if err != nil {
+				cmd.Printf("Error printing publicKey: %v\n", err)
+				return
+			}
+			cmd.Println("Public key in PEM:")
+			cmd.Println(publicKeyAsPEM)
 		},
 	})
 
