@@ -221,7 +221,9 @@ type HttpRequestDoer interface {
 // Client which conforms to the OpenAPI3 specification for this service.
 type Client struct {
 	// The endpoint of the server conforming to this interface, with scheme,
-	// https://api.deepmap.com for example.
+	// https://api.deepmap.com for example. This can contain a path relative
+	// to the server, such as https://api.deepmap.com/dev-test, and all the
+	// paths in the swagger spec will be appended to the server.
 	Server string
 
 	// Doer for performing requests, typically a *http.Client with any
@@ -279,6 +281,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// SignTLSCertificate request  with any body
+	SignTLSCertificateWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
+
 	// SelfSignVendorCACertificate request
 	SelfSignVendorCACertificate(ctx context.Context, params *SelfSignVendorCACertificateParams) (*http.Response, error)
 
@@ -320,6 +325,21 @@ type ClientInterface interface {
 	VerifyWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error)
 
 	Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.Response, error)
+}
+
+func (c *Client) SignTLSCertificateWithBody(ctx context.Context, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := NewSignTLSCertificateRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if c.RequestEditor != nil {
+		err = c.RequestEditor(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) SelfSignVendorCACertificate(ctx context.Context, params *SelfSignVendorCACertificateParams) (*http.Response, error) {
@@ -560,6 +580,34 @@ func (c *Client) Verify(ctx context.Context, body VerifyJSONRequestBody) (*http.
 		}
 	}
 	return c.Client.Do(req)
+}
+
+// NewSignTLSCertificateRequestWithBody generates requests for SignTLSCertificate with any type of body
+func NewSignTLSCertificateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	queryUrl, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	basePath := fmt.Sprintf("/crypto/certificate/tls")
+	if basePath[0] == '/' {
+		basePath = basePath[1:]
+	}
+
+	queryUrl, err = queryUrl.Parse(basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryUrl.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+	return req, nil
 }
 
 // NewSelfSignVendorCACertificateRequest generates requests for SelfSignVendorCACertificate
@@ -1004,6 +1052,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// SignTLSCertificate request  with any body
+	SignTLSCertificateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignTLSCertificateResponse, error)
+
 	// SelfSignVendorCACertificate request
 	SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*SelfSignVendorCACertificateResponse, error)
 
@@ -1045,6 +1096,27 @@ type ClientWithResponsesInterface interface {
 	VerifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*VerifyResponse, error)
 
 	VerifyWithResponse(ctx context.Context, body VerifyJSONRequestBody) (*VerifyResponse, error)
+}
+
+type SignTLSCertificateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r SignTLSCertificateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SignTLSCertificateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type SelfSignVendorCACertificateResponse struct {
@@ -1262,6 +1334,15 @@ func (r VerifyResponse) StatusCode() int {
 	return 0
 }
 
+// SignTLSCertificateWithBodyWithResponse request with arbitrary body returning *SignTLSCertificateResponse
+func (c *ClientWithResponses) SignTLSCertificateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader) (*SignTLSCertificateResponse, error) {
+	rsp, err := c.SignTLSCertificateWithBody(ctx, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignTLSCertificateResponse(rsp)
+}
+
 // SelfSignVendorCACertificateWithResponse request returning *SelfSignVendorCACertificateResponse
 func (c *ClientWithResponses) SelfSignVendorCACertificateWithResponse(ctx context.Context, params *SelfSignVendorCACertificateParams) (*SelfSignVendorCACertificateResponse, error) {
 	rsp, err := c.SelfSignVendorCACertificate(ctx, params)
@@ -1398,6 +1479,25 @@ func (c *ClientWithResponses) VerifyWithResponse(ctx context.Context, body Verif
 		return nil, err
 	}
 	return ParseVerifyResponse(rsp)
+}
+
+// ParseSignTLSCertificateResponse parses an HTTP response from a SignTLSCertificateWithResponse call
+func ParseSignTLSCertificateResponse(rsp *http.Response) (*SignTLSCertificateResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer rsp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SignTLSCertificateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	}
+
+	return response, nil
 }
 
 // ParseSelfSignVendorCACertificateResponse parses an HTTP response from a SelfSignVendorCACertificateWithResponse call
@@ -1627,6 +1727,9 @@ func ParseVerifyResponse(rsp *http.Response) (*VerifyResponse, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Create a TLS client certificate given a public key
+	// (POST /crypto/certificate/tls)
+	SignTLSCertificate(ctx echo.Context) error
 	// Self-sign a vendor CA certificate.
 	// (POST /crypto/certificate/vendorca)
 	SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error
@@ -1662,6 +1765,15 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// SignTLSCertificate converts echo context to params.
+func (w *ServerInterfaceWrapper) SignTLSCertificate(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.SignTLSCertificate(ctx)
+	return err
 }
 
 // SelfSignVendorCACertificate converts echo context to params.
@@ -1812,21 +1924,28 @@ type EchoRouter interface {
 
 // RegisterHandlers adds each server route to the EchoRouter.
 func RegisterHandlers(router EchoRouter, si ServerInterface) {
+	RegisterHandlersWithBaseURL(router, si, "")
+}
+
+// Registers handlers, and prepends BaseURL to the paths, so that the paths
+// can be served under a prefix.
+func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL string) {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
 	}
 
-	router.POST("/crypto/certificate/vendorca", wrapper.SelfSignVendorCACertificate)
-	router.POST("/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
-	router.POST("/crypto/decrypt", wrapper.Decrypt)
-	router.POST("/crypto/encrypt", wrapper.Encrypt)
-	router.POST("/crypto/external_id", wrapper.ExternalId)
-	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
-	router.GET("/crypto/public_key/:urn", wrapper.PublicKey)
-	router.POST("/crypto/sign", wrapper.Sign)
-	router.POST("/crypto/sign_jwt", wrapper.SignJwt)
-	router.POST("/crypto/verify", wrapper.Verify)
+	router.POST(baseURL+"/crypto/certificate/tls", wrapper.SignTLSCertificate)
+	router.POST(baseURL+"/crypto/certificate/vendorca", wrapper.SelfSignVendorCACertificate)
+	router.POST(baseURL+"/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
+	router.POST(baseURL+"/crypto/decrypt", wrapper.Decrypt)
+	router.POST(baseURL+"/crypto/encrypt", wrapper.Encrypt)
+	router.POST(baseURL+"/crypto/external_id", wrapper.ExternalId)
+	router.POST(baseURL+"/crypto/generate", wrapper.GenerateKeyPair)
+	router.GET(baseURL+"/crypto/public_key/:urn", wrapper.PublicKey)
+	router.POST(baseURL+"/crypto/sign", wrapper.Sign)
+	router.POST(baseURL+"/crypto/sign_jwt", wrapper.SignJwt)
+	router.POST(baseURL+"/crypto/verify", wrapper.Verify)
 
 }
 

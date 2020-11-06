@@ -21,6 +21,12 @@ package engine
 import (
 	"bytes"
 	"encoding/pem"
+	"io/ioutil"
+	"os"
+	"path"
+	"strings"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
@@ -29,11 +35,6 @@ import (
 	"github.com/nuts-foundation/nuts-go-test/io"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"os"
-	"path"
-	"strings"
-	"testing"
 )
 
 func TestNewCryptoEngine(t *testing.T) {
@@ -51,7 +52,7 @@ func TestNewCryptoEngine(t *testing.T) {
 }
 
 func TestNewCryptoEngine_Routes(t *testing.T) {
-	t.Run("Registers the 4 available routes", func(t *testing.T) {
+	t.Run("Registers the available routes", func(t *testing.T) {
 		ce := NewCryptoEngine()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -59,6 +60,7 @@ func TestNewCryptoEngine_Routes(t *testing.T) {
 
 		echo.EXPECT().POST("/crypto/csr/vendorca", gomock.Any())
 		echo.EXPECT().POST("/crypto/certificate/vendorca", gomock.Any())
+		echo.EXPECT().POST("/crypto/certificate/tls", gomock.Any())
 		echo.EXPECT().POST("/crypto/sign", gomock.Any())
 		echo.EXPECT().POST("/crypto/verify", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())

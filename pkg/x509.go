@@ -22,6 +22,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -62,9 +63,16 @@ const SigningCertificateValidityInDays = 365
 // Certificate validity in days according to Nuts RFC003
 const RFC003ValidityInDays = 4
 
-// RFC003CertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
-var RFC003CertificateProfile = CertificateProfile{
+// RFC003SigningCertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
+var RFC003SigningCertificateProfile = CertificateProfile{
 	KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
+	NumDaysValid: RFC003ValidityInDays,
+}
+
+// RFC003TLSCertificateProfile is a x509.CertificateProfile according to RFC003/RFC008: setting up the TLS connection between nodes
+var RFC003TLSCertificateProfile = CertificateProfile{
+	KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
+	ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	NumDaysValid: RFC003ValidityInDays,
 }
 
@@ -197,6 +205,10 @@ func (client *Crypto) RenewSigningCertificate(entity types.LegalEntity) (*x509.C
 	})
 }
 
+func (client *Crypto) SignTLSCertificate(key crypto.PublicKey) (*x509.Certificate, error) {
+	return client.generateVendorTLSCertificate(key)
+}
+
 func (client *Crypto) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
 	key := types.KeyForEntity(entity).WithQualifier(TLSCertificateQualifier)
 	return client.getCertificateAndKey(key)
@@ -210,40 +222,84 @@ func (client *Crypto) RenewTLSCertificate(entity types.LegalEntity) (*x509.Certi
 	})
 }
 
-func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.Signer, error) {
+// validatePublicKeyRequirements checks if the given public key is a ecdsa or rsa public key and validates minimum length
+func validatePublicKeyRequirements(publicKey crypto.PublicKey) error {
+	// the current version of the used JWT lib doesn't support the crypto.Signer interface. The 4.0.0 version will.
+	switch publicKey.(type) {
+	case *rsa.PublicKey:
+		rpk := publicKey.(*rsa.PublicKey)
+		if rpk.Size() < MinKeySize {
+			return ErrInvalidKeySize
+		}
+	case *ecdsa.PublicKey:
+		epk := publicKey.(*ecdsa.PublicKey)
+		switch epk.Params().BitSize {
+		case 256:
+		case 384:
+		case 521:
+		default:
+			return ErrInvalidKeySize
+		}
+	default:
+		return ErrInvalidAlgorithm
+	}
+	return nil
+}
+
+// generateVendorCertificate holds common logic for singing TLS and Signing certificates
+// only ecdsa and rsa pub keys are supported
+func (client *Crypto) generateVendorCertificate(publicKey crypto.PublicKey, qualifier string, profile CertificateProfile) (*x509.Certificate, error) {
 	entity := vendorEntity()
-	log.Logger().Debugf("Generating '%s' certificate for entity: %s", OAuthCertificateQualifier, entity)
+	log.Logger().Debugf("Generating '%s' certificate for entity: %s", qualifier, entity)
+
+	if err := validatePublicKeyRequirements(publicKey); err != nil {
+		return nil, err
+	}
 
 	caKey := types.KeyForEntity(entity)
 	caCertificate, err := client.Storage.GetCertificate(caKey)
 	if err != nil || caCertificate == nil {
-		return nil, nil, fmt.Errorf("unable to retrieve CA certificate %s: %v", caKey, err)
+		return nil, fmt.Errorf("unable to retrieve CA certificate %s: %v", caKey, err)
 	}
 	if len(caCertificate.Subject.Organization) == 0 {
-		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'O' component", caKey)
+		return nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'O' component", caKey)
 	}
 	if len(caCertificate.Subject.Country) == 0 {
-		return nil, nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
+		return nil, fmt.Errorf("subject of CA certificate %s doesn't contain 'C' component", caKey)
 	}
 
 	var certificate *x509.Certificate
-	var privateKey *ecdsa.PrivateKey
-	if privateKey, err = generateECKeyPair(); err != nil {
-		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", OAuthCertificateQualifier)
-	}
-	csr, err := cert.CSRFromVendorCA(caCertificate, CACertificateQualifier, OAuthCertificateQualifier, &privateKey.PublicKey)
+
+	csr, err := cert.CSRFromVendorCA(caCertificate, CACertificateQualifier, qualifier, publicKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to construct CSR: %w", err)
+		return nil, fmt.Errorf("unable to construct CSR: %w", err)
 	}
 
 	// in this case we don't serialize the CSR so the extra extensions need to be copied to the extensions
 	csr.Extensions = csr.ExtraExtensions
 
-	certificateAsBytes, err := client.signCertificate(csr, caKey, RFC003CertificateProfile, false)
+	certificateAsBytes, err := client.signCertificate(csr, caKey, profile, false)
 	if err != nil {
-		return nil, nil, errors2.Wrapf(err, "unable to generate %s certificate %s", OAuthCertificateQualifier, caKey)
+		return nil, errors2.Wrapf(err, "unable to generate %s certificate %s", qualifier, caKey)
 	}
 	certificate, err = x509.ParseCertificate(certificateAsBytes)
+	if err != nil {
+		return nil, err
+	}
+	return certificate, nil
+}
+
+func (client *Crypto) generateVendorTLSCertificate(publicKey crypto.PublicKey) (*x509.Certificate, error) {
+	return client.generateVendorCertificate(publicKey, TLSCertificateQualifier, RFC003TLSCertificateProfile)
+}
+
+func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.Signer, error) {
+	var privateKey *ecdsa.PrivateKey
+	var err error
+	if privateKey, err = generateECKeyPair(); err != nil {
+		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", OAuthCertificateQualifier)
+	}
+	certificate, err := client.generateVendorCertificate(&privateKey.PublicKey, OAuthCertificateQualifier, RFC003SigningCertificateProfile)
 	if err != nil {
 		return nil, nil, err
 	}

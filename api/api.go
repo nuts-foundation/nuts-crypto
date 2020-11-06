@@ -349,6 +349,31 @@ func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, sig)
 }
 
+func (w *ApiWrapper) SignTLSCertificate(ctx echo.Context) error {
+	buf, err := readBody(ctx)
+	if err != nil {
+		return err
+	}
+
+	// read public key
+	pk, err := cert.PemToPublicKey(buf)
+	if err != nil {
+		log.Logger().Error(err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	c, err := w.C.SignTLSCertificate(pk)
+	if err != nil {
+		log.Logger().Error(err.Error())
+		if errors.Is(err, pkg.ErrInvalidKeySize) || errors.Is(err, pkg.ErrInvalidAlgorithm) {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return ctx.String(http.StatusOK, cert.CertificateToPEM(c))
+}
+
 func (w *ApiWrapper) Verify(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {

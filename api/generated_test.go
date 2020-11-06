@@ -75,6 +75,10 @@ func (t *testServerInterface) SignJwt(ctx echo.Context) error {
 	return t.err
 }
 
+func (t *testServerInterface) SignTLSCertificate(ctx echo.Context) error {
+	return t.err
+}
+
 var siws = []*ServerInterfaceWrapper{
 	serverInterfaceWrapper(nil), serverInterfaceWrapper(errors.New("Server error")),
 }
@@ -251,6 +255,7 @@ func TestRegisterHandlers(t *testing.T) {
 
 		echo.EXPECT().POST("/crypto/csr/vendorca", gomock.Any())
 		echo.EXPECT().POST("/crypto/certificate/vendorca", gomock.Any())
+		echo.EXPECT().POST("/crypto/certificate/tls", gomock.Any())
 		echo.EXPECT().POST("/crypto/decrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/encrypt", gomock.Any())
 		echo.EXPECT().POST("/crypto/external_id", gomock.Any())

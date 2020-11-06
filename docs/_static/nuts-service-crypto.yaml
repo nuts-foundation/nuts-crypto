@@ -287,19 +287,12 @@ paths:
             application/x-pem-file:
               schema:
                 type: string
-  /crypto/vendor/{urn}/certificate/tls:
+  /crypto/certificate/tls:
     post:
       summary: "Create a TLS client certificate given a public key"
       operationId: signTLSCertificate
       tags:
         - crypto
-      parameters:
-        - name: urn
-          in: path
-          description: "URN of the vendor"
-          required: true
-          schema:
-            type: string
       requestBody:
         required: true
         description: "public key in pem format"
@@ -313,7 +306,7 @@ paths:
           content:
             text/plain:
               example:
-                "invalid name"
+                "invalid public key"
         '200':
           description: "OK response, body holds certificate as PEM-encoded X.509 certificate"
           content:
@@ -459,7 +452,6 @@ components:
     JWK:
       type: object
       description: as described by https://tools.ietf.org/html/rfc7517. Modelled as object so libraries can parse the tokens themselves.
-      additionalProperties: {}
     Identifier:
       type: string
       description: >

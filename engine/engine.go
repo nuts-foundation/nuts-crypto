@@ -231,24 +231,28 @@ func cmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "sign-tls-cert [vendor-id] [public-key-file] [OPTIONAL output-file]",
+		Use:   "sign-tls-cert [public-key-file] [OPTIONAL output-file]",
 		Short: "Creates and signs a certificate for usage as TLS client certificate",
 		Long: "Creates a CSR for the given public-key using a TLS client certificate template. " +
-			"It's signed with the vendor CA of the given vendor-id (URN). " +
+			"It's signed with the vendor CA. " +
 			"The certificate is printed to stdout in PEM encoded form and optionally stored in the given location",
-		Args: cobra.RangeArgs(2, 3),
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Logger().Infof("Creating and signging TLS Client certificate '%s'", args[0])
+			log.Logger().Info("Creating and signging TLS Client certificate")
 			cc := client.NewCryptoClient()
 
-			le := types.LegalEntity{URI: args[0]}
-			pk, err := ioutil.ReadFile(args[1])
+			pp, err := ioutil.ReadFile(args[0])
 			if err != nil {
 				log.Logger().Errorf("Error while reading %s : %v", args[1], err)
 				return err
 			}
+			pk, err := cert.PemToPublicKey(pp)
+			if err != nil {
+				log.Logger().Errorf("Error while parsing %s : %v", args[1], err)
+				return err
+			}
 
-			certificate, err := cc.SignTLSCertificate(le, pk)
+			certificate, err := cc.SignTLSCertificate(pk)
 			if err != nil {
 				log.Logger().Errorf("Error while self-signing : %v", err)
 				return err
@@ -257,10 +261,10 @@ func cmd() *cobra.Command {
 				Type:  "CERTIFICATE",
 				Bytes: certificate.Raw,
 			})
-			if len(args) == 2 {
+			if len(args) == 1 {
 				cmd.Println(string(certificateAsPEM))
 			} else {
-				outputFile := args[2]
+				outputFile := args[1]
 				cmd.Println(fmt.Sprintf("Writing certificate to %s", outputFile))
 				return ioutil.WriteFile(outputFile, certificateAsPEM, 0777)
 			}
