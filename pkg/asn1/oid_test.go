@@ -2,8 +2,9 @@ package asn1
 
 import (
 	"encoding/asn1"
-	"github.com/magiconair/properties/assert"
 	"testing"
+
+	"github.com/magiconair/properties/assert"
 )
 
 func TestOIDAppend(t *testing.T) {

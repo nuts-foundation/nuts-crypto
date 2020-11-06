@@ -20,8 +20,9 @@
 package client
 
 import (
-	core "github.com/nuts-foundation/nuts-go-core"
 	"time"
+
+	core "github.com/nuts-foundation/nuts-go-core"
 
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"

@@ -7,13 +7,14 @@ package mock
 import (
 	crypto "crypto"
 	x509 "crypto/x509"
+	reflect "reflect"
+	time "time"
+
 	gomock "github.com/golang/mock/gomock"
 	jwk "github.com/lestrrat-go/jwx/jwk"
 	pkg "github.com/nuts-foundation/nuts-crypto/pkg"
 	cert "github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
-	reflect "reflect"
-	time "time"
 )
 
 // MockClient is a mock of Client interface

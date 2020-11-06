@@ -1,8 +1,9 @@
 package pkg
 
 import (
-	"github.com/sirupsen/logrus"
 	"path"
+
+	"github.com/sirupsen/logrus"
 )
 
 // NewTestCryptoInstance returns a new Crypto instance to be used for integration tests. Any data is stored in the

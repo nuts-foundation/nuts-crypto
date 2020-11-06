@@ -3,13 +3,14 @@ package storage
 import (
 	"encoding/pem"
 	"fmt"
-	"github.com/nuts-foundation/nuts-crypto/test"
-	"github.com/nuts-foundation/nuts-go-test/io"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/stretchr/testify/assert"

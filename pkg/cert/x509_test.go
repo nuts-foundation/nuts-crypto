@@ -5,9 +5,10 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/nuts-foundation/nuts-crypto/test"
 	"testing"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/test"
 
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/assert"

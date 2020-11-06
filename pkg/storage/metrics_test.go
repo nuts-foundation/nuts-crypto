@@ -19,10 +19,11 @@
 package storage
 
 import (
-	"github.com/nuts-foundation/nuts-crypto/test"
-	"github.com/nuts-foundation/nuts-go-test/io"
 	"testing"
 	"time"
+
+	"github.com/nuts-foundation/nuts-crypto/test"
+	"github.com/nuts-foundation/nuts-go-test/io"
 
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
