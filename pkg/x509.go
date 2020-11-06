@@ -228,7 +228,7 @@ func validatePublicKeyRequirements(publicKey crypto.PublicKey) error {
 	switch publicKey.(type) {
 	case *rsa.PublicKey:
 		rpk := publicKey.(*rsa.PublicKey)
-		if rpk.Size() < MinKeySize {
+		if rpk.N.BitLen() < MinKeySize {
 			return ErrInvalidKeySize
 		}
 	case *ecdsa.PublicKey:

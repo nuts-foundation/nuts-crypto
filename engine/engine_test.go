@@ -222,8 +222,8 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 		})
 	})
 
+	const certificateHeader = "-----BEGIN CERTIFICATE-----"
 	t.Run("selfSignVendorCertificate", func(t *testing.T) {
-		const certificateHeader = "-----BEGIN CERTIFICATE-----"
 		t.Run("ok - write certificate to stdout", func(t *testing.T) {
 			cmd, _ := createCmd(t)
 			buf := new(bytes.Buffer)
@@ -248,6 +248,73 @@ func TestNewCryptoEngine_Cmd(t *testing.T) {
 				return
 			}
 			assert.NotContains(t, buf.String(), certificateHeader)
+			certData, err := ioutil.ReadFile(certFile)
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !assert.Contains(t, string(certData), certificateHeader) {
+				return
+			}
+			_, rest := pem.Decode(certData)
+			assert.Empty(t, rest)
+		})
+	})
+
+	t.Run("signTLSCert", func(t *testing.T) {
+		cmd, i := createCmd(t)
+		ca, _ := i.SelfSignVendorCACertificate("test")
+		i.StoreVendorCACertificate(ca)
+		certFile := path.Join(io.TestDirectory(t), "certificate.pem")
+
+		t.Run("error - missing public key file", func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"sign-tls-cert", "foo"})
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if !assert.Error(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), "no such file or directory")
+		})
+
+		t.Run("error - publicKey not in pem format", func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"sign-tls-cert", "../test/broken.pem"})
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if !assert.Error(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), "failed to decode PEM block containing public key")
+		})
+
+		t.Run("ok - output to stdout", func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"sign-tls-cert", "../test/public_2048.pem"})
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Contains(t, buf.String(), certificateHeader)
+		})
+
+		t.Run("ok - output to file", func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd.SetArgs([]string{"sign-tls-cert", "../test/public_2048.pem", certFile})
+			cmd.SetOut(buf)
+
+			err := cmd.Execute()
+
+			if !assert.NoError(t, err) {
+				return
+			}
 			certData, err := ioutil.ReadFile(certFile)
 			if !assert.NoError(t, err) {
 				return

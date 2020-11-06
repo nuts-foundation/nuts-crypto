@@ -243,12 +243,12 @@ func cmd() *cobra.Command {
 
 			pp, err := ioutil.ReadFile(args[0])
 			if err != nil {
-				log.Logger().Errorf("Error while reading %s : %v", args[1], err)
+				log.Logger().Errorf("Error while reading %s : %v", args[0], err)
 				return err
 			}
 			pk, err := cert.PemToPublicKey(pp)
 			if err != nil {
-				log.Logger().Errorf("Error while parsing %s : %v", args[1], err)
+				log.Logger().Errorf("Error while parsing %s : %v", args[0], err)
 				return err
 			}
 
