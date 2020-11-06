@@ -205,6 +205,8 @@ func (client *Crypto) RenewSigningCertificate(entity types.LegalEntity) (*x509.C
 	})
 }
 
+// SignTLSCertificate creates a TLS Client certificate. It uses the Vendor CA to sign.
+// the resulting certificate is valid for 4 days.
 func (client *Crypto) SignTLSCertificate(key crypto.PublicKey) (*x509.Certificate, error) {
 	return client.generateVendorTLSCertificate(key)
 }
