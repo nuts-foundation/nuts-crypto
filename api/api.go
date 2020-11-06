@@ -114,6 +114,24 @@ func (w *Wrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCAC
 	return ctx.Blob(http.StatusOK, "application/x-pem-file", csrAsPEM)
 }
 
+func validateEncryptRequest(body []byte) (*EncryptRequest, error) {
+	var encryptRequest = &EncryptRequest{}
+	err := json.Unmarshal(body, encryptRequest)
+
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling json: %w", err)
+	}
+
+	if len(encryptRequest.EncryptRequestSubjects) == 0 {
+		return nil, errors.New("missing encryptRequestSubjects in encryptRequest")
+	}
+
+	if len(encryptRequest.PlainText) == 0 {
+		return nil, errors.New("missing plainText in encryptRequest")
+	}
+	return encryptRequest, nil
+}
+
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
 func (w *Wrapper) Encrypt(ctx echo.Context) error {
 	buf, err := readBody(ctx)
@@ -121,23 +139,18 @@ func (w *Wrapper) Encrypt(ctx echo.Context) error {
 		return err
 	}
 
-	var encryptRequest = &EncryptRequest{}
-	err = json.Unmarshal(buf, encryptRequest)
+	encryptRequest, err := validateEncryptRequest(buf)
 
 	if err != nil {
-		msg := fmt.Sprintf("Error unmarshalling json: %v", err.Error())
-		log.Logger().Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
+		log.Logger().Error(err)
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if len(encryptRequest.EncryptRequestSubjects) == 0 {
-		msg := "missing encryptRequestSubjects in encryptRequest"
-		log.Logger().Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
-	}
+	// encrypt with symmetric key and encrypt keys with asymmetric keys
+	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
 
-	if len(encryptRequest.PlainText) == 0 {
-		msg := "missing plainText in encryptRequest"
+	if err != nil {
+		msg := fmt.Sprintf("Illegal base64 encoded string: %s", err.Error())
 		log.Logger().Error(msg)
 		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
@@ -170,15 +183,6 @@ func (w *Wrapper) Encrypt(ctx echo.Context) error {
 
 		pubKeys = append(pubKeys, j)
 		legalEntities = append(legalEntities, e.LegalEntity)
-	}
-
-	// encrypt with symmetric key and encrypt keys with asymmetric keys
-	plainTextBytes, err := base64.StdEncoding.DecodeString(encryptRequest.PlainText)
-
-	if err != nil {
-		msg := fmt.Sprintf("Illegal base64 encoded string: %s", err.Error())
-		log.Logger().Error(msg)
-		return echo.NewHTTPError(http.StatusBadRequest, msg)
 	}
 
 	dect, err := w.C.EncryptKeyAndPlainText(plainTextBytes, pubKeys)

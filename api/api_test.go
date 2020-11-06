@@ -310,7 +310,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
+		expected := "code=400, message=error unmarshalling json: unexpected end of JSON input"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
