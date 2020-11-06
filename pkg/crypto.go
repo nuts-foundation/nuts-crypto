@@ -70,9 +70,9 @@ type CryptoConfig struct {
 func (cc CryptoConfig) getFSPath() string {
 	if cc.Fspath == "" {
 		return DefaultCryptoConfig().Fspath
-	} else {
-		return cc.Fspath
 	}
+
+	return cc.Fspath
 }
 
 func DefaultCryptoConfig() CryptoConfig {
@@ -211,15 +211,16 @@ func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier, overwrite
 		logrus.Warnf("Unable to generate new key pair for %s: it already exists and overwrite=false", key)
 		return nil, ErrKeyAlreadyExists
 	}
-	if keyPair, err := client.generateKeyPair(); err != nil {
+	keyPair, err := client.generateKeyPair()
+	if err != nil {
 		return nil, err
-	} else {
-		if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
-			return nil, err
-		} else {
-			return keyPair, nil
-		}
 	}
+
+	if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 func (client *Crypto) generateKeyPair() (*rsa.PrivateKey, error) {
