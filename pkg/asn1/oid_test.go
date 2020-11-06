@@ -7,5 +7,5 @@ import (
 )
 
 func TestOIDAppend(t *testing.T) {
-	assert.Equal(t,asn1.ObjectIdentifier{1, 2, 3, 4}, OIDAppend(asn1.ObjectIdentifier{1, 2, 3}, 4))
+	assert.Equal(t, asn1.ObjectIdentifier{1, 2, 3, 4}, OIDAppend(asn1.ObjectIdentifier{1, 2, 3}, 4))
 }
