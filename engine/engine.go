@@ -230,5 +230,43 @@ func cmd() *cobra.Command {
 		},
 	})
 
+	cmd.AddCommand(&cobra.Command{
+		Use:   "sign-tls-cert [vendor-id] [public-key-file] [OPTIONAL output-file]",
+		Short: "Creates and signs a certificate for usage as TLS client certificate",
+		Long: "Creates a CSR for the given public-key using a TLS client certificate template. " +
+			"It's signed with the vendor CA of the given vendor-id (URN). " +
+			"The certificate is printed to stdout in PEM encoded form and optionally stored in the given location",
+		Args: cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Logger().Infof("Creating and signging TLS Client certificate '%s'", args[0])
+			cc := client.NewCryptoClient()
+
+			le := types.LegalEntity{URI: args[0]}
+			pk, err := ioutil.ReadFile(args[1])
+			if err != nil {
+				log.Logger().Errorf("Error while reading %s : %v", args[1], err)
+				return err
+			}
+
+			certificate, err := cc.SignTLSCertificate(le, pk)
+			if err != nil {
+				log.Logger().Errorf("Error while self-signing : %v", err)
+				return err
+			}
+			certificateAsPEM := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: certificate.Raw,
+			})
+			if len(args) == 2 {
+				cmd.Println(string(certificateAsPEM))
+			} else {
+				outputFile := args[2]
+				cmd.Println(fmt.Sprintf("Writing certificate to %s", outputFile))
+				return ioutil.WriteFile(outputFile, certificateAsPEM, 0777)
+			}
+			return nil
+		},
+	})
+
 	return cmd
 }

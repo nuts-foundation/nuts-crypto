@@ -1,6 +1,6 @@
 module github.com/nuts-foundation/nuts-crypto
 
-go 1.14
+go 1.15
 
 require (
 	github.com/deepmap/oapi-codegen v1.3.13
