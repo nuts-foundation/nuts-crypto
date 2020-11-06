@@ -268,6 +268,9 @@ func TestHttpClient_NonImplemented(t *testing.T) {
 		"StoreVendorCACertificate": func() {
 			c.StoreVendorCACertificate(nil)
 		},
+		"SignTLSCertificate": func() {
+			c.SignTLSCertificate(nil)
+		},
 	}
 	for fnName, fn := range funcs {
 		t.Run(fnName+" should panic", func(t *testing.T) {

@@ -42,7 +42,7 @@ import (
 const MinKeySize = 2048
 
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
-var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits", MinKeySize), false)
+var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits for RSA and 256 bits for EC", MinKeySize), false)
 
 // ErrInvalidKeyIdentifier is returned when the provided key identifier isn't valid
 var ErrInvalidKeyIdentifier = core.NewError("invalid key identifier", false)
