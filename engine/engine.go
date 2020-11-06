@@ -52,7 +52,7 @@ func NewCryptoEngine() *engine.Engine {
 		FlagSet:   flagSet(),
 		Name:      "Crypto",
 		Routes: func(router engine.EchoRouter) {
-			api.RegisterHandlers(router, &api.ApiWrapper{C: cb})
+			api.RegisterHandlers(router, &api.Wrapper{C: cb})
 		},
 		Start:    cb.Start,
 		Shutdown: cb.Shutdown,
@@ -91,7 +91,7 @@ func cmd() *cobra.Command {
 			echoServer := echo.New()
 			echoServer.HideBanner = true
 			echoServer.Use(middleware.Logger())
-			api.RegisterHandlers(echoServer, &api.ApiWrapper{C: cryptoEngine})
+			api.RegisterHandlers(echoServer, &api.Wrapper{C: cryptoEngine})
 			logrus.Fatal(echoServer.Start(":1324"))
 		},
 	})

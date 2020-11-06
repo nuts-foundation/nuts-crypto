@@ -33,10 +33,10 @@ func NewCryptoClient() pkg.Client {
 	instance := pkg.CryptoInstance()
 	if core.NutsConfig().GetEngineMode(instance.Config.Mode) == core.ServerEngineMode {
 		return instance
-	} else {
-		return api.HttpClient{
-			ServerAddress: instance.Config.Address,
-			Timeout:       time.Duration(instance.Config.ClientTimeout) * time.Second,
-		}
+	}
+
+	return api.HttpClient{
+		ServerAddress: instance.Config.Address,
+		Timeout:       time.Duration(instance.Config.ClientTimeout) * time.Second,
 	}
 }

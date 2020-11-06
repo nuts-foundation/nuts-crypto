@@ -217,7 +217,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		cl := mock2.NewMockClient(ctrl)
 		echo := mock.NewMockContext(ctrl)
 
-		se := ApiWrapper{
+		se := Wrapper{
 			C: cl,
 		}
 
@@ -1362,7 +1362,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	})
 }
 
-func apiWrapper(t *testing.T) *ApiWrapper {
+func apiWrapper(t *testing.T) *Wrapper {
 	backend, _ := storage.NewFileSystemBackend(io.TestDirectory(t))
 	crypto := pkg.Crypto{
 		Storage: backend,
@@ -1370,7 +1370,7 @@ func apiWrapper(t *testing.T) *ApiWrapper {
 	}
 	crypto.Config.Keysize = 1024
 
-	return &ApiWrapper{C: &crypto}
+	return &Wrapper{C: &crypto}
 }
 
 type errorCloser struct{}

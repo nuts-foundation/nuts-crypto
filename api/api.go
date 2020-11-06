@@ -41,13 +41,14 @@ import (
 	"github.com/nuts-foundation/nuts-crypto/pkg/types"
 )
 
-type ApiWrapper struct {
+// Wrapper implements the generated interface from oapi-codegen
+type Wrapper struct {
 	C pkg.Client
 }
 
 // GenerateKeyPair is the implementation of the REST service call POST /crypto/generate
 // It returns the public key for the given legal entity in either PEM or JWK format depending on the accept-header. Default is PEM (backwards compatibility)
-func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
+func (w *Wrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairParams) error {
 	key := types.KeyForEntity(types.LegalEntity{URI: string(params.LegalEntity)})
 	overwrite := false
 	if params.Overwrite != nil {
@@ -81,7 +82,7 @@ func (w *ApiWrapper) GenerateKeyPair(ctx echo.Context, params GenerateKeyPairPar
 	return ctx.String(http.StatusOK, pub)
 }
 
-func (w *ApiWrapper) SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error {
+func (w *Wrapper) SelfSignVendorCACertificate(ctx echo.Context, params SelfSignVendorCACertificateParams) error {
 	if strings.TrimSpace(params.Name) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name is invalid")
 	}
@@ -97,7 +98,7 @@ func (w *ApiWrapper) SelfSignVendorCACertificate(ctx echo.Context, params SelfSi
 	return ctx.Blob(http.StatusOK, "application/x-pem-file", certificateAsPEM)
 }
 
-func (w *ApiWrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error {
+func (w *Wrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendorCACSRParams) error {
 	if strings.TrimSpace(params.Name) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name is invalid")
 	}
@@ -114,7 +115,7 @@ func (w *ApiWrapper) GenerateVendorCACSR(ctx echo.Context, params GenerateVendor
 }
 
 // Encrypt is the implementation of the REST service call POST /crypto/encrypt
-func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
+func (w *Wrapper) Encrypt(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -192,7 +193,7 @@ func (w *ApiWrapper) Encrypt(ctx echo.Context) error {
 }
 
 // Decrypt is the API handler function for decrypting a piece of data.
-func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
+func (w *Wrapper) Decrypt(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -234,7 +235,7 @@ func (w *ApiWrapper) Decrypt(ctx echo.Context) error {
 }
 
 // ExternalId is the API handler function for generating a unique external identifier for a given identifier and legalEntity.
-func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
+func (w *Wrapper) ExternalId(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -274,7 +275,7 @@ func (w *ApiWrapper) ExternalId(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, externalIdResponse)
 }
 
-func (w *ApiWrapper) Sign(ctx echo.Context) error {
+func (w *Wrapper) Sign(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -316,7 +317,7 @@ func (w *ApiWrapper) Sign(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, signResponse)
 }
 
-func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
+func (w *Wrapper) SignJwt(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -351,7 +352,7 @@ func (w *ApiWrapper) SignJwt(ctx echo.Context) error {
 
 // SignTLSCertificate creates a certificate based on a PEM encoded public key. It uses the Vendor CA to sign.
 // the resulting certificate is valid for 4 days.
-func (w *ApiWrapper) SignTLSCertificate(ctx echo.Context) error {
+func (w *Wrapper) SignTLSCertificate(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -376,7 +377,7 @@ func (w *ApiWrapper) SignTLSCertificate(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, cert.CertificateToPEM(c))
 }
 
-func (w *ApiWrapper) Verify(ctx echo.Context) error {
+func (w *Wrapper) Verify(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {
 		return err
@@ -445,7 +446,7 @@ func (w *ApiWrapper) Verify(ctx echo.Context) error {
 
 // PublicKey returns a public key for the given urn. The urn represents a legal entity. The api returns the public key either in PEM or JWK format.
 // It uses the accept header to determine this. Default is PEM (text/plain), only when application/json is requested will it return JWK.
-func (w *ApiWrapper) PublicKey(ctx echo.Context, urn string) error {
+func (w *Wrapper) PublicKey(ctx echo.Context, urn string) error {
 	if match, err := regexp.MatchString(`^\S+$`, urn); !match || err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "incorrect organization urn in request")
 	}
