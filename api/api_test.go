@@ -1092,7 +1092,7 @@ func TestWrapper_SignJwt(t *testing.T) {
 func TestWrapper_SignTLSCertificate(t *testing.T) {
 	client := apiWrapper(t)
 
-	t.Run("Incorrect public key format returns 400", func(t *testing.T) {
+	t.Run("error - incorrect public key format returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1109,7 +1109,7 @@ func TestWrapper_SignTLSCertificate(t *testing.T) {
 		assert.Contains(t, err.Error(), "code=400, message=failed to decode PEM block containing public key")
 	})
 
-	t.Run("Incorrect public key size returns 400", func(t *testing.T) {
+	t.Run("error - incorrect public key size returns 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1130,7 +1130,28 @@ func TestWrapper_SignTLSCertificate(t *testing.T) {
 		assert.Contains(t, err.Error(), "code=400, message=invalid keySize")
 	})
 
-	t.Run("All OK returns 200", func(t *testing.T) {
+	t.Run("error - 500", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+		cl := mock2.NewMockClient(ctrl)
+		wrapper := Wrapper{C: cl}
+		b, _ := ioutil.ReadFile("../test/publickey.pem")
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(b)),
+		}
+
+		cl.EXPECT().SignTLSCertificate(gomock.Any()).Return(nil, errors.New("B00M!"))
+		echo.EXPECT().Request().Return(request)
+
+		err := wrapper.SignTLSCertificate(echo)
+
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=500, message=B00M!")
+	})
+
+	t.Run("ok - 200", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)
@@ -1153,7 +1174,7 @@ func TestWrapper_SignTLSCertificate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("Missing body gives 400", func(t *testing.T) {
+	t.Run("error - missing body gives 400", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		echo := mock.NewMockContext(ctrl)

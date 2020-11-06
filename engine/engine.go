@@ -254,7 +254,7 @@ func cmd() *cobra.Command {
 
 			certificate, err := cc.SignTLSCertificate(pk)
 			if err != nil {
-				log.Logger().Errorf("Error while self-signing : %v", err)
+				log.Logger().Errorf("Error while signing : %v", err)
 				return err
 			}
 			certificateAsPEM := pem.EncodeToMemory(&pem.Block{
