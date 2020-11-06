@@ -60,7 +60,7 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
-// Certificate validity in days according to Nuts RFC003
+// RFC003ValidityInDays is the number of days a certificate is valid according to Nuts RFC003
 const RFC003ValidityInDays = 4
 
 // RFC003SigningCertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
@@ -126,11 +126,11 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 	csrAsASN1, privateKey, err := client.generateVendorCACSR(name, identity)
 	if err != nil {
 		return nil, err
-	} else {
-		if csr, err = x509.ParseCertificateRequest(csrAsASN1); err != nil {
-			return nil, errors2.Wrap(err, "unable to parse CSR")
-		}
 	}
+	if csr, err = x509.ParseCertificateRequest(csrAsASN1); err != nil {
+		return nil, errors2.Wrap(err, "unable to parse CSR")
+	}
+
 	serialNumber, err := cert.SerialNumber()
 	if err != nil {
 		return nil, errors2.Wrap(err, "unable to generate certificate serial number")
@@ -148,21 +148,22 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 		IsCA:                  true,
 	}
 	log.Logger().Infof("Self-signing Vendor CA certificate for vendor: %s", name)
-	if certificate, err := x509.CreateCertificate(rand.Reader, template, template, template.PublicKey, privateKey); err != nil {
+	certificate, err := x509.CreateCertificate(rand.Reader, template, template, template.PublicKey, privateKey)
+	if err != nil {
 		return nil, errors2.Wrap(err, "unable to create certificate")
-	} else {
-		return x509.ParseCertificate(certificate)
 	}
+
+	return x509.ParseCertificate(certificate)
 }
 
 func (client *Crypto) GenerateVendorCACSR(name string) ([]byte, error) {
 	identity := core.NutsConfig().VendorID()
 	log.Logger().Infof("Generating CSR for Vendor CA certificate (for current vendor: %s, name: %s)", identity, name)
-	if pkcs10, _, err := client.generateVendorCACSR(name, identity); err != nil {
+	pkcs10, _, err := client.generateVendorCACSR(name, identity)
+	if err != nil {
 		return nil, err
-	} else {
-		return pkcs10, nil
 	}
+	return pkcs10, nil
 }
 
 func (client *Crypto) generateVendorCACSR(name string, identity core.PartyID) ([]byte, crypto.PrivateKey, error) {
