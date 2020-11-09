@@ -221,7 +221,9 @@ type HttpRequestDoer interface {
 // Client which conforms to the OpenAPI3 specification for this service.
 type Client struct {
 	// The endpoint of the server conforming to this interface, with scheme,
-	// https://api.deepmap.com for example.
+	// https://api.deepmap.com for example. This can contain a path relative
+	// to the server, such as https://api.deepmap.com/dev-test, and all the
+	// paths in the swagger spec will be appended to the server.
 	Server string
 
 	// Doer for performing requests, typically a *http.Client with any
@@ -1812,21 +1814,27 @@ type EchoRouter interface {
 
 // RegisterHandlers adds each server route to the EchoRouter.
 func RegisterHandlers(router EchoRouter, si ServerInterface) {
+	RegisterHandlersWithBaseURL(router, si, "")
+}
+
+// Registers handlers, and prepends BaseURL to the paths, so that the paths
+// can be served under a prefix.
+func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL string) {
 
 	wrapper := ServerInterfaceWrapper{
 		Handler: si,
 	}
 
-	router.POST("/crypto/certificate/vendorca", wrapper.SelfSignVendorCACertificate)
-	router.POST("/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
-	router.POST("/crypto/decrypt", wrapper.Decrypt)
-	router.POST("/crypto/encrypt", wrapper.Encrypt)
-	router.POST("/crypto/external_id", wrapper.ExternalId)
-	router.POST("/crypto/generate", wrapper.GenerateKeyPair)
-	router.GET("/crypto/public_key/:urn", wrapper.PublicKey)
-	router.POST("/crypto/sign", wrapper.Sign)
-	router.POST("/crypto/sign_jwt", wrapper.SignJwt)
-	router.POST("/crypto/verify", wrapper.Verify)
+	router.POST(baseURL+"/crypto/certificate/vendorca", wrapper.SelfSignVendorCACertificate)
+	router.POST(baseURL+"/crypto/csr/vendorca", wrapper.GenerateVendorCACSR)
+	router.POST(baseURL+"/crypto/decrypt", wrapper.Decrypt)
+	router.POST(baseURL+"/crypto/encrypt", wrapper.Encrypt)
+	router.POST(baseURL+"/crypto/external_id", wrapper.ExternalId)
+	router.POST(baseURL+"/crypto/generate", wrapper.GenerateKeyPair)
+	router.GET(baseURL+"/crypto/public_key/:urn", wrapper.PublicKey)
+	router.POST(baseURL+"/crypto/sign", wrapper.Sign)
+	router.POST(baseURL+"/crypto/sign_jwt", wrapper.SignJwt)
+	router.POST(baseURL+"/crypto/verify", wrapper.Verify)
 
 }
 

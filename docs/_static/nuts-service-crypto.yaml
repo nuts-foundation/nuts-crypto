@@ -426,7 +426,6 @@ components:
     JWK:
       type: object
       description: as described by https://tools.ietf.org/html/rfc7517. Modelled as object so libraries can parse the tokens themselves.
-      additionalProperties: {}
     Identifier:
       type: string
       description: >
