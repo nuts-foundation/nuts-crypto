@@ -235,7 +235,7 @@ func cmd() *cobra.Command {
 		Short: "Creates and signs a certificate for usage as TLS client certificate",
 		Long: "Creates a CSR for the given public-key using a TLS client certificate template. " +
 			"It's signed with the vendor CA. " +
-			"The certificate is printed to stdout in PEM encoded form and optionally stored in the given location",
+			"The certificate is printed to stdout in PEM encoded form or stored in the given location",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			log.Logger().Info("Creating and signging TLS Client certificate")

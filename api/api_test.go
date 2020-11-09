@@ -239,7 +239,7 @@ func TestWrapper_GenerateKeyPair(t *testing.T) {
 func TestWrapper_Encrypt(t *testing.T) {
 	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
-	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
+	crypto.Config.Keysize = pkg.MinRSAKeySize // required for RSA OAEP encryption
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key, false)
 	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
@@ -505,7 +505,7 @@ func TestWrapper_Encrypt(t *testing.T) {
 func TestWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
-	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
+	crypto.Config.Keysize = pkg.MinRSAKeySize // required for RSA OAEP encryption
 
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key, false)

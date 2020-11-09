@@ -38,11 +38,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MinKeySize defines the minimum (RSA) key size
-const MinKeySize = 2048
+// MinRSAKeySize defines the minimum RSA key size
+const MinRSAKeySize = 2048
+
+// MinECKeySize defines the minimum EC key size
+const MinECKeySize = 256
 
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
-var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits for RSA and 256 bits for EC", MinKeySize), false)
+var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits for RSA and %d bits for EC", MinRSAKeySize, MinECKeySize), false)
 
 // ErrInvalidKeyIdentifier is returned when the provided key identifier isn't valid
 var ErrInvalidKeyIdentifier = core.NewError("invalid key identifier", false)
@@ -274,7 +277,7 @@ func (client Crypto) TrustStore() cert.TrustStore {
 }
 
 func (client *Crypto) verifyKeySize(keySize int) error {
-	if keySize < MinKeySize && core.NutsConfig().InStrictMode() {
+	if keySize < MinRSAKeySize && core.NutsConfig().InStrictMode() {
 		return ErrInvalidKeySize
 	}
 	return nil

@@ -39,7 +39,7 @@ func TestCrypto_DecryptCipherTextFor(t *testing.T) {
 	createCrypto(t)
 
 	client := createCrypto(t)
-	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
+	client.Config.Keysize = MinRSAKeySize // required for RSA OAEP encryption
 
 	t.Run("Encrypted text can be decrypted again", func(t *testing.T) {
 		key := types.KeyForEntity(types.LegalEntity{URI: "test"})
@@ -101,7 +101,7 @@ func TestCrypto_EncryptKeyAndPlainTextWith(t *testing.T) {
 
 func TestCrypto_DecryptKeyAndCipherTextFor(t *testing.T) {
 	client := createCrypto(t)
-	client.Config.Keysize = MinKeySize // required for RSA OAEP encryption
+	client.Config.Keysize = MinRSAKeySize // required for RSA OAEP encryption
 	createCrypto(t)
 
 	client.GenerateKeyPair(key, false)

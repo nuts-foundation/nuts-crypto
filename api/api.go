@@ -354,8 +354,7 @@ func (w *Wrapper) SignJwt(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, sig)
 }
 
-// SignTLSCertificate creates a certificate based on a PEM encoded public key. It uses the Vendor CA to sign.
-// the resulting certificate is valid for 4 days.
+// SignTLSCertificate creates a TLS client certificate based on a PEM encoded public key. It uses the Vendor CA to sign.
 func (w *Wrapper) SignTLSCertificate(ctx echo.Context) error {
 	buf, err := readBody(ctx)
 	if err != nil {

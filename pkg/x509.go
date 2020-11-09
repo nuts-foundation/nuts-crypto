@@ -60,20 +60,20 @@ const TLSCertificateValidityInDays = 365
 // SigningCertificateValidityInDays holds the number of days issued signing certificates are valid
 const SigningCertificateValidityInDays = 365
 
-// RFC003ValidityInDays is the number of days a certificate is valid according to Nuts RFC003
-const RFC003ValidityInDays = 4
+// rfc003ValidityInDays is the number of days a certificate is valid according to Nuts RFC003
+const rfc003ValidityInDays = 4
 
-// RFC003SigningCertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
-var RFC003SigningCertificateProfile = CertificateProfile{
+// rfc003SigningCertificateProfile is a x509.CertificateProfile according to RFC003: signing the JWT bearer token
+var rfc003SigningCertificateProfile = CertificateProfile{
 	KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
-	NumDaysValid: RFC003ValidityInDays,
+	NumDaysValid: rfc003ValidityInDays,
 }
 
-// RFC003TLSCertificateProfile is a x509.CertificateProfile according to RFC003/RFC008: setting up the TLS connection between nodes
-var RFC003TLSCertificateProfile = CertificateProfile{
+// rfc003TLSCertificateProfile is a x509.CertificateProfile according to RFC003/RFC008: setting up the TLS connection between nodes
+var rfc003TLSCertificateProfile = CertificateProfile{
 	KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
-	ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-	NumDaysValid: RFC003ValidityInDays,
+	ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	NumDaysValid: rfc003ValidityInDays,
 }
 
 // vendorCACertificateDaysValid holds the number of days self-signed Vendor CA certificates are valid
@@ -231,7 +231,7 @@ func validatePublicKeyRequirements(publicKey crypto.PublicKey) error {
 	switch publicKey.(type) {
 	case *rsa.PublicKey:
 		rpk := publicKey.(*rsa.PublicKey)
-		if rpk.N.BitLen() < MinKeySize {
+		if rpk.N.BitLen() < MinRSAKeySize {
 			return ErrInvalidKeySize
 		}
 	case *ecdsa.PublicKey:
@@ -293,7 +293,7 @@ func (client *Crypto) generateVendorCertificate(publicKey crypto.PublicKey, qual
 }
 
 func (client *Crypto) generateVendorTLSCertificate(publicKey crypto.PublicKey) (*x509.Certificate, error) {
-	return client.generateVendorCertificate(publicKey, TLSCertificateQualifier, RFC003TLSCertificateProfile)
+	return client.generateVendorCertificate(publicKey, TLSCertificateQualifier, rfc003TLSCertificateProfile)
 }
 
 func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certificate, crypto.Signer, error) {
@@ -302,7 +302,7 @@ func (client *Crypto) generateVendorEphemeralSigningCertificate() (*x509.Certifi
 	if privateKey, err = generateECKeyPair(); err != nil {
 		return nil, nil, errors2.Wrapf(err, "unable to generate key pair for new %s certificate", OAuthCertificateQualifier)
 	}
-	certificate, err := client.generateVendorCertificate(&privateKey.PublicKey, OAuthCertificateQualifier, RFC003SigningCertificateProfile)
+	certificate, err := client.generateVendorCertificate(&privateKey.PublicKey, OAuthCertificateQualifier, rfc003SigningCertificateProfile)
 	if err != nil {
 		return nil, nil, err
 	}
