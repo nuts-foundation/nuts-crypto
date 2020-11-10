@@ -19,6 +19,7 @@
 package cert
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -71,6 +72,17 @@ func TestCrypto_pemToPublicKey(t *testing.T) {
 		if err.Error() != expected {
 			t.Errorf("Expected error [%s], got [%s]", expected, err.Error())
 		}
+	})
+
+	t.Run("converts EC public key", func(t *testing.T) {
+		pem := "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEny33KMxU+mtPxSBMIztm69lehhNo\nCQD632dFAYSzDGh2LqemmYx9EKFzuzvCqbw87BD3spzbakjj5R315qV0gw==\n-----END PUBLIC KEY-----"
+
+		pk, err := PemToPublicKey([]byte(pem))
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		assert.IsType(t, &ecdsa.PublicKey{}, pk)
 	})
 }
 

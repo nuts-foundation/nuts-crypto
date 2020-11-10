@@ -52,7 +52,7 @@ func NewCryptoEngine() *engine.Engine {
 		FlagSet:   flagSet(),
 		Name:      "Crypto",
 		Routes: func(router engine.EchoRouter) {
-			api.RegisterHandlers(router, &api.ApiWrapper{C: cb})
+			api.RegisterHandlers(router, &api.Wrapper{C: cb})
 		},
 		Start:    cb.Start,
 		Shutdown: cb.Shutdown,
@@ -91,7 +91,7 @@ func cmd() *cobra.Command {
 			echoServer := echo.New()
 			echoServer.HideBanner = true
 			echoServer.Use(middleware.Logger())
-			api.RegisterHandlers(echoServer, &api.ApiWrapper{C: cryptoEngine})
+			api.RegisterHandlers(echoServer, &api.Wrapper{C: cryptoEngine})
 			logrus.Fatal(echoServer.Start(":1324"))
 		},
 	})
@@ -159,15 +159,15 @@ func cmd() *cobra.Command {
 			if err := jwk.Raw(&publicKey); err != nil {
 				cmd.Printf("Error printing publicKey: %v\n", err)
 				return
-			} else {
-				publicKeyAsPEM, err := cert.PublicKeyToPem(publicKey.(crypto.PublicKey))
-				if err != nil {
-					cmd.Printf("Error printing publicKey: %v\n", err)
-					return
-				}
-				cmd.Println("Public key in PEM:")
-				cmd.Println(publicKeyAsPEM)
 			}
+
+			publicKeyAsPEM, err := cert.PublicKeyToPem(publicKey.(crypto.PublicKey))
+			if err != nil {
+				cmd.Printf("Error printing publicKey: %v\n", err)
+				return
+			}
+			cmd.Println("Public key in PEM:")
+			cmd.Println(publicKeyAsPEM)
 		},
 	})
 
@@ -213,6 +213,48 @@ func cmd() *cobra.Command {
 			certificate, err := cc.SelfSignVendorCACertificate(args[0])
 			if err != nil {
 				log.Logger().Errorf("Error while self-signing : %v", err)
+				return err
+			}
+			certificateAsPEM := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: certificate.Raw,
+			})
+			if len(args) == 1 {
+				cmd.Println(string(certificateAsPEM))
+			} else {
+				outputFile := args[1]
+				cmd.Println(fmt.Sprintf("Writing certificate to %s", outputFile))
+				return ioutil.WriteFile(outputFile, certificateAsPEM, 0777)
+			}
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "sign-tls-cert [public-key-file] [OPTIONAL output-file]",
+		Short: "Creates and signs a certificate for usage as TLS client certificate",
+		Long: "Creates a CSR for the given public-key using a TLS client certificate template. " +
+			"It's signed with the vendor CA. " +
+			"The certificate is printed to stdout in PEM encoded form or stored in the given location",
+		Args: cobra.RangeArgs(1, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Logger().Info("Creating and signging TLS Client certificate")
+			cc := client.NewCryptoClient()
+
+			pp, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				log.Logger().Errorf("Error while reading %s : %v", args[0], err)
+				return err
+			}
+			pk, err := cert.PemToPublicKey(pp)
+			if err != nil {
+				log.Logger().Errorf("Error while parsing %s : %v", args[0], err)
+				return err
+			}
+
+			certificate, err := cc.SignTLSCertificate(pk)
+			if err != nil {
+				log.Logger().Errorf("Error while signing : %v", err)
 				return err
 			}
 			certificateAsPEM := pem.EncodeToMemory(&pem.Block{

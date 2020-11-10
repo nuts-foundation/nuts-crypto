@@ -50,8 +50,8 @@ var ErrRsaPubKeyConversion = core.NewError("Unable to convert public key to RSA 
 // ErrWrongPublicKey indicates a wrong certificate format
 var ErrInvalidCertificate = core.NewError("failed to decode PEM block containing certificate", false)
 
-// PemToPublicKey converts a PEM encoded public key to an rsa.PublicKeyInPEM
-func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
+// PemToPublicKey converts a PEM encoded public key to a crypto.PublicKey
+func PemToPublicKey(pub []byte) (crypto.PublicKey, error) {
 	block, _ := pem.Decode(pub)
 	if block == nil || block.Type != "PUBLIC KEY" {
 		return nil, ErrWrongPublicKey
@@ -62,12 +62,7 @@ func PemToPublicKey(pub []byte) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	finalKey, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return nil, ErrRsaPubKeyConversion
-	}
-
-	return finalKey, nil
+	return key, nil
 }
 
 // PublicKeyToPem converts an rsa.PublicKeyInPEM to PEM encoding

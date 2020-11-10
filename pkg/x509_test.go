@@ -19,7 +19,11 @@
 package pkg
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -640,6 +644,20 @@ func TestCrypto_SignCertificate(t *testing.T) {
 	})
 }
 
+func TestCrypto_generateVendorCertificate(t *testing.T) {
+	client := createCrypto(t)
+	t.Run("error - invalid public key", func(t *testing.T) {
+		sk, _ := rsa.GenerateKey(rand.Reader, 1024)
+
+		_, err := client.generateVendorTLSCertificate(&sk.PublicKey)
+
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Equal(t, ErrInvalidKeySize, err)
+	})
+}
+
 func TestCrypto_generateVendorEphemeralSigningCertificate(t *testing.T) {
 	client := createCrypto(t)
 	t.Run("ok", func(t *testing.T) {
@@ -694,6 +712,73 @@ func TestCrypto_generateVendorEphemeralSigningCertificate2(t *testing.T) {
 		}
 		assert.NotNil(t, sk)
 		assert.NotNil(t, cert)
+	})
+}
+
+func TestValidatePublicKeyRequirements(t *testing.T) {
+	t.Run("ok - ecdsa 256", func(t *testing.T) {
+		sk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("ok - ecdsa 384", func(t *testing.T) {
+		sk, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("ok - ecdsa 521", func(t *testing.T) {
+		sk, _ := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("error - ecdsa 224", func(t *testing.T) {
+		sk, _ := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Equal(t, ErrInvalidKeySize, err)
+	})
+
+	t.Run("ok - rsa 2048", func(t *testing.T) {
+		sk, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("error - rsa 1024", func(t *testing.T) {
+		sk, _ := rsa.GenerateKey(rand.Reader, 1024)
+
+		err := validatePublicKeyRequirements(&sk.PublicKey)
+
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Equal(t, ErrInvalidKeySize, err)
+	})
+
+	t.Run("error - ed25519", func(t *testing.T) {
+		pk, _, _ := ed25519.GenerateKey(rand.Reader)
+
+		err := validatePublicKeyRequirements(&pk)
+
+		if !assert.Error(t, err) {
+			return
+		}
+		assert.Equal(t, ErrInvalidAlgorithm, err)
 	})
 }
 

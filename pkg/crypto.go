@@ -38,11 +38,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MinKeySize defines the minimum (RSA) key size
-const MinKeySize = 2048
+// MinRSAKeySize defines the minimum RSA key size
+const MinRSAKeySize = 2048
+
+// MinECKeySize defines the minimum EC key size
+const MinECKeySize = 256
 
 // ErrInvalidKeySize is returned when the keySize for new keys is too short
-var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits", MinKeySize), false)
+var ErrInvalidKeySize = core.NewError(fmt.Sprintf("invalid keySize, needs to be at least %d bits for RSA and %d bits for EC", MinRSAKeySize, MinECKeySize), false)
 
 // ErrInvalidKeyIdentifier is returned when the provided key identifier isn't valid
 var ErrInvalidKeyIdentifier = core.NewError("invalid key identifier", false)
@@ -70,9 +73,9 @@ type CryptoConfig struct {
 func (cc CryptoConfig) getFSPath() string {
 	if cc.Fspath == "" {
 		return DefaultCryptoConfig().Fspath
-	} else {
-		return cc.Fspath
 	}
+
+	return cc.Fspath
 }
 
 func DefaultCryptoConfig() CryptoConfig {
@@ -211,15 +214,16 @@ func (client *Crypto) generateAndStoreKeyPair(key types.KeyIdentifier, overwrite
 		logrus.Warnf("Unable to generate new key pair for %s: it already exists and overwrite=false", key)
 		return nil, ErrKeyAlreadyExists
 	}
-	if keyPair, err := client.generateKeyPair(); err != nil {
+	keyPair, err := client.generateKeyPair()
+	if err != nil {
 		return nil, err
-	} else {
-		if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
-			return nil, err
-		} else {
-			return keyPair, nil
-		}
 	}
+
+	if err = client.Storage.SavePrivateKey(key, keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 func (client *Crypto) generateKeyPair() (*rsa.PrivateKey, error) {
@@ -273,7 +277,7 @@ func (client Crypto) TrustStore() cert.TrustStore {
 }
 
 func (client *Crypto) verifyKeySize(keySize int) error {
-	if keySize < MinKeySize && core.NutsConfig().InStrictMode() {
+	if keySize < MinRSAKeySize && core.NutsConfig().InStrictMode() {
 		return ErrInvalidKeySize
 	}
 	return nil

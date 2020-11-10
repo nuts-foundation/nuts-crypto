@@ -20,8 +20,9 @@
 package client
 
 import (
-	core "github.com/nuts-foundation/nuts-go-core"
 	"time"
+
+	core "github.com/nuts-foundation/nuts-go-core"
 
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
@@ -32,10 +33,10 @@ func NewCryptoClient() pkg.Client {
 	instance := pkg.CryptoInstance()
 	if core.NutsConfig().GetEngineMode(instance.Config.Mode) == core.ServerEngineMode {
 		return instance
-	} else {
-		return api.HttpClient{
-			ServerAddress: instance.Config.Address,
-			Timeout:       time.Duration(instance.Config.ClientTimeout) * time.Second,
-		}
+	}
+
+	return api.HttpClient{
+		ServerAddress: instance.Config.Address,
+		Timeout:       time.Duration(instance.Config.ClientTimeout) * time.Second,
 	}
 }

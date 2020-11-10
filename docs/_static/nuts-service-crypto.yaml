@@ -287,6 +287,32 @@ paths:
             application/x-pem-file:
               schema:
                 type: string
+  /crypto/certificate/tls:
+    post:
+      summary: "Create a TLS client certificate given a public key"
+      operationId: signTLSCertificate
+      tags:
+        - crypto
+      requestBody:
+        required: true
+        description: "public key in pem format"
+        content:
+          application/x-pem-file:
+            schema:
+              type: string
+      responses:
+        '400':
+          description: "incorrect data"
+          content:
+            text/plain:
+              example:
+                "invalid public key"
+        '200':
+          description: "OK response, body holds certificate as PEM-encoded X.509 certificate"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
 components:
   schemas:
     EncryptRequest:

@@ -215,6 +215,10 @@ func (hb HttpClient) VerifyWith(data []byte, sig []byte, jwk jwk.Key) (bool, err
 	panic(ErrNotImplemented)
 }
 
+func (hb HttpClient) SignTLSCertificate(key crypto.PublicKey) (*x509.Certificate, error) {
+	panic(ErrNotImplemented)
+}
+
 func (hb HttpClient) GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error) {
 	panic(ErrNotImplemented)
 }

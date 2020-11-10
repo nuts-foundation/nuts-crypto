@@ -1,13 +1,14 @@
 package client
 
 import (
+	"os"
+	"testing"
+
 	"github.com/nuts-foundation/nuts-crypto/api"
 	"github.com/nuts-foundation/nuts-crypto/pkg"
 	core "github.com/nuts-foundation/nuts-go-core"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestNewCryptoClient_ServerMode(t *testing.T) {

@@ -75,7 +75,7 @@ func (p jwkMatcher) String() string {
 	return "JWK Matcher"
 }
 
-func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
+func TestWrapper_GenerateVendorCACSR(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
 		defer os.Unsetenv("NUTS_IDENTITY")
@@ -110,7 +110,7 @@ func TestApiWrapper_GenerateVendorCACSR(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_SelfSignVendorCACertificate(t *testing.T) {
+func TestWrapper_SelfSignVendorCACertificate(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		os.Setenv("NUTS_IDENTITY", "urn:oid:1.3.6.1.4.1.54851.4:4")
 		defer os.Unsetenv("NUTS_IDENTITY")
@@ -145,7 +145,7 @@ func TestApiWrapper_SelfSignVendorCACertificate(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_GenerateKeyPair(t *testing.T) {
+func TestWrapper_GenerateKeyPair(t *testing.T) {
 	legalEntity := Identifier("test")
 	t.Run("GenerateKeyPairAPI call returns 200 with pub in PEM format", func(t *testing.T) {
 		se := apiWrapper(t)
@@ -217,7 +217,7 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 		cl := mock2.NewMockClient(ctrl)
 		echo := mock.NewMockContext(ctrl)
 
-		se := ApiWrapper{
+		se := Wrapper{
 			C: cl,
 		}
 
@@ -236,10 +236,10 @@ func TestApiWrapper_GenerateKeyPair(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_Encrypt(t *testing.T) {
+func TestWrapper_Encrypt(t *testing.T) {
 	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
-	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
+	crypto.Config.Keysize = pkg.MinRSAKeySize // required for RSA OAEP encryption
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key, false)
 	pemKey, _ := client.C.GetPublicKeyAsPEM(key)
@@ -310,7 +310,7 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 			t.Error("Expected error got nothing")
 		}
 
-		expected := "code=400, message=Error unmarshalling json: unexpected end of JSON input"
+		expected := "code=400, message=error unmarshalling json: unexpected end of JSON input"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error [%s], got: [%s]", expected, err.Error())
 		}
@@ -502,10 +502,10 @@ func TestApiWrapper_Encrypt(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_Decrypt(t *testing.T) {
+func TestWrapper_Decrypt(t *testing.T) {
 	client := apiWrapper(t)
 	crypto := client.C.(*pkg.Crypto)
-	crypto.Config.Keysize = pkg.MinKeySize // required for RSA OAEP encryption
+	crypto.Config.Keysize = pkg.MinRSAKeySize // required for RSA OAEP encryption
 
 	plaintext := "for your eyes only"
 	client.C.GenerateKeyPair(key, false)
@@ -710,7 +710,7 @@ func TestApiWrapper_Decrypt(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_ExternalIdFor(t *testing.T) {
+func TestWrapper_ExternalIdFor(t *testing.T) {
 	client := apiWrapper(t)
 
 	subject := Identifier("test")
@@ -1001,7 +1001,7 @@ func TestDefaultCryptoEngine_Sign(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_SignJwt(t *testing.T) {
+func TestWrapper_SignJwt(t *testing.T) {
 	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key, false)
@@ -1083,6 +1083,107 @@ func TestApiWrapper_SignJwt(t *testing.T) {
 		echo.EXPECT().Request().Return(request)
 
 		err := client.SignJwt(echo)
+
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=missing body in request")
+	})
+}
+
+func TestWrapper_SignTLSCertificate(t *testing.T) {
+	client := apiWrapper(t)
+
+	t.Run("error - incorrect public key format returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte("not PEM"))),
+		}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.SignTLSCertificate(echo)
+
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=failed to decode PEM block containing public key")
+	})
+
+	t.Run("error - incorrect public key size returns 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+		cl := mock2.NewMockClient(ctrl)
+		wrapper := Wrapper{C: cl}
+		b, _ := ioutil.ReadFile("../test/publickey.pem")
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(b)),
+		}
+
+		cl.EXPECT().SignTLSCertificate(gomock.Any()).Return(nil, pkg.ErrInvalidKeySize)
+		echo.EXPECT().Request().Return(request)
+
+		err := wrapper.SignTLSCertificate(echo)
+
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=400, message=invalid keySize")
+	})
+
+	t.Run("error - 500", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+		cl := mock2.NewMockClient(ctrl)
+		wrapper := Wrapper{C: cl}
+		b, _ := ioutil.ReadFile("../test/publickey.pem")
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(b)),
+		}
+
+		cl.EXPECT().SignTLSCertificate(gomock.Any()).Return(nil, errors.New("B00M!"))
+		echo.EXPECT().Request().Return(request)
+
+		err := wrapper.SignTLSCertificate(echo)
+
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "code=500, message=B00M!")
+	})
+
+	t.Run("ok - 200", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+		cl := mock2.NewMockClient(ctrl)
+		wrapper := Wrapper{C: cl}
+		b, _ := ioutil.ReadFile("../test/publickey.pem")
+		bc, _ := ioutil.ReadFile("../test/certificate.pem")
+		c, _ := cert.PemToX509(bc)
+
+		request := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(b)),
+		}
+
+		cl.EXPECT().SignTLSCertificate(gomock.Any()).Return(c, nil)
+		echo.EXPECT().Request().Return(request)
+		echo.EXPECT().String(http.StatusOK, string(bc)+"\n")
+
+		err := wrapper.SignTLSCertificate(echo)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("error - missing body gives 400", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		echo := mock.NewMockContext(ctrl)
+
+		request := &http.Request{}
+
+		echo.EXPECT().Request().Return(request)
+
+		err := client.SignTLSCertificate(echo)
 
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "code=400, message=missing body in request")
@@ -1301,7 +1402,7 @@ func TestDefaultCryptoEngine_Verify(t *testing.T) {
 	})
 }
 
-func TestApiWrapper_PublicKey(t *testing.T) {
+func TestWrapper_PublicKey(t *testing.T) {
 	client := apiWrapper(t)
 
 	client.C.GenerateKeyPair(key, false)
@@ -1362,7 +1463,7 @@ func TestApiWrapper_PublicKey(t *testing.T) {
 	})
 }
 
-func apiWrapper(t *testing.T) *ApiWrapper {
+func apiWrapper(t *testing.T) *Wrapper {
 	backend, _ := storage.NewFileSystemBackend(io.TestDirectory(t))
 	crypto := pkg.Crypto{
 		Storage: backend,
@@ -1370,7 +1471,7 @@ func apiWrapper(t *testing.T) *ApiWrapper {
 	}
 	crypto.Config.Keysize = 1024
 
-	return &ApiWrapper{C: &crypto}
+	return &Wrapper{C: &crypto}
 }
 
 type errorCloser struct{}

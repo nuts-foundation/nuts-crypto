@@ -62,6 +62,9 @@ type Client interface {
 	// If there's no TLS certificate for the given entity nil is returned. In that case RenewTLSCertificate can be used
 	// to (re)issue the certificate.
 	GetTLSCertificate(entity types.LegalEntity) (*x509.Certificate, crypto.PrivateKey, error)
+	// SignTLSCertificate creates a CSR for the given public key and will sign it with the vendorCA.
+	// It differs from GetTLSCertificate in the fact that the private key is unknown/external.
+	SignTLSCertificate(publicKey crypto.PublicKey) (*x509.Certificate, error)
 	// RenewTLSCertificate issues a TLS certificate and corresponding private key for the given entity. If it already
 	// exists the existing private key and certificate are overwritten.
 	// The specified entity MUST have a valid CA certificate with private key, otherwise an error is returned.

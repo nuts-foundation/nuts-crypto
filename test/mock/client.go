@@ -7,13 +7,14 @@ package mock
 import (
 	crypto "crypto"
 	x509 "crypto/x509"
+	reflect "reflect"
+	time "time"
+
 	gomock "github.com/golang/mock/gomock"
 	jwk "github.com/lestrrat-go/jwx/jwk"
 	pkg "github.com/nuts-foundation/nuts-crypto/pkg"
 	cert "github.com/nuts-foundation/nuts-crypto/pkg/cert"
 	types "github.com/nuts-foundation/nuts-crypto/pkg/types"
-	reflect "reflect"
-	time "time"
 )
 
 // MockClient is a mock of Client interface
@@ -217,6 +218,21 @@ func (m *MockClient) GetTLSCertificate(entity types.LegalEntity) (*x509.Certific
 func (mr *MockClientMockRecorder) GetTLSCertificate(entity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTLSCertificate", reflect.TypeOf((*MockClient)(nil).GetTLSCertificate), entity)
+}
+
+// SignTLSCertificate mocks base method
+func (m *MockClient) SignTLSCertificate(publicKey crypto.PublicKey) (*x509.Certificate, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SignTLSCertificate", publicKey)
+	ret0, _ := ret[0].(*x509.Certificate)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SignTLSCertificate indicates an expected call of SignTLSCertificate
+func (mr *MockClientMockRecorder) SignTLSCertificate(publicKey interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignTLSCertificate", reflect.TypeOf((*MockClient)(nil).SignTLSCertificate), publicKey)
 }
 
 // RenewTLSCertificate mocks base method
