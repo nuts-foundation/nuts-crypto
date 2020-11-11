@@ -43,17 +43,17 @@ type poolCertVerifier struct {
 	pool *x509.CertPool
 }
 
-func (n poolCertVerifier) Pool() *x509.CertPool {
-	return n.pool
+func (n *poolCertVerifier) Roots() ([]*x509.Certificate, *x509.CertPool) {
+	return nil, n.pool
+}
+
+func (n *poolCertVerifier) Intermediates() ([]*x509.Certificate, *x509.CertPool) {
+	return nil, n.pool
 }
 
 func (n *poolCertVerifier) AddCertificate(certificate *x509.Certificate) error {
 	n.pool.AddCert(certificate)
 	return nil
-}
-
-func (n poolCertVerifier) GetRoots(t time.Time) []*x509.Certificate {
-	panic("implement me")
 }
 
 func (n poolCertVerifier) GetCertificates(i [][]*x509.Certificate, t time.Time, b bool) [][]*x509.Certificate {

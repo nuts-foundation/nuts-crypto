@@ -24,7 +24,7 @@ func TestNewTrustStore(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 1)
+		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("ok - create empty", func(t *testing.T) {
 		const file = "non-existent.pem"
@@ -35,7 +35,7 @@ func TestNewTrustStore(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 0)
+		assert.Len(t, ts.allCerts, 0)
 	})
 	t.Run("ok - mixed", func(t *testing.T) {
 		// Loads a mixed PEM file which does contain certificates but also other PEM-encoded objects
@@ -44,7 +44,7 @@ func TestNewTrustStore(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 1)
+		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("ok - roundtrip", func(t *testing.T) {
 		const file = "roundtrip.pem"
@@ -55,7 +55,7 @@ func TestNewTrustStore(t *testing.T) {
 			return
 		}
 		ts := trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 0)
+		assert.Len(t, ts.allCerts, 0)
 		err = trustStore.AddCertificate(generateSelfSignedsCertificate("Test", time.Now(), 1, test.GenerateRSAKey()))
 		if !assert.NoError(t, err) {
 			return
@@ -65,7 +65,7 @@ func TestNewTrustStore(t *testing.T) {
 			return
 		}
 		ts = trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 1)
+		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("error - path does not exist", func(t *testing.T) {
 		trustStore, err := NewTrustStore("/non/existent/path/1234/truststore.pem")
@@ -97,10 +97,10 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		ts := trustStore.(*fileTrustStore)
 		err = trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 		assert.NoError(t, err)
-		assert.Len(t, ts.certs, 1)
+		assert.Len(t, ts.allCerts, 1)
 		err = trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 		assert.NoError(t, err)
-		assert.Len(t, ts.certs, 2)
+		assert.Len(t, ts.allCerts, 2)
 	})
 	t.Run("ok - duplicate", func(t *testing.T) {
 		os.Remove(file)
@@ -115,7 +115,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		assert.NoError(t, err)
 		err = trustStore.AddCertificate(certificate)
 		assert.NoError(t, err)
-		assert.Len(t, ts.certs, 1)
+		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("ok - concurrency", func(t *testing.T) {
 		os.Remove(file)
@@ -136,7 +136,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		}
 		wg.Wait()
 		ts := trustStore.(*fileTrustStore)
-		assert.Len(t, ts.certs, 100)
+		assert.Len(t, ts.allCerts, 100)
 	})
 	t.Run("error - cert is nil", func(t *testing.T) {
 		os.Remove(file)
@@ -147,25 +147,15 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 	})
 }
 
-func Test_fileTrustStore_Pool(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		const file = "pool.pem"
-		os.Remove(file)
-		defer os.Remove(file)
-		trustStore, _ := NewTrustStore(file)
-		assert.NotNil(t, trustStore.Pool())
-	})
-}
-
 func Test_fileTrustStore_Verify(t *testing.T) {
 	t.Run("ok - valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).certs[0], time.Now())
+		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
 		assert.NoError(t, err)
 	})
 	t.Run("ok - not valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).certs[0], time.Unix(2000, 0))
+		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
 		assert.Error(t, err)
 	})
 }
@@ -173,39 +163,42 @@ func Test_fileTrustStore_Verify(t *testing.T) {
 func Test_fileTrustStore_VerifiedChain(t *testing.T) {
 	t.Run("ok - valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).certs[0], time.Now())
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
 		assert.NoError(t, err)
 		assert.Len(t, chain, 1)
 		assert.Len(t, chain[0], 1)
 	})
 	t.Run("ok - not valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).certs[0], time.Unix(2000, 0))
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
 		assert.Error(t, err)
 		assert.Nil(t, chain)
 	})
 }
 
-func Test_fileTrustStore_GetRoots(t *testing.T) {
+func Test_fileTrustStore_Roots(t *testing.T) {
 	trustStore, _ := NewTrustStore("../../test/truststore.pem")
 	t.Run("returns root", func(t *testing.T) {
-		roots := trustStore.GetRoots(time.Now())
+		roots, _ := trustStore.Roots()
 
 		assert.Len(t, roots, 1)
-		assert.Equal(t, (trustStore.(*fileTrustStore)).certs[0], roots[0])
+		assert.Equal(t, (trustStore.(*fileTrustStore)).allCerts[0], roots[0])
 	})
+}
 
-	t.Run("returns nothing when not active", func(t *testing.T) {
-		roots := trustStore.GetRoots(time.Unix(2000, 0))
+func Test_fileTrustStore_Intermediates(t *testing.T) {
+	trustStore, _ := NewTrustStore("../../test/truststore.pem")
+	t.Run("returns intermediates", func(t *testing.T) {
+		intermediates, _ := trustStore.Intermediates()
 
-		assert.Len(t, roots, 0)
+		assert.Len(t, intermediates, 0)
 	})
 }
 
 func Test_fileTrustStore_GetCertificates(t *testing.T) {
 	t.Run("finds no certs when only root present", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		roots := trustStore.GetRoots(time.Now())
+		roots, _ := trustStore.Roots()
 		var chains [][]*x509.Certificate
 		for _, r := range roots {
 			chains = append(chains, []*x509.Certificate{r})
@@ -300,10 +293,11 @@ func Test_fileTrustStore_contains(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &fileTrustStore{
-				pool:  tt.fields.pool,
-				certs: tt.fields.certs,
-				file:  tt.fields.file,
-				mutex: tt.fields.mutex,
+				rootPool: tt.fields.pool,
+				allCerts: tt.fields.certs,
+				roots:    tt.fields.certs,
+				file:     tt.fields.file,
+				mutex:    tt.fields.mutex,
 			}
 			if got := m.contains(tt.args.certificate); got != tt.want {
 				t.Errorf("contains() = %v, want %v", got, tt.want)
