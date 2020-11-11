@@ -36,7 +36,7 @@ type TrustStore interface {
 }
 
 func NewTrustStore(file string) (TrustStore, error) {
-	trustStore := &fileTrustStore{
+	trustStore := &FileTrustStore{
 		rootPool:         x509.NewCertPool(),
 		intermediatePool: x509.NewCertPool(),
 		roots:            make([]*x509.Certificate, 0),
@@ -58,7 +58,7 @@ func NewTrustStore(file string) (TrustStore, error) {
 	return trustStore, nil
 }
 
-type fileTrustStore struct {
+type FileTrustStore struct {
 	rootPool         *x509.CertPool
 	intermediatePool *x509.CertPool
 	// x509.CertPool doesn't allow you to extract the certificates in it, so we need to keep our own administration.
@@ -71,7 +71,7 @@ type fileTrustStore struct {
 	mutex *sync.Mutex
 }
 
-func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
+func (m *FileTrustStore) addCertificate(certificate *x509.Certificate) error {
 	if certificate == nil {
 		return errors.New("certificate is nil")
 	}
@@ -90,7 +90,7 @@ func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
 	return nil
 }
 
-func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
+func (m *FileTrustStore) AddCertificate(certificate *x509.Certificate) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -101,16 +101,16 @@ func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
 }
 
 // GetRoots returns the list of root certificates and a CertPool for convenience
-func (m *fileTrustStore) Roots() ([]*x509.Certificate, *x509.CertPool) {
+func (m *FileTrustStore) Roots() ([]*x509.Certificate, *x509.CertPool) {
 	return m.roots, m.rootPool
 }
 
 // GetRoots returns the list of intermediate certificates and a CertPool for convenience
-func (m fileTrustStore) Intermediates() ([]*x509.Certificate, *x509.CertPool) {
+func (m FileTrustStore) Intermediates() ([]*x509.Certificate, *x509.CertPool) {
 	return m.intermediates, m.intermediatePool
 }
 
-func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment time.Time, isCA bool) [][]*x509.Certificate {
+func (m *FileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment time.Time, isCA bool) [][]*x509.Certificate {
 	var certs [][]*x509.Certificate
 	roots := x509.NewCertPool()
 	intermediates := x509.NewCertPool()
@@ -150,7 +150,7 @@ func isSelfSigned(cert *x509.Certificate) bool {
 	return false
 }
 
-func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
+func (m *FileTrustStore) contains(certificate *x509.Certificate) bool {
 	for _, cert := range m.allCerts {
 		if cert.Equal(certificate) {
 			return true
@@ -159,7 +159,7 @@ func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
 	return false
 }
 
-func (m *fileTrustStore) save() error {
+func (m *FileTrustStore) save() error {
 	buffer := new(bytes.Buffer)
 	if err := write(buffer, m.roots); err != nil {
 		return err
@@ -183,7 +183,7 @@ func write(buffer *bytes.Buffer, certs []*x509.Certificate) error {
 	return nil
 }
 
-func (m *fileTrustStore) load(file string) error {
+func (m *FileTrustStore) load(file string) error {
 	m.file = file
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -220,12 +220,12 @@ func exists(file string) (bool, error) {
 	return !info.IsDir(), nil
 }
 
-func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
+func (m FileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
 	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
 	return err
 }
 
-func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
+func (m FileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
 	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
 }
 

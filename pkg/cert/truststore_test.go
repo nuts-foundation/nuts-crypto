@@ -23,7 +23,7 @@ func TestNewTrustStore(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("ok - create empty", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNewTrustStore(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 0)
 	})
 	t.Run("ok - mixed", func(t *testing.T) {
@@ -43,7 +43,7 @@ func TestNewTrustStore(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("ok - roundtrip", func(t *testing.T) {
@@ -54,7 +54,7 @@ func TestNewTrustStore(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 0)
 		err = trustStore.AddCertificate(generateSelfSignedsCertificate("Test", time.Now(), 1, test.GenerateRSAKey()))
 		if !assert.NoError(t, err) {
@@ -64,7 +64,7 @@ func TestNewTrustStore(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts = trustStore.(*fileTrustStore)
+		ts = trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 1)
 	})
 	t.Run("error - path does not exist", func(t *testing.T) {
@@ -94,7 +94,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		err = trustStore.AddCertificate(generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey))
 		assert.NoError(t, err)
 		assert.Len(t, ts.allCerts, 1)
@@ -109,7 +109,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		certificate := generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey)
 		err = trustStore.AddCertificate(certificate)
 		assert.NoError(t, err)
@@ -135,7 +135,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 			}()
 		}
 		wg.Wait()
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		assert.Len(t, ts.allCerts, 100)
 	})
 	t.Run("error - cert is nil", func(t *testing.T) {
@@ -152,7 +152,7 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		if !assert.NoError(t, err) {
 			return
 		}
-		ts := trustStore.(*fileTrustStore)
+		ts := trustStore.(*FileTrustStore)
 		parent := generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey)
 		err = trustStore.AddCertificate(parent)
 		assert.NoError(t, err)
@@ -169,12 +169,12 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 func Test_fileTrustStore_Verify(t *testing.T) {
 	t.Run("ok - valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
+		err := trustStore.Verify((trustStore.(*FileTrustStore)).allCerts[0], time.Now())
 		assert.NoError(t, err)
 	})
 	t.Run("ok - not valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
+		err := trustStore.Verify((trustStore.(*FileTrustStore)).allCerts[0], time.Unix(2000, 0))
 		assert.Error(t, err)
 	})
 }
@@ -182,14 +182,14 @@ func Test_fileTrustStore_Verify(t *testing.T) {
 func Test_fileTrustStore_VerifiedChain(t *testing.T) {
 	t.Run("ok - valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
+		chain, err := trustStore.VerifiedChain((trustStore.(*FileTrustStore)).allCerts[0], time.Now())
 		assert.NoError(t, err)
 		assert.Len(t, chain, 1)
 		assert.Len(t, chain[0], 1)
 	})
 	t.Run("ok - not valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
+		chain, err := trustStore.VerifiedChain((trustStore.(*FileTrustStore)).allCerts[0], time.Unix(2000, 0))
 		assert.Error(t, err)
 		assert.Nil(t, chain)
 	})
@@ -201,7 +201,7 @@ func Test_fileTrustStore_Roots(t *testing.T) {
 		roots, _ := trustStore.Roots()
 
 		assert.Len(t, roots, 1)
-		assert.Equal(t, (trustStore.(*fileTrustStore)).allCerts[0], roots[0])
+		assert.Equal(t, (trustStore.(*FileTrustStore)).allCerts[0], roots[0])
 	})
 }
 
@@ -311,7 +311,7 @@ func Test_fileTrustStore_contains(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &fileTrustStore{
+			m := &FileTrustStore{
 				rootPool: tt.fields.pool,
 				allCerts: tt.fields.certs,
 				roots:    tt.fields.certs,
@@ -327,7 +327,7 @@ func Test_fileTrustStore_contains(t *testing.T) {
 
 func Test_fileTrustStore_load(t *testing.T) {
 	t.Run("error - file does not exist", func(t *testing.T) {
-		err := (&fileTrustStore{}).load("non-existent")
+		err := (&FileTrustStore{}).load("non-existent")
 		assert.EqualError(t, err, "unable to read truststore file: non-existent: open non-existent: no such file or directory")
 	})
 }
