@@ -83,7 +83,7 @@ func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
 		m.roots = append(m.roots, certificate)
 	} else {
 		m.intermediatePool.AddCert(certificate)
-		m.intermediates = append(m.roots, certificate)
+		m.intermediates = append(m.intermediates, certificate)
 	}
 	m.allCerts = append(m.allCerts, certificate)
 

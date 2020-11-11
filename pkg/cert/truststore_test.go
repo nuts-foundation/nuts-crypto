@@ -145,6 +145,25 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 		err := trustStore.AddCertificate(nil)
 		assert.EqualError(t, err, "certificate is nil")
 	})
+	t.Run("ok - intermediate", func(t *testing.T) {
+		os.Remove(file)
+		defer os.Remove(file)
+		trustStore, err := NewTrustStore(file)
+		if !assert.NoError(t, err) {
+			return
+		}
+		ts := trustStore.(*fileTrustStore)
+		parent := generateSelfSignedsCertificate(t.Name(), time.Now(), 1, privateKey)
+		err = trustStore.AddCertificate(parent)
+		assert.NoError(t, err)
+		assert.Len(t, ts.allCerts, 1)
+		publicKey := test.GenerateRSAKey().PublicKey
+		err = trustStore.AddCertificate(generateCertificateCA(t.Name()+"sub", time.Now(), 1, parent, &publicKey, privateKey))
+		assert.NoError(t, err)
+		assert.Len(t, ts.allCerts, 2)
+		assert.Len(t, ts.roots, 1)
+		assert.Len(t, ts.intermediates, 1)
+	})
 }
 
 func Test_fileTrustStore_Verify(t *testing.T) {
