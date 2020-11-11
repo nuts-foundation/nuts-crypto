@@ -72,8 +72,6 @@ type fileTrustStore struct {
 }
 
 func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	if certificate == nil {
 		return errors.New("certificate is nil")
 	}
@@ -93,6 +91,9 @@ func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
 }
 
 func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	if err := m.addCertificate(certificate); err != nil {
 		return err
 	}
