@@ -24,10 +24,11 @@ type Verifier interface {
 
 type TrustStore interface {
 	Verifier
-	Pool() *x509.CertPool
 	AddCertificate(certificate *x509.Certificate) error
-	// GetRoots returns all roots active at the given time
-	GetRoots(time.Time) []*x509.Certificate
+	// GetRoots returns all roots active
+	Roots() ([]*x509.Certificate, *x509.CertPool)
+	// GetIntermediates returns all intermediates
+	Intermediates() ([]*x509.Certificate, *x509.CertPool)
 	// GetCertificates returns all certificates signed by given signer chains, active at the given time and if it must be a CA
 	// The chain is returned in reverse order, the latest in the chain being the root. This is also the order the certificates in the chain
 	// param are expected
@@ -36,9 +37,12 @@ type TrustStore interface {
 
 func NewTrustStore(file string) (TrustStore, error) {
 	trustStore := &fileTrustStore{
-		pool:  x509.NewCertPool(),
-		certs: make([]*x509.Certificate, 0),
-		mutex: &sync.Mutex{},
+		rootPool:         x509.NewCertPool(),
+		intermediatePool: x509.NewCertPool(),
+		roots:            make([]*x509.Certificate, 0),
+		intermediates:    make([]*x509.Certificate, 0),
+		allCerts:         make([]*x509.Certificate, 0),
+		mutex:            &sync.Mutex{},
 	}
 	if exists, err := exists(file); err != nil {
 		return nil, errors2.Wrap(err, "error checking for existing truststore")
@@ -55,45 +59,55 @@ func NewTrustStore(file string) (TrustStore, error) {
 }
 
 type fileTrustStore struct {
-	pool *x509.CertPool
+	rootPool         *x509.CertPool
+	intermediatePool *x509.CertPool
 	// x509.CertPool doesn't allow you to extract the certificates in it, so we need to keep our own administration.
-	certs []*x509.Certificate
-	file  string
+	roots         []*x509.Certificate
+	intermediates []*x509.Certificate
+	allCerts      []*x509.Certificate
+	file          string
 	// mutex secures concurrent access to AddCertificate() since it might be called concurrently, which is bad since
 	// it does some file manipulation.
 	mutex *sync.Mutex
 }
 
-func (m fileTrustStore) Pool() *x509.CertPool {
-	return m.pool
-}
-
-func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+func (m *fileTrustStore) addCertificate(certificate *x509.Certificate) error {
 	if certificate == nil {
 		return errors.New("certificate is nil")
 	}
 	if m.contains(certificate) {
 		return nil
 	}
-	m.pool.AddCert(certificate)
-	m.certs = append(m.certs, certificate)
+	if isSelfSigned(certificate) {
+		m.rootPool.AddCert(certificate)
+		m.roots = append(m.roots, certificate)
+	} else {
+		m.intermediatePool.AddCert(certificate)
+		m.intermediates = append(m.intermediates, certificate)
+	}
+	m.allCerts = append(m.allCerts, certificate)
+
+	return nil
+}
+
+func (m *fileTrustStore) AddCertificate(certificate *x509.Certificate) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if err := m.addCertificate(certificate); err != nil {
+		return err
+	}
 	return m.save()
 }
 
-// GetRoots checks if certificates have the same issuer as the subject and if they are self signed
-// multiple roots can be active at the same time.
-func (m *fileTrustStore) GetRoots(moment time.Time) []*x509.Certificate {
-	var certs []*x509.Certificate
+// GetRoots returns the list of root certificates and a CertPool for convenience
+func (m *fileTrustStore) Roots() ([]*x509.Certificate, *x509.CertPool) {
+	return m.roots, m.rootPool
+}
 
-	for _, c := range m.certs {
-		if isSelfSigned(c) && isValidAt(c, moment) {
-			certs = append(certs, c)
-		}
-	}
-
-	return certs
+// GetRoots returns the list of intermediate certificates and a CertPool for convenience
+func (m fileTrustStore) Intermediates() ([]*x509.Certificate, *x509.CertPool) {
+	return m.intermediates, m.intermediatePool
 }
 
 func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment time.Time, isCA bool) [][]*x509.Certificate {
@@ -114,7 +128,7 @@ func (m *fileTrustStore) GetCertificates(chain [][]*x509.Certificate, moment tim
 		}
 	}
 
-	for _, c := range m.certs {
+	for _, c := range m.allCerts {
 		if c.IsCA == isCA && !rootsAndIntermediates[c] {
 			chain, err := c.Verify(x509.VerifyOptions{Roots: roots, Intermediates: intermediates, CurrentTime: moment})
 			if err == nil {
@@ -136,12 +150,8 @@ func isSelfSigned(cert *x509.Certificate) bool {
 	return false
 }
 
-func isValidAt(cert *x509.Certificate, moment time.Time) bool {
-	return cert.NotBefore.Before(moment) && cert.NotAfter.After(moment)
-}
-
 func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
-	for _, cert := range m.certs {
+	for _, cert := range m.allCerts {
 		if cert.Equal(certificate) {
 			return true
 		}
@@ -151,7 +161,18 @@ func (m *fileTrustStore) contains(certificate *x509.Certificate) bool {
 
 func (m *fileTrustStore) save() error {
 	buffer := new(bytes.Buffer)
-	for _, cert := range m.certs {
+	if err := write(buffer, m.roots); err != nil {
+		return err
+	}
+	if err := write(buffer, m.intermediates); err != nil {
+		return err
+	}
+	stat, _ := os.Stat(m.file)
+	return ioutil.WriteFile(m.file, buffer.Bytes(), stat.Mode())
+}
+
+func write(buffer *bytes.Buffer, certs []*x509.Certificate) error {
+	for _, cert := range certs {
 		if err := pem.Encode(buffer, &pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: cert.Raw,
@@ -159,8 +180,7 @@ func (m *fileTrustStore) save() error {
 			return err
 		}
 	}
-	stat, _ := os.Stat(m.file)
-	return ioutil.WriteFile(m.file, buffer.Bytes(), stat.Mode())
+	return nil
 }
 
 func (m *fileTrustStore) load(file string) error {
@@ -183,8 +203,9 @@ func (m *fileTrustStore) load(file string) error {
 		if err != nil {
 			return errors2.Wrap(err, "unable to parse truststore certificate")
 		}
-		m.certs = append(m.certs, certificate)
-		m.pool.AddCert(certificate)
+		if err = m.addCertificate(certificate); err != nil {
+			return errors2.Wrap(err, "unable to add truststore certificate")
+		}
 	}
 	return nil
 }
@@ -200,12 +221,12 @@ func exists(file string) (bool, error) {
 }
 
 func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
-	_, err := cert.Verify(x509.VerifyOptions{Roots: m.pool, CurrentTime: moment})
+	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
 	return err
 }
 
 func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
-	return cert.Verify(x509.VerifyOptions{Roots: m.pool, CurrentTime: moment})
+	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
 }
 
 func findBlocksInPEM(data []byte, blockType string) ([]*pem.Block, error) {
