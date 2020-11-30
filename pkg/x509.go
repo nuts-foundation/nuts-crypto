@@ -143,7 +143,6 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(0, 0, vendorCACertificateDaysValid),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		ExtraExtensions:       csr.Extensions,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

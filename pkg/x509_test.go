@@ -153,9 +153,6 @@ func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
 		})
-		t.Run("verify extended key usage", func(t *testing.T) {
-			assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}, certificate.ExtKeyUsage)
-		})
 	})
 }
 
