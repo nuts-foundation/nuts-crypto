@@ -221,12 +221,14 @@ func exists(file string) (bool, error) {
 }
 
 func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
-	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
+	// todo pass ExtKeyUsage?
+	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}})
 	return err
 }
 
 func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
-	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment})
+	// todo pass ExtKeyUsage?
+	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}})
 }
 
 func findBlocksInPEM(data []byte, blockType string) ([]*pem.Block, error) {
