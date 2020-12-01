@@ -235,7 +235,6 @@ func generateECKeyPair() (*ecdsa.PrivateKey, error) {
 }
 
 // SignFor signs a piece of data using the given key. It is expected that the plain data is given, and it uses the SHA256 hashing function.
-// todo: SHA_256?
 func (client *Crypto) Sign(data []byte, key types.KeyIdentifier) ([]byte, error) {
 	// random
 	rng := rand.Reader

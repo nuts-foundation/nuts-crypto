@@ -163,14 +163,21 @@ func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
 func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	client := createCrypto(t)
 	createCrypto(t)
-
-	t.Run("ok - private key exists", func(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		client.GenerateKeyPair(key, false)
+		privateKey, _ := client.GetPrivateKey(key)
+		certificateAsBytes := test.GenerateCertificateCA(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		err := client.StoreVendorCACertificate(certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("error - missing ExtKeyUsage", func(t *testing.T) {
 		client.GenerateKeyPair(key, false)
 		privateKey, _ := client.GetPrivateKey(key)
 		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		err := client.StoreVendorCACertificate(certificate)
-		assert.NoError(t, err)
+		assert.EqualError(t, err, "certificate does not define ExtKeyUsage: ClientAuth, ServerAuth")
 	})
 	t.Run("error - private key does not exist", func(t *testing.T) {
 		client := createCrypto(t)
