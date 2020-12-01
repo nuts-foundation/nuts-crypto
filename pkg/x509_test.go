@@ -60,12 +60,12 @@ func (n poolCertVerifier) GetCertificates(i [][]*x509.Certificate, t time.Time, 
 	panic("implement me")
 }
 
-func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error {
-	_, err := n.VerifiedChain(cert, moment)
+func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time, eku []x509.ExtKeyUsage) error {
+	_, err := n.VerifiedChain(cert, moment, eku)
 	return err
 }
 
-func (n poolCertVerifier) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
+func (n poolCertVerifier) VerifiedChain(cert *x509.Certificate, moment time.Time, _ []x509.ExtKeyUsage) ([][]*x509.Certificate, error) {
 	if n.pool == nil {
 		return nil, nil
 	}
@@ -154,6 +154,7 @@ func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
 			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
 		})
 		t.Run("verify extended key usage", func(t *testing.T) {
+			println(cert.CertificateToPEM(certificate))
 			assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}, certificate.ExtKeyUsage)
 		})
 	})

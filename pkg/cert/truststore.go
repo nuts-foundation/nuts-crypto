@@ -16,10 +16,12 @@ import (
 
 type Verifier interface {
 	// Verify verifies the given certificate. The validity of the certificate is checked against the given moment in time.
-	Verify(*x509.Certificate, time.Time) error
+	// for the ExtKeyUsage, x509.ExtKeyUsageAny can be used to match any.
+	Verify(*x509.Certificate, time.Time, []x509.ExtKeyUsage) error
 	// VerifiedChain verifies the certificate against the truststore and returns the chain of trust as result
 	// multiple chains can apply but this should only happen when the VendorCA was renewed (overlapping certs)
-	VerifiedChain(*x509.Certificate, time.Time) ([][]*x509.Certificate, error)
+	// for the ExtKeyUsage, x509.ExtKeyUsageAny can be used to match any.
+	VerifiedChain(*x509.Certificate, time.Time, []x509.ExtKeyUsage) ([][]*x509.Certificate, error)
 }
 
 type TrustStore interface {
@@ -220,15 +222,13 @@ func exists(file string) (bool, error) {
 	return !info.IsDir(), nil
 }
 
-func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time) error {
-	// todo pass ExtKeyUsage?
-	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}})
+func (m fileTrustStore) Verify(cert *x509.Certificate, moment time.Time, keyUsages []x509.ExtKeyUsage) error {
+	_, err := cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: keyUsages})
 	return err
 }
 
-func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
-	// todo pass ExtKeyUsage?
-	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}})
+func (m fileTrustStore) VerifiedChain(cert *x509.Certificate, moment time.Time, keyUsages []x509.ExtKeyUsage) ([][]*x509.Certificate, error) {
+	return cert.Verify(x509.VerifyOptions{Roots: m.rootPool, Intermediates: m.intermediatePool, CurrentTime: moment, KeyUsages: keyUsages})
 }
 
 func findBlocksInPEM(data []byte, blockType string) ([]*pem.Block, error) {
