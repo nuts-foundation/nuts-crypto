@@ -130,7 +130,7 @@ func (client *Crypto) StoreVendorCACertificate(certificate *x509.Certificate) er
 			}
 		}
 	}
-	if found != 2 {
+	if found != len(expectedEKU) {
 		return fmt.Errorf("certificate does not define ExtKeyUsage: ClientAuth, ServerAuth")
 	}
 	return client.Storage.SaveCertificate(key, certificate.Raw)
