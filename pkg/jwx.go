@@ -160,7 +160,7 @@ func (client *Crypto) VerifyJWS(signature []byte, signingTime time.Time, certVer
 		return nil, err
 	}
 	// Check certificate is trusted
-	if err := certVerifier.Verify(signingCert, signingTime); err != nil {
+	if err := certVerifier.Verify(signingCert, signingTime, []x509.ExtKeyUsage{x509.ExtKeyUsageAny}); err != nil {
 		return nil, errors2.Wrap(err, ErrCertificateNotTrusted.Error())
 	}
 	// Check if the KeyUsage of the certificate is applicable for signing

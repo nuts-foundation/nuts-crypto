@@ -108,14 +108,30 @@ func (client *Crypto) StoreVendorCACertificate(certificate *x509.Certificate) er
 	}
 	identity := core.NutsConfig().VendorID()
 	log.Logger().Infof("Storing CA certificate for: %s", identity)
+
 	key := types.KeyForEntity(types.LegalEntity{URI: identity.String()})
 	if !client.Storage.PrivateKeyExists(key) {
 		return fmt.Errorf("private key not present for key: %s", key)
 	}
+
 	if publicKey, err := client.Storage.GetPublicKey(key); err != nil {
 		return err
 	} else if !reflect.DeepEqual(publicKey, certificate.PublicKey) {
 		return fmt.Errorf("public key in certificate does not match stored private key (key: %s)", key)
+	}
+
+	// check ExtKeyUsage
+	expectedEKU := []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}
+	found := 0
+	for _, exp := range expectedEKU {
+		for _, eku := range certificate.ExtKeyUsage {
+			if exp == eku {
+				found++
+			}
+		}
+	}
+	if found != len(expectedEKU) {
+		return fmt.Errorf("certificate does not define ExtKeyUsage: ClientAuth, ServerAuth")
 	}
 	return client.Storage.SaveCertificate(key, certificate.Raw)
 }
@@ -143,6 +159,7 @@ func (client *Crypto) SelfSignVendorCACertificate(name string) (*x509.Certificat
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(0, 0, vendorCACertificateDaysValid),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		ExtraExtensions:       csr.Extensions,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

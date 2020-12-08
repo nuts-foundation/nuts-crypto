@@ -167,14 +167,19 @@ func Test_fileTrustStore_AddCertificate(t *testing.T) {
 }
 
 func Test_fileTrustStore_Verify(t *testing.T) {
-	t.Run("ok - valid", func(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
+		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Now(), []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
 		assert.NoError(t, err)
 	})
-	t.Run("ok - not valid", func(t *testing.T) {
+	t.Run("not valid - different ExtKeyUsage", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
+		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Now(), []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection})
+		assert.Error(t, err)
+	})
+	t.Run("not valid at beginning of time", func(t *testing.T) {
+		trustStore, _ := NewTrustStore("../../test/truststore.pem")
+		err := trustStore.Verify((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0), []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
 		assert.Error(t, err)
 	})
 }
@@ -182,14 +187,14 @@ func Test_fileTrustStore_Verify(t *testing.T) {
 func Test_fileTrustStore_VerifiedChain(t *testing.T) {
 	t.Run("ok - valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Now())
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Now(), []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
 		assert.NoError(t, err)
 		assert.Len(t, chain, 1)
 		assert.Len(t, chain[0], 1)
 	})
 	t.Run("ok - not valid", func(t *testing.T) {
 		trustStore, _ := NewTrustStore("../../test/truststore.pem")
-		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0))
+		chain, err := trustStore.VerifiedChain((trustStore.(*fileTrustStore)).allCerts[0], time.Unix(2000, 0), []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
 		assert.Error(t, err)
 		assert.Nil(t, chain)
 	})

@@ -60,12 +60,12 @@ func (n poolCertVerifier) GetCertificates(i [][]*x509.Certificate, t time.Time, 
 	panic("implement me")
 }
 
-func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time) error {
-	_, err := n.VerifiedChain(cert, moment)
+func (n poolCertVerifier) Verify(cert *x509.Certificate, moment time.Time, eku []x509.ExtKeyUsage) error {
+	_, err := n.VerifiedChain(cert, moment, eku)
 	return err
 }
 
-func (n poolCertVerifier) VerifiedChain(cert *x509.Certificate, moment time.Time) ([][]*x509.Certificate, error) {
+func (n poolCertVerifier) VerifiedChain(cert *x509.Certificate, moment time.Time, _ []x509.ExtKeyUsage) ([][]*x509.Certificate, error) {
 	if n.pool == nil {
 		return nil, nil
 	}
@@ -153,20 +153,31 @@ func TestCrypto_SelfSignVendorCACertificate(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, "healthcare", strings.TrimSpace(string(extension.Value)))
 		})
+		t.Run("verify extended key usage", func(t *testing.T) {
+			println(cert.CertificateToPEM(certificate))
+			assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}, certificate.ExtKeyUsage)
+		})
 	})
 }
 
 func TestCrypto_StoreVendorCACertificate(t *testing.T) {
 	client := createCrypto(t)
 	createCrypto(t)
-
-	t.Run("ok - private key exists", func(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		client.GenerateKeyPair(key, false)
+		privateKey, _ := client.GetPrivateKey(key)
+		certificateAsBytes := test.GenerateCertificateCA(time.Now(), 1, privateKey)
+		certificate, _ := x509.ParseCertificate(certificateAsBytes)
+		err := client.StoreVendorCACertificate(certificate)
+		assert.NoError(t, err)
+	})
+	t.Run("error - missing ExtKeyUsage", func(t *testing.T) {
 		client.GenerateKeyPair(key, false)
 		privateKey, _ := client.GetPrivateKey(key)
 		certificateAsBytes := test.GenerateCertificate(time.Now(), 1, privateKey)
 		certificate, _ := x509.ParseCertificate(certificateAsBytes)
 		err := client.StoreVendorCACertificate(certificate)
-		assert.NoError(t, err)
+		assert.EqualError(t, err, "certificate does not define ExtKeyUsage: ClientAuth, ServerAuth")
 	})
 	t.Run("error - private key does not exist", func(t *testing.T) {
 		client := createCrypto(t)
