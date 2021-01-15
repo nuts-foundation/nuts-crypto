@@ -7,7 +7,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.4.4
 	github.com/labstack/echo/v4 v4.1.17
-	github.com/lestrrat-go/jwx v1.0.7
+	github.com/lestrrat-go/jwx v1.0.8
 	github.com/magiconair/properties v1.8.4
 	github.com/nuts-foundation/nuts-go-core v0.16.0
 	github.com/nuts-foundation/nuts-go-test v0.16.0
