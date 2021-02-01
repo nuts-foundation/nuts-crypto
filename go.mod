@@ -7,7 +7,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.4.4
 	github.com/labstack/echo/v4 v4.1.17
-	github.com/lestrrat-go/jwx v1.0.7
+	github.com/lestrrat-go/jwx v1.1.0
 	github.com/magiconair/properties v1.8.4
 	github.com/nuts-foundation/nuts-go-core v0.16.0
 	github.com/nuts-foundation/nuts-go-test v0.16.0
@@ -18,6 +18,4 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
-	golang.org/x/net v0.0.0-20200927032502-5d4f70055728 // indirect
-	golang.org/x/sys v0.0.0-20200928205150-006507a75852 // indirect
 )
