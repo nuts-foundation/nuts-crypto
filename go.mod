@@ -6,7 +6,7 @@ require (
 	github.com/deepmap/oapi-codegen v1.4.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/mock v1.4.4
-	github.com/labstack/echo/v4 v4.1.17
+	github.com/labstack/echo/v4 v4.2.0
 	github.com/lestrrat-go/jwx v1.0.7
 	github.com/magiconair/properties v1.8.4
 	github.com/nuts-foundation/nuts-go-core v0.16.0
